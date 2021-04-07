@@ -1,1 +1,4 @@
-´make html´
+
+Build documentation:
+
+`make html`
