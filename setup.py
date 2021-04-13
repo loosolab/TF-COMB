@@ -2,8 +2,6 @@ import os
 import sys
 import re
 from setuptools import setup, Extension, dist, find_packages
-from Cython.Distutils import build_ext
-cmdclass = {'build_ext': build_ext}
 
 #Test if numpy is installed
 try:
@@ -12,6 +10,25 @@ except:
 	#Else, fetch numpy if needed
 	dist.Distribution().fetch_build_eggs(['numpy'])
 	import numpy as np
+
+#Add cython modules depending on the availability of cython
+cmdclass = {}
+try:
+	from Cython.Distutils import build_ext
+	cmdclass = {'build_ext': build_ext}
+except ImportError:
+	use_cython = False
+else:
+	use_cython = True
+
+#To compile or not to compile
+if use_cython:
+	ext_modules = [Extension("tfcomb.counting", ["tfcomb/counting.pyx"], include_dirs=[".", np.get_include()])]
+else:
+	if os.path.exists("tfcomb/counting.c"):
+		ext_modules = [Extension("tfcomb.counting", ["tfcomb/counting.pyx"], include_dirs=[".", np.get_include()])]
+	else: #Only happens when installing directly from source
+		sys.exit("Cython is needed to compile TF-comb.")
 
 #Path of setup file to establish version
 setupdir = os.path.abspath(os.path.dirname(__file__))
@@ -24,7 +41,6 @@ def find_version(init_file):
 	else:
 		raise RuntimeError("Unable to find version string.")
 
-ext_modules = [Extension("tfcomb.counting", ["tfcomb/counting.pyx"], include_dirs=[np.get_include()])]
 
 #Readme from git
 def readme():
@@ -41,9 +57,6 @@ setup(name='TF-comb',
 		author_email='mette.bentsen@mpi-bn.mpg.de',
 		license='MIT',
 		packages=find_packages(),
-		entry_points={
-			'console_scripts': ['TF-comb=tfcomb.cli:main']
-		},
 		ext_modules=ext_modules,
 		cmdclass=cmdclass,
 		setup_requires=["numpy"],
@@ -53,7 +66,6 @@ setup(name='TF-comb',
 			'pysam',
 			'pybedtools',
 			'matplotlib>=2',
-			#'scikit-learn',
 			'pandas',
 			'tobias',
 			'networkx',
