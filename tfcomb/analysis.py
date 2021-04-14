@@ -3,6 +3,10 @@ from __future__ import print_function
 import os
 import pkg_resources
 import pandas as pd
+import networkx as nx
+import itertools
+
+import community as community_louvain
 
 #GO-term analysis
 from goatools.base import download_ncbi_associations
@@ -126,16 +130,171 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 
 	return(table)
 
+#------------------------ Directionality analysis ---------------------------#
+
+
+def directionality_analysis():
+	""" 
+	
+	1. TF1-TF2: |TF1+>    |TF2+>   =   <TF2-|   <TF1-|
+	2. TF2-TF1: |TF2+>    |TF1+>   =   <TF1-|   <TF2-|
+	3. against: |TF1+>    <TF2-|   =   |TF2+>   <TF1-|
+	4. away:    <TF1-|    |TF2+>   =   <TF2-|   |TF1+>
+	
+	"""
+
+	#4 different scenarios
+	table[["TF1_name", "TF1_strand"]] = table["TF1"].str.split("(", expand=True)
+	table["TF1_strand"] = table["TF1_strand"].str.replace(")", "")
+
+	table[["TF2_name", "TF2_strand"]] = table["TF2"].str.split("(", expand=True)
+	table["TF2_strand"] = table["TF2_strand"].str.replace(")", "")
+
+
+	#Convert counts to dictionary:
+	keys = table[["TF1_name", "TF1_strand","TF2_name", "TF2_strand"]].apply(tuple, axis=1) 
+	values = table[["TF1_TF2_count","TF1_count","TF2_count"]].apply(np.array, axis=1) 
+	pair_dict = dict(zip(keys, values))
+
+	TFs = set(table["TF1_name"].tolist() + table["TF2_name"].tolist())
+
+	for TF1 in TFs:
+		for TF2 in TFs:
+			for TF1_strand in ["+","-"]:
+				for TF2_strand in ["+","-"]:
+					key = (TF1, TF1_strand, TF2, TF2_strand)
+					if not key in pair_dict:
+						pair_dict[key] = np.array([0,0,0])
+
+	null = np.array([0,0,0])
+	lines = []
+	for pair in itertools.combinations(TFs, 2):
+		
+		TF1, TF2 = pair
+		
+		#Scenario 1
+		keys = [(TF1, "+", TF2, "+"), (TF2, "-", TF1, "-")] 
+		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
+		sce1 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
+		sce1 = market_basket(sce1)
+		
+		#Scenario 2
+		keys = [(TF2, "+", TF1, "+"), (TF1, "-", TF2, "-")]
+		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
+		sce2 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
+		sce2 = market_basket(sce2)
+		
+		#Scenario 3
+		keys = [(TF1, "+", TF2, "-"), (TF2, "+", TF1, "-")]
+		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
+		sce3 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
+		sce3 = market_basket(sce3)
+		
+		#Scenario 4
+		keys = [(TF1, "-", TF2, "+"), (TF2, "-", TF1, "+")]
+		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
+		sce4 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
+		sce4 = market_basket(sce4)
+		
+		## Calculate variance between lifts
+		lifts = [series["lift"] for series in [sce1, sce2, sce3, sce4]]
+		total = sum([series["TF1_TF2_count"] for series in [sce1, sce2, sce3, sce4]])
+		
+		line = [TF1, TF2] + lifts + [total]
+		lines.append(line)
+
+	frame = pd.DataFrame(lines)
+	frame.fillna(0, inplace=True)
 
 
 #----------------------------- Network analysis -----------------------------#
 
+#tfcomb.analysis.build_network(edges_table) #, node1=node1, node2=node2)
+#edges_to_network()
+
+def is_symmetric(a, rtol=1e-05, atol=1e-08):
+    #https://stackoverflow.com/a/42913743
+    return np.allclose(a, a.T, rtol=rtol, atol=atol)
+
+
+def build_network(table, weight="cosine", multi=True):
+    """ 
+    Table is the .table from .market_basket()
+    
+    multi : bool
+        Allow multiple edges between two vertices. If false, 
+    """
+    
+    table = table.copy()
+    
+    #Find out if table is undirected or directed in terms of weight
+    pivot = pd.pivot_table(table, values=weight, index="TF1", columns="TF2")
+    matrix = np.nan_to_num(pivot.to_numpy())
+    symmetric = is_symmetric(matrix) #if table is symmetric, the network is undirected
+    
+    ###### Setup node attributes
+    attribute_columns = [col for col in table.columns if col not in ["TF1", "TF2"]]
+    
+    node1_attributes = ["TF1_count", "TF1_support"]
+    node2_attributes = ["TF2_count", "TF2_support"]
+    node_attributes = node1_attributes + node2_attributes
+    
+    TF1_table = table[["TF1"] + node1_attributes].drop_duplicates()
+    TF1_table.set_index("TF1", inplace=True)
+    TF2_table = table[["TF2"] + node2_attributes].drop_duplicates()
+    TF2_table.set_index("TF2", inplace=True)
+    
+    node_table = pd.concat([TF1_table, TF2_table], axis=1)
+    node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
+    
+    ######## Setup edges with attributes
+    
+    #Remove duplicated TF1-TF2 / TF2-TF1 pairs if matrix is symmetric
+    if symmetric == True:
+        TFs = list(set(table["TF1"]))
+        unique_pairs = list(itertools.combinations(TFs, 2))
+        table.set_index(["TF1", "TF2"], inplace=True)
+        table = table.loc[unique_pairs]
+        table.reset_index(inplace=True)
+    
+    edge_attributes = ["TF1_TF2_count", "TF1_TF2_support", "confidence", "lift", "cosine", "jaccard"]
+    edges = [(row["TF1"], row["TF2"], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
+    for edge in edges:
+        edge[-1]["weight"] = edge[-1][weight]
+    
+    ######## Setup Graph ########
+    if symmetric == True:
+        G = nx.Graph()
+        G.add_edges_from(edges)
+    else:       
+        G = nx.MultiDiGraph()
+        G.add_edges_from(edges)
+    
+    #Add node attributes
+    nx.set_node_attributes(G, node_attribute_dict)
+
+    return(G)
+
+import community as community_louvain
+
+
+def get_partitions(network):
+	"""
+
+	Parameters
+	----------
+	network
 
 
 
+	"""
 
+	partition_dict = community_louvain.best_partition(network)
 
+	#Add partition information to each node
+	nx.set_node_attributes(G, partition_dict)
 
+	#return(partition)
 
 
 

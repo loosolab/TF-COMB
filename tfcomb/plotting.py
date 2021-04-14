@@ -38,7 +38,7 @@ def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_su
 	return(ax)
 
 
-def heatmap(edges_table, columns="TF1", rows="TF2", color_by="lift", figsize=(8,8)):
+def heatmap(edges_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(8,8)):
 	"""
 	"""
 
@@ -119,46 +119,9 @@ def _plot_condition_heatmap(edges_table):
 	pass
 
 
-#setup network
-def _build_network(table, node1="TF1", node2="TF2", weight=None):
-	"""
+def network(network, color_edge_by=""):
+	""" """
 
-	"""
-
-	#Check that node1, node2 and weight are present
-	chosen_columns = [col for col in [node1, node2, weight] if col != None]
-	available_columns = table.columns
-	for col in chosen_columns:
-		if col not in available_columns:
-			raise ValueError("{0} is not a column in the given table. Available columns are: {1}".format(col, available_columns))
-
-	node1_list = set(table[node1])
-	node2_list = set(table[node2])
-
-	#Select edge with highest weight
-
-	#Depending on directional
-	edge_attributes = set(table.columns) - set([node1, node2])
-	#print(edge_attributes)
-
-	#Setup edges list
-	edges = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
-
-	#Set weight
-	if weight != None:
-		for i in range(len(edges)):
-			edges[i][2]["weight"] = edges[i][2][weight] #create key with "weight"
-
-	#Add node attributes
-
-	#Create directed multigraph
-	MG = nx.MultiDiGraph()
-	MG.add_edges_from(edges)
-
-	#Create undirected graph
-	#self.nx_undirected = []
-
-	return(MG)
 
 
 def circos(edges_table, node1="TF1", node2="TF2",
@@ -167,7 +130,7 @@ def circos(edges_table, node1="TF1", node2="TF2",
 
 	"""
 	
-	G = _build_network(edges_table, node1=node1, node2=node2)
+	G = tfcomb.analysis.build_network(edges_table) #, node1=node1, node2=node2)
 
 
 	#edge_width = edges_table[size_edge_by]
