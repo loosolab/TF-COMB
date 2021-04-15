@@ -12,8 +12,10 @@
 #
 import os
 import sys
+import glob
+import json
 
-#sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../examples'))
 sys.path.insert(0, os.path.abspath('../tfcomb'))
 
 
@@ -36,10 +38,13 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
               'sphinx.ext.napoleon',
               'sphinx.ext.viewcode',
-              'sphinx.ext.intersphinx'
+              'sphinx.ext.intersphinx',
+              "nbsphinx",
+              "nbsphinx_link",
               ]
 
 napoleon_numpy_docstring = True
+autodoc_member_order = 'bysource'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -48,6 +53,23 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+
+# -- Create nblink files  -------------------------------------------------
+
+#Remove all previous .nblink files
+links = glob.glob("examples/*.nblink")
+for l in links:
+    os.remove(l) 
+
+#Create nblinks for current notebooks
+notebooks = glob.glob("../examples/*.ipynb")
+for f in notebooks:
+    f_name = os.path.basename(f).replace(".ipynb", "")
+
+    d = {"path": "../" + f} 
+    with open("examples/" + f_name + ".nblink", 'w') as fp:
+        json.dump(d, fp)
 
 
 # -- Options for HTML output -------------------------------------------------
