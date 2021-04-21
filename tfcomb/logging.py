@@ -38,36 +38,8 @@ class TFcombLogger(logging.RootLogger):
 	def log(self, level, msg):
 		super().log(level, msg)
 
-	def error(self, msg):	#level 0
-		return(self.log(ERROR, msg))
-
-	def info(self, msg):
-		return(self.log(INFO, msg))
-
-	#def debug(self, msg):	
-
-"""
-	def _set_log_file(settings):
-		file = settings.logfile
-		name = settings.logpath
-		root = settings._root_logger
-		h = logging.StreamHandler(file) if name is None else logging.FileHandler(name)
-		h.setFormatter(_LogFormatter())
-		h.setLevel(self.level)
-		if len(root.handlers) == 1:
-			root.removeHandler(root.handlers[0])
-		elif len(root.handlers) > 1:
-			raise RuntimeError('Scanpy’s root logger somehow got more than one handler')
-	root.addHandler(h)
-"""
-"""
-def _set_log_level(settings, level: int):
-
-	root = settings._root_logger
-	root.setLevel(level)
-	h, = root.handlers  # may only be 1
-	h.setLevel(level)
-"""
+	def spam(self, msg):
+		return(self.log(SPAM, msg))
 
 #Formatter for log
 class _LogFormatter(logging.Formatter):

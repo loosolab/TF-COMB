@@ -3,9 +3,11 @@ from __future__ import print_function
 import os
 import pkg_resources
 import pandas as pd
-import networkx as nx
+import numpy as np
 import itertools
 
+#Network analysis
+import networkx as nx
 import community as community_louvain
 
 #GO-term analysis
@@ -26,7 +28,9 @@ DATA_PATH = pkg_resources.resource_filename("tfcomb", 'data/')
 name_to_taxid = {"human": 9606, 
 				 "mouse": 10090}
 
+
 def _fmt_field(v):
+	""" Format a object to string depending on type. For use when formatting table entries of tuple/list """
 
 	if isinstance(v, str):
 		s = v
@@ -42,7 +46,17 @@ def _fmt_field(v):
 
 def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 	"""
-	
+	Perform go_enrichment on the gene ids given
+
+	Parameters
+	-----------
+	gene_ids : list
+		A list of gene ids
+	organism : :obj:`str`, optional
+		The organism. Defaults to "human".
+	background_gene_ids : list
+		Defaults to uniprot proteins.
+
 	"""
 	
 	#verbosity 0/1/2
@@ -135,7 +149,8 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 
 def directionality_analysis():
 	""" 
-	
+	Perform directionality analysis on the TF pairs in edges table 
+
 	1. TF1-TF2: |TF1+>    |TF2+>   =   <TF2-|   <TF1-|
 	2. TF2-TF1: |TF2+>    |TF1+>   =   <TF1-|   <TF2-|
 	3. against: |TF1+>    <TF2-|   =   |TF2+>   <TF1-|
@@ -207,92 +222,105 @@ def directionality_analysis():
 	frame.fillna(0, inplace=True)
 
 
+
 #----------------------------- Network analysis -----------------------------#
 
 #tfcomb.analysis.build_network(edges_table) #, node1=node1, node2=node2)
 #edges_to_network()
 
-def is_symmetric(a, rtol=1e-05, atol=1e-08):
-    #https://stackoverflow.com/a/42913743
-    return np.allclose(a, a.T, rtol=rtol, atol=atol)
+def _is_symmetric(a, rtol=1e-05, atol=1e-08):
+	""" Utility to check if a matrix is symmetric. 
+	Source: https://stackoverflow.com/a/42913743
+	"""
+	return np.allclose(a, a.T, rtol=rtol, atol=atol)
+
 
 
 def build_network(table, weight="cosine", multi=True):
-    """ 
-    Table is the .table from .market_basket()
-    
-    multi : bool
-        Allow multiple edges between two vertices. If false, 
-    """
-    
-    table = table.copy()
-    
-    #Find out if table is undirected or directed in terms of weight
-    pivot = pd.pivot_table(table, values=weight, index="TF1", columns="TF2")
-    matrix = np.nan_to_num(pivot.to_numpy())
-    symmetric = is_symmetric(matrix) #if table is symmetric, the network is undirected
-    
-    ###### Setup node attributes
-    attribute_columns = [col for col in table.columns if col not in ["TF1", "TF2"]]
-    
-    node1_attributes = ["TF1_count", "TF1_support"]
-    node2_attributes = ["TF2_count", "TF2_support"]
-    node_attributes = node1_attributes + node2_attributes
-    
-    TF1_table = table[["TF1"] + node1_attributes].drop_duplicates()
-    TF1_table.set_index("TF1", inplace=True)
-    TF2_table = table[["TF2"] + node2_attributes].drop_duplicates()
-    TF2_table.set_index("TF2", inplace=True)
-    
-    node_table = pd.concat([TF1_table, TF2_table], axis=1)
-    node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
-    
-    ######## Setup edges with attributes
-    
-    #Remove duplicated TF1-TF2 / TF2-TF1 pairs if matrix is symmetric
-    if symmetric == True:
-        TFs = list(set(table["TF1"]))
-        unique_pairs = list(itertools.combinations(TFs, 2))
-        table.set_index(["TF1", "TF2"], inplace=True)
-        table = table.loc[unique_pairs]
-        table.reset_index(inplace=True)
-    
-    edge_attributes = ["TF1_TF2_count", "TF1_TF2_support", "confidence", "lift", "cosine", "jaccard"]
-    edges = [(row["TF1"], row["TF2"], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
-    for edge in edges:
-        edge[-1]["weight"] = edge[-1][weight]
-    
-    ######## Setup Graph ########
-    if symmetric == True:
-        G = nx.Graph()
-        G.add_edges_from(edges)
-    else:       
-        G = nx.MultiDiGraph()
-        G.add_edges_from(edges)
-    
-    #Add node attributes
-    nx.set_node_attributes(G, node_attribute_dict)
+	""" 
+	Table is the .table from .market_basket()
+	
+	multi : bool
+		Allow multiple edges between two vertices. If false, 
+	"""
+	
+	table = table.copy()
+	
+	#Find out if table is undirected or directed in terms of weight
+	pivot = pd.pivot_table(table, values=weight, index="TF1", columns="TF2")
+	matrix = np.nan_to_num(pivot.to_numpy())
+	symmetric = _is_symmetric(matrix) #if table is symmetric, the network is undirected
+	
+	######### Setup node attributes #########
+	attribute_columns = [col for col in table.columns if col not in ["TF1", "TF2"]]
+	
+	node1_attributes = ["TF1_count", "TF1_support"]
+	node2_attributes = ["TF2_count", "TF2_support"]
+	node_attributes = node1_attributes + node2_attributes
+	
+	TF1_table = table[["TF1"] + node1_attributes].drop_duplicates()
+	TF1_table.set_index("TF1", inplace=True)
+	TF2_table = table[["TF2"] + node2_attributes].drop_duplicates()
+	TF2_table.set_index("TF2", inplace=True)
+	
+	node_table = pd.concat([TF1_table, TF2_table], axis=1)
+	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
+	
+	######## Setup edge attributes #######
+	#Remove duplicated TF1-TF2 / TF2-TF1 pairs if matrix is symmetric
+	if len(table) > 1 and symmetric == True: #table is always symmetric if there is only one edge; but this is not an issue
+		TFs = list(set(table["TF1"]))
+		unique_pairs = list(itertools.combinations(TFs, 2))
+		table.set_index(["TF1", "TF2"], inplace=True)
+		available_keys = list(table.index)
+		unique_pairs = [pair for pair in unique_pairs if pair in available_keys] #only use pairs present in table
 
-    return(G)
+		table = table.loc[unique_pairs]
+		table.reset_index(inplace=True)
+	
+	edge_attributes = ["TF1_TF2_count", "TF1_TF2_support", "confidence", "lift", "cosine", "jaccard"]
+	edges = [(row["TF1"], row["TF2"], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
+	for edge in edges:
+		edge[-1]["weight"] = edge[-1][weight]
+	
+	############ Setup Graph ############
+	if symmetric == True:
+		G = nx.Graph()
+		G.add_edges_from(edges)
+	else:       
+		G = nx.MultiDiGraph()
+		G.add_edges_from(edges)
+	
+	#Add node attributes
+	nx.set_node_attributes(G, node_attribute_dict)
 
-import community as community_louvain
+	return(G)
+
+#Center-piece subgraphs
 
 
+
+#Graph partitioning 
 def get_partitions(network):
 	"""
+	Partition a network using community louvain.
 
 	Parameters
 	----------
-	network
-
-
+	network : networkx.Graph 
 
 	"""
 
+	#network must be undirected
+	#if graph.is_directed():
+    #raise TypeError("Bad graph type, use only non directed graph")
+
+
 	partition_dict = community_louvain.best_partition(network)
+	partition_dict_fmt = {key: {"partition": value} for key, value in partition_dict.items()}
 
 	#Add partition information to each node
-	nx.set_node_attributes(G, partition_dict)
+	nx.set_node_attributes(network, partition_dict_fmt)
 
 	#return(partition)
 
@@ -302,11 +330,16 @@ def get_partitions(network):
 
 def annotate_peaks(regions, gtf, config=None, copy=None):
 	"""
-	
+	Annotate regions with genes from .gtf using UROPA. 
+
+
+
 	Parameters
 	----------
-		regions : RegionList() obj
-	path to gtf file
+	regions : tobias.utils.regions.RegionList()
+		A RegionList object
+	gtf : str
+		path to gtf file
 	
 	"""
 	

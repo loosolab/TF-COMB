@@ -1201,6 +1201,16 @@ typedef npy_cdouble __pyx_t_5numpy_complex_t;
 #define __Pyx_CLEAR(r)    do { PyObject* tmp = ((PyObject*)(r)); r = NULL; __Pyx_DECREF(tmp);} while(0)
 #define __Pyx_XCLEAR(r)   do { if((r) != NULL) {PyObject* tmp = ((PyObject*)(r)); r = NULL; __Pyx_DECREF(tmp);}} while(0)
 
+/* PyObjectGetAttrStr.proto */
+#if CYTHON_USE_TYPE_SLOTS
+static CYTHON_INLINE PyObject* __Pyx_PyObject_GetAttrStr(PyObject* obj, PyObject* attr_name);
+#else
+#define __Pyx_PyObject_GetAttrStr(o,n) PyObject_GetAttr(o,n)
+#endif
+
+/* GetBuiltinName.proto */
+static PyObject *__Pyx_GetBuiltinName(PyObject *name);
+
 /* RaiseArgTupleInvalid.proto */
 static void __Pyx_RaiseArgtupleInvalid(const char* func_name, int exact,
     Py_ssize_t num_min, Py_ssize_t num_max, Py_ssize_t num_found);
@@ -1239,16 +1249,6 @@ static void __Pyx_ZeroBuffer(Py_buffer* buf);
 static CYTHON_INLINE void __Pyx_SafeReleaseBuffer(Py_buffer* info);
 static Py_ssize_t __Pyx_minusones[] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 static Py_ssize_t __Pyx_zeros[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-
-/* PyObjectGetAttrStr.proto */
-#if CYTHON_USE_TYPE_SLOTS
-static CYTHON_INLINE PyObject* __Pyx_PyObject_GetAttrStr(PyObject* obj, PyObject* attr_name);
-#else
-#define __Pyx_PyObject_GetAttrStr(o,n) PyObject_GetAttr(o,n)
-#endif
-
-/* GetBuiltinName.proto */
-static PyObject *__Pyx_GetBuiltinName(PyObject *name);
 
 /* PyDictVersioning.proto */
 #if CYTHON_USE_DICT_VERSIONS && CYTHON_USE_TYPE_SLOTS
@@ -1629,9 +1629,11 @@ extern int __pyx_module_is_main_tfcomb__counting;
 int __pyx_module_is_main_tfcomb__counting = 0;
 
 /* Implementation of 'tfcomb.counting' */
+static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_ImportError;
 static const char __pyx_k_i[] = "i";
 static const char __pyx_k_j[] = "j";
+static const char __pyx_k_k[] = "k";
 static const char __pyx_k_w[] = "w";
 static const char __pyx_k_np[] = "np";
 static const char __pyx_k_main[] = "__main__";
@@ -1639,8 +1641,10 @@ static const char __pyx_k_name[] = "__name__";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_dtype[] = "dtype";
 static const char __pyx_k_numpy[] = "numpy";
+static const char __pyx_k_range[] = "range";
 static const char __pyx_k_sites[] = "sites";
 static const char __pyx_k_zeros[] = "zeros";
+static const char __pyx_k_binary[] = "binary";
 static const char __pyx_k_import[] = "__import__";
 static const char __pyx_k_TF1_chr[] = "TF1_chr";
 static const char __pyx_k_TF1_end[] = "TF1_end";
@@ -1650,10 +1654,12 @@ static const char __pyx_k_n_names[] = "n_names";
 static const char __pyx_k_n_sites[] = "n_sites";
 static const char __pyx_k_TF1_name[] = "TF1_name";
 static const char __pyx_k_TF2_name[] = "TF2_name";
+static const char __pyx_k_distance[] = "distance";
 static const char __pyx_k_short_bp[] = "short_bp";
 static const char __pyx_k_total_bp[] = "total_bp";
 static const char __pyx_k_TF1_start[] = "TF1_start";
 static const char __pyx_k_TF2_start[] = "TF2_start";
+static const char __pyx_k_TF2_counts[] = "TF2_counts";
 static const char __pyx_k_count_dict[] = "count_dict";
 static const char __pyx_k_overlap_bp[] = "overlap_bp";
 static const char __pyx_k_stretch_bp[] = "stretch_bp";
@@ -1681,21 +1687,25 @@ static PyObject *__pyx_n_s_TF1_end;
 static PyObject *__pyx_n_s_TF1_name;
 static PyObject *__pyx_n_s_TF1_start;
 static PyObject *__pyx_n_s_TF2_chr;
+static PyObject *__pyx_n_s_TF2_counts;
 static PyObject *__pyx_n_s_TF2_end;
 static PyObject *__pyx_n_s_TF2_name;
 static PyObject *__pyx_n_s_TF2_start;
+static PyObject *__pyx_n_s_binary;
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_count_co_occurrence;
 static PyObject *__pyx_n_s_count_dict;
 static PyObject *__pyx_n_s_current_chrom;
 static PyObject *__pyx_n_s_current_end;
 static PyObject *__pyx_n_s_current_start;
+static PyObject *__pyx_n_s_distance;
 static PyObject *__pyx_n_s_dtype;
 static PyObject *__pyx_n_s_finding_assoc;
 static PyObject *__pyx_n_s_get_unique_bp;
 static PyObject *__pyx_n_s_i;
 static PyObject *__pyx_n_s_import;
 static PyObject *__pyx_n_s_j;
+static PyObject *__pyx_n_s_k;
 static PyObject *__pyx_n_s_main;
 static PyObject *__pyx_n_s_max_overlap;
 static PyObject *__pyx_n_s_n_names;
@@ -1709,6 +1719,7 @@ static PyObject *__pyx_n_s_overlap_bp;
 static PyObject *__pyx_n_s_pair_count_mat;
 static PyObject *__pyx_n_s_previous_end;
 static PyObject *__pyx_n_s_previous_start;
+static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_short_bp;
 static PyObject *__pyx_n_s_single_count_arr;
 static PyObject *__pyx_n_s_sites;
@@ -1720,7 +1731,7 @@ static PyObject *__pyx_n_s_total_bp;
 static PyObject *__pyx_n_s_valid_pair;
 static PyObject *__pyx_n_s_w;
 static PyObject *__pyx_n_s_zeros;
-static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, int __pyx_v_w, int __pyx_v_max_overlap, int __pyx_v_n_names); /* proto */
+static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, int __pyx_v_w, int __pyx_v_max_overlap, int __pyx_v_n_names, int __pyx_v_binary); /* proto */
 static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites); /* proto */
 static PyObject *__pyx_tuple_;
 static PyObject *__pyx_tuple__2;
@@ -1730,23 +1741,24 @@ static PyObject *__pyx_codeobj__4;
 static PyObject *__pyx_codeobj__6;
 /* Late includes */
 
-/* "tfcomb/counting.pyx":12
+/* "tfcomb/counting.pyx":13
  * @cython.wraparound(False) 	#dont deal with negative indices
  * @cython.nonecheck(False)
- * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000):             # <<<<<<<<<<<<<<
+ * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000, int binary = 1):             # <<<<<<<<<<<<<<
  * 
  * 	"""
  */
 
 /* Python wrapper */
 static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6tfcomb_8counting_count_co_occurrence[] = "\n\tSuperfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction \n\t\n\tParameters:\n\t------------\n\tsites : np.array\n\t\tList of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)\n\tw : int\n\t\tWindowsize\n\t\t\n\tmax_overlap (float)\n\t\tmaximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed.\n\toutput: count_dict   - Dictionary with all TFs and all occuring TF pairs with corresponding count\n\n\tReturns:\n\t-----------\n\n\n\t";
+static char __pyx_doc_6tfcomb_8counting_count_co_occurrence[] = "\n\tSuperfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction \n\t\n\tParameters:\n\t------------\n\tsites : np.array\n\t\tList of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)\n\tw : int\n\t\tWindowsize\n\t\t\n\tmax_overlap (float)\n\t\tmaximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed.\n\n\tbinary : int\n\t\t0 or 1 bool integer. If 0; counts are left raw\n\n\tReturns:\n\t-----------\n\ttuple\n\n\n\t";
 static PyMethodDef __pyx_mdef_6tfcomb_8counting_1count_co_occurrence = {"count_co_occurrence", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6tfcomb_8counting_1count_co_occurrence, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6tfcomb_8counting_count_co_occurrence};
 static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_sites = 0;
   int __pyx_v_w;
   int __pyx_v_max_overlap;
   int __pyx_v_n_names;
+  int __pyx_v_binary;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -1754,12 +1766,14 @@ static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("count_co_occurrence (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_sites,&__pyx_n_s_w,&__pyx_n_s_max_overlap,&__pyx_n_s_n_names,0};
-    PyObject* values[4] = {0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_sites,&__pyx_n_s_w,&__pyx_n_s_max_overlap,&__pyx_n_s_n_names,&__pyx_n_s_binary,0};
+    PyObject* values[5] = {0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
         CYTHON_FALLTHROUGH;
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
@@ -1780,13 +1794,13 @@ static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_w)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("count_co_occurrence", 0, 3, 4, 1); __PYX_ERR(0, 12, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("count_co_occurrence", 0, 3, 5, 1); __PYX_ERR(0, 13, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_max_overlap)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("count_co_occurrence", 0, 3, 4, 2); __PYX_ERR(0, 12, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("count_co_occurrence", 0, 3, 5, 2); __PYX_ERR(0, 13, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
@@ -1794,12 +1808,20 @@ static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx
           PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_n_names);
           if (value) { values[3] = value; kw_args--; }
         }
+        CYTHON_FALLTHROUGH;
+        case  4:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_binary);
+          if (value) { values[4] = value; kw_args--; }
+        }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "count_co_occurrence") < 0)) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "count_co_occurrence") < 0)) __PYX_ERR(0, 13, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
         CYTHON_FALLTHROUGH;
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
@@ -1810,24 +1832,29 @@ static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx
       }
     }
     __pyx_v_sites = ((PyArrayObject *)values[0]);
-    __pyx_v_w = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_w == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 12, __pyx_L3_error)
-    __pyx_v_max_overlap = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_max_overlap == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 12, __pyx_L3_error)
+    __pyx_v_w = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_w == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 13, __pyx_L3_error)
+    __pyx_v_max_overlap = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_max_overlap == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 13, __pyx_L3_error)
     if (values[3]) {
-      __pyx_v_n_names = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_n_names == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 12, __pyx_L3_error)
+      __pyx_v_n_names = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_n_names == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 13, __pyx_L3_error)
     } else {
       __pyx_v_n_names = ((int)0x3E8);
+    }
+    if (values[4]) {
+      __pyx_v_binary = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_binary == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 13, __pyx_L3_error)
+    } else {
+      __pyx_v_binary = ((int)1);
     }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("count_co_occurrence", 0, 3, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 12, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("count_co_occurrence", 0, 3, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 13, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("tfcomb.counting.count_co_occurrence", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sites), __pyx_ptype_5numpy_ndarray, 1, "sites", 0))) __PYX_ERR(0, 12, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6tfcomb_8counting_count_co_occurrence(__pyx_self, __pyx_v_sites, __pyx_v_w, __pyx_v_max_overlap, __pyx_v_n_names);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sites), __pyx_ptype_5numpy_ndarray, 1, "sites", 0))) __PYX_ERR(0, 13, __pyx_L1_error)
+  __pyx_r = __pyx_pf_6tfcomb_8counting_count_co_occurrence(__pyx_self, __pyx_v_sites, __pyx_v_w, __pyx_v_max_overlap, __pyx_v_n_names, __pyx_v_binary);
 
   /* function exit code */
   goto __pyx_L0;
@@ -1838,13 +1865,15 @@ static PyObject *__pyx_pw_6tfcomb_8counting_1count_co_occurrence(PyObject *__pyx
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, int __pyx_v_w, int __pyx_v_max_overlap, int __pyx_v_n_names) {
+static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, int __pyx_v_w, int __pyx_v_max_overlap, int __pyx_v_n_names, int __pyx_v_binary) {
   CYTHON_UNUSED PyObject *__pyx_v_count_dict = 0;
   int __pyx_v_n_sites;
+  PyArrayObject *__pyx_v_TF2_counts = 0;
   PyArrayObject *__pyx_v_single_count_arr = 0;
   PyArrayObject *__pyx_v_pair_count_mat = 0;
   int __pyx_v_i;
   int __pyx_v_j;
+  int __pyx_v_k;
   int __pyx_v_finding_assoc;
   int __pyx_v_TF1_chr;
   int __pyx_v_TF1_name;
@@ -1857,6 +1886,8 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   int __pyx_v_valid_pair;
   int __pyx_v_TF2_chr;
   int __pyx_v_TF2_name;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_TF2_counts;
+  __Pyx_Buffer __pyx_pybuffer_TF2_counts;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_pair_count_mat;
   __Pyx_Buffer __pyx_pybuffer_pair_count_mat;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_single_count_arr;
@@ -1872,17 +1903,23 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   PyObject *__pyx_t_5 = NULL;
   PyArrayObject *__pyx_t_6 = NULL;
   PyArrayObject *__pyx_t_7 = NULL;
-  int __pyx_t_8;
-  Py_ssize_t __pyx_t_9;
+  PyArrayObject *__pyx_t_8 = NULL;
+  int __pyx_t_9;
   Py_ssize_t __pyx_t_10;
-  int __pyx_t_11;
+  Py_ssize_t __pyx_t_11;
   int __pyx_t_12;
   int __pyx_t_13;
   int __pyx_t_14;
+  int __pyx_t_15;
+  Py_ssize_t __pyx_t_16;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("count_co_occurrence", 0);
+  __pyx_pybuffer_TF2_counts.pybuffer.buf = NULL;
+  __pyx_pybuffer_TF2_counts.refcount = 0;
+  __pyx_pybuffernd_TF2_counts.data = NULL;
+  __pyx_pybuffernd_TF2_counts.rcbuffer = &__pyx_pybuffer_TF2_counts;
   __pyx_pybuffer_single_count_arr.pybuffer.buf = NULL;
   __pyx_pybuffer_single_count_arr.refcount = 0;
   __pyx_pybuffernd_single_count_arr.data = NULL;
@@ -1897,152 +1934,193 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   __pyx_pybuffernd_sites.rcbuffer = &__pyx_pybuffer_sites;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sites.rcbuffer->pybuffer, (PyObject*)__pyx_v_sites, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 12, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sites.rcbuffer->pybuffer, (PyObject*)__pyx_v_sites, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 13, __pyx_L1_error)
   }
   __pyx_pybuffernd_sites.diminfo[0].strides = __pyx_pybuffernd_sites.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_sites.diminfo[0].shape = __pyx_pybuffernd_sites.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_sites.diminfo[1].strides = __pyx_pybuffernd_sites.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_sites.diminfo[1].shape = __pyx_pybuffernd_sites.rcbuffer->pybuffer.shape[1];
 
-  /* "tfcomb/counting.pyx":34
+  /* "tfcomb/counting.pyx":38
  * 	"""
  * 
  * 	cdef dict count_dict = {} #for saving co-occurrences             # <<<<<<<<<<<<<<
  * 	cdef int n_sites = len(sites)
  * 
  */
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 38, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_count_dict = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "tfcomb/counting.pyx":35
+  /* "tfcomb/counting.pyx":39
  * 
  * 	cdef dict count_dict = {} #for saving co-occurrences
  * 	cdef int n_sites = len(sites)             # <<<<<<<<<<<<<<
  * 
  * 	#Create n x n count matrix
  */
-  __pyx_t_2 = PyObject_Length(((PyObject *)__pyx_v_sites)); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 35, __pyx_L1_error)
+  __pyx_t_2 = PyObject_Length(((PyObject *)__pyx_v_sites)); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 39, __pyx_L1_error)
   __pyx_v_n_sites = __pyx_t_2;
 
-  /* "tfcomb/counting.pyx":38
+  /* "tfcomb/counting.pyx":42
  * 
  * 	#Create n x n count matrix
- * 	cdef np.ndarray[np.int64_t, ndim=1] single_count_arr = np.zeros(n_names, dtype=int)             # <<<<<<<<<<<<<<
+ * 	cdef np.ndarray[np.int64_t, ndim=1] TF2_counts = np.zeros(n_names, dtype=int) #for counting TF2 during run             # <<<<<<<<<<<<<<
+ * 	cdef np.ndarray[np.int64_t, ndim=1] single_count_arr = np.zeros(n_names, dtype=int)
  * 	cdef np.ndarray[np.int64_t, ndim=2] pair_count_mat = np.zeros((n_names, n_names), dtype=int)
- * 
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 38, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 38, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 38, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 38, __pyx_L1_error)
+  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 38, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 38, __pyx_L1_error)
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_4, __pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 38, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 42, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_4, __pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 38, __pyx_L1_error)
+  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 42, __pyx_L1_error)
   __pyx_t_6 = ((PyArrayObject *)__pyx_t_5);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer, (PyObject*)__pyx_t_6, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 1, 0, __pyx_stack) == -1)) {
-      __pyx_v_single_count_arr = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 38, __pyx_L1_error)
-    } else {__pyx_pybuffernd_single_count_arr.diminfo[0].strides = __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_single_count_arr.diminfo[0].shape = __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.shape[0];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer, (PyObject*)__pyx_t_6, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 1, 0, __pyx_stack) == -1)) {
+      __pyx_v_TF2_counts = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 42, __pyx_L1_error)
+    } else {__pyx_pybuffernd_TF2_counts.diminfo[0].strides = __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_TF2_counts.diminfo[0].shape = __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_t_6 = 0;
-  __pyx_v_single_count_arr = ((PyArrayObject *)__pyx_t_5);
+  __pyx_v_TF2_counts = ((PyArrayObject *)__pyx_t_5);
   __pyx_t_5 = 0;
 
-  /* "tfcomb/counting.pyx":39
+  /* "tfcomb/counting.pyx":43
  * 	#Create n x n count matrix
+ * 	cdef np.ndarray[np.int64_t, ndim=1] TF2_counts = np.zeros(n_names, dtype=int) #for counting TF2 during run
+ * 	cdef np.ndarray[np.int64_t, ndim=1] single_count_arr = np.zeros(n_names, dtype=int)             # <<<<<<<<<<<<<<
+ * 	cdef np.ndarray[np.int64_t, ndim=2] pair_count_mat = np.zeros((n_names, n_names), dtype=int)
+ * 
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_5);
+  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_5);
+  __pyx_t_5 = 0;
+  __pyx_t_5 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  if (PyDict_SetItem(__pyx_t_5, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 43, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_4, __pyx_t_5); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 43, __pyx_L1_error)
+  __pyx_t_7 = ((PyArrayObject *)__pyx_t_3);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer, (PyObject*)__pyx_t_7, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 1, 0, __pyx_stack) == -1)) {
+      __pyx_v_single_count_arr = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 43, __pyx_L1_error)
+    } else {__pyx_pybuffernd_single_count_arr.diminfo[0].strides = __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_single_count_arr.diminfo[0].shape = __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.shape[0];
+    }
+  }
+  __pyx_t_7 = 0;
+  __pyx_v_single_count_arr = ((PyArrayObject *)__pyx_t_3);
+  __pyx_t_3 = 0;
+
+  /* "tfcomb/counting.pyx":44
+ * 	cdef np.ndarray[np.int64_t, ndim=1] TF2_counts = np.zeros(n_names, dtype=int) #for counting TF2 during run
  * 	cdef np.ndarray[np.int64_t, ndim=1] single_count_arr = np.zeros(n_names, dtype=int)
  * 	cdef np.ndarray[np.int64_t, ndim=2] pair_count_mat = np.zeros((n_names, n_names), dtype=int)             # <<<<<<<<<<<<<<
  * 
  * 	cdef int i = 0
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 39, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 39, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 39, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 39, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_3 = PyTuple_New(2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 39, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 44, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GIVEREF(__pyx_t_5);
-  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_5);
-  __Pyx_GIVEREF(__pyx_t_4);
-  PyTuple_SET_ITEM(__pyx_t_3, 1, __pyx_t_4);
-  __pyx_t_5 = 0;
-  __pyx_t_4 = 0;
-  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 39, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_4);
-  __Pyx_GIVEREF(__pyx_t_3);
-  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_3);
-  __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 39, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 39, __pyx_L1_error)
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_4, __pyx_t_3); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 39, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 44, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (!(likely(((__pyx_t_5) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_5, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 39, __pyx_L1_error)
-  __pyx_t_7 = ((PyArrayObject *)__pyx_t_5);
+  __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_n_names); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GIVEREF(__pyx_t_3);
+  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_t_4);
+  __pyx_t_3 = 0;
+  __pyx_t_4 = 0;
+  __pyx_t_4 = PyTuple_New(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_1);
+  __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 44, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_5, __pyx_t_4, __pyx_t_1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 44, __pyx_L1_error)
+  __pyx_t_8 = ((PyArrayObject *)__pyx_t_3);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer, (PyObject*)__pyx_t_7, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack) == -1)) {
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack) == -1)) {
       __pyx_v_pair_count_mat = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 39, __pyx_L1_error)
+      __PYX_ERR(0, 44, __pyx_L1_error)
     } else {__pyx_pybuffernd_pair_count_mat.diminfo[0].strides = __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_pair_count_mat.diminfo[0].shape = __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_pair_count_mat.diminfo[1].strides = __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_pair_count_mat.diminfo[1].shape = __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.shape[1];
     }
   }
-  __pyx_t_7 = 0;
-  __pyx_v_pair_count_mat = ((PyArrayObject *)__pyx_t_5);
-  __pyx_t_5 = 0;
+  __pyx_t_8 = 0;
+  __pyx_v_pair_count_mat = ((PyArrayObject *)__pyx_t_3);
+  __pyx_t_3 = 0;
 
-  /* "tfcomb/counting.pyx":41
+  /* "tfcomb/counting.pyx":46
  * 	cdef np.ndarray[np.int64_t, ndim=2] pair_count_mat = np.zeros((n_names, n_names), dtype=int)
  * 
  * 	cdef int i = 0             # <<<<<<<<<<<<<<
  * 	cdef int j = 0
- * 	cdef bint finding_assoc = True
+ * 	cdef int k
  */
   __pyx_v_i = 0;
 
-  /* "tfcomb/counting.pyx":42
+  /* "tfcomb/counting.pyx":47
  * 
  * 	cdef int i = 0
  * 	cdef int j = 0             # <<<<<<<<<<<<<<
+ * 	cdef int k
  * 	cdef bint finding_assoc = True
- * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end,
  */
   __pyx_v_j = 0;
 
-  /* "tfcomb/counting.pyx":43
- * 	cdef int i = 0
+  /* "tfcomb/counting.pyx":49
  * 	cdef int j = 0
+ * 	cdef int k
  * 	cdef bint finding_assoc = True             # <<<<<<<<<<<<<<
  * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end,
  * 	cdef int TF2_start, TF2_end, overlap_bp, short_bp, valid_pair
  */
   __pyx_v_finding_assoc = 1;
 
-  /* "tfcomb/counting.pyx":49
+  /* "tfcomb/counting.pyx":56
  * 
  * 	#Loop over all sites
  * 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites             # <<<<<<<<<<<<<<
@@ -2050,64 +2128,87 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 		#Get current TF information
  */
   while (1) {
-    __pyx_t_8 = ((__pyx_v_i < __pyx_v_n_sites) != 0);
-    if (!__pyx_t_8) break;
+    __pyx_t_9 = ((__pyx_v_i < __pyx_v_n_sites) != 0);
+    if (!__pyx_t_9) break;
 
-    /* "tfcomb/counting.pyx":52
+    /* "tfcomb/counting.pyx":59
  * 
  * 		#Get current TF information
  * 		TF1_chr = sites[i,0]             # <<<<<<<<<<<<<<
  * 		TF1_start = sites[i,1]
  * 		TF1_end = sites[i,2]
  */
-    __pyx_t_9 = __pyx_v_i;
-    __pyx_t_10 = 0;
-    __pyx_v_TF1_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_10 = __pyx_v_i;
+    __pyx_t_11 = 0;
+    __pyx_v_TF1_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":53
+    /* "tfcomb/counting.pyx":60
  * 		#Get current TF information
  * 		TF1_chr = sites[i,0]
  * 		TF1_start = sites[i,1]             # <<<<<<<<<<<<<<
  * 		TF1_end = sites[i,2]
  * 		TF1_name = sites[i,3]
  */
-    __pyx_t_10 = __pyx_v_i;
-    __pyx_t_9 = 1;
-    __pyx_v_TF1_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_11 = __pyx_v_i;
+    __pyx_t_10 = 1;
+    __pyx_v_TF1_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":54
+    /* "tfcomb/counting.pyx":61
  * 		TF1_chr = sites[i,0]
  * 		TF1_start = sites[i,1]
  * 		TF1_end = sites[i,2]             # <<<<<<<<<<<<<<
  * 		TF1_name = sites[i,3]
  * 
  */
-    __pyx_t_9 = __pyx_v_i;
-    __pyx_t_10 = 2;
-    __pyx_v_TF1_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_10 = __pyx_v_i;
+    __pyx_t_11 = 2;
+    __pyx_v_TF1_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":55
+    /* "tfcomb/counting.pyx":62
  * 		TF1_start = sites[i,1]
  * 		TF1_end = sites[i,2]
  * 		TF1_name = sites[i,3]             # <<<<<<<<<<<<<<
  * 
  * 		#Count TF1
  */
-    __pyx_t_10 = __pyx_v_i;
-    __pyx_t_9 = 3;
-    __pyx_v_TF1_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_11 = __pyx_v_i;
+    __pyx_t_10 = 3;
+    __pyx_v_TF1_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":58
+    /* "tfcomb/counting.pyx":65
  * 
  * 		#Count TF1
  * 		single_count_arr[TF1_name] += 1             # <<<<<<<<<<<<<<
  * 
+ * 		#Initialize array to 0 for counting TF2-counts
+ */
+    __pyx_t_10 = __pyx_v_TF1_name;
+    *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_single_count_arr.diminfo[0].strides) += 1;
+
+    /* "tfcomb/counting.pyx":68
+ * 
+ * 		#Initialize array to 0 for counting TF2-counts
+ * 		for k in range(n_names):             # <<<<<<<<<<<<<<
+ * 			TF2_counts[k] = 0
+ * 
+ */
+    __pyx_t_12 = __pyx_v_n_names;
+    __pyx_t_13 = __pyx_t_12;
+    for (__pyx_t_14 = 0; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
+      __pyx_v_k = __pyx_t_14;
+
+      /* "tfcomb/counting.pyx":69
+ * 		#Initialize array to 0 for counting TF2-counts
+ * 		for k in range(n_names):
+ * 			TF2_counts[k] = 0             # <<<<<<<<<<<<<<
+ * 
  * 		#Find possible associations with TF1 within window
  */
-    __pyx_t_9 = __pyx_v_TF1_name;
-    *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_single_count_arr.diminfo[0].strides) += 1;
+      __pyx_t_10 = __pyx_v_k;
+      *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_TF2_counts.diminfo[0].strides) = 0;
+    }
 
-    /* "tfcomb/counting.pyx":61
+    /* "tfcomb/counting.pyx":72
  * 
  * 		#Find possible associations with TF1 within window
  * 		finding_assoc = True             # <<<<<<<<<<<<<<
@@ -2116,7 +2217,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
     __pyx_v_finding_assoc = 1;
 
-    /* "tfcomb/counting.pyx":62
+    /* "tfcomb/counting.pyx":73
  * 		#Find possible associations with TF1 within window
  * 		finding_assoc = True
  * 		j = 0             # <<<<<<<<<<<<<<
@@ -2125,7 +2226,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
     __pyx_v_j = 0;
 
-    /* "tfcomb/counting.pyx":63
+    /* "tfcomb/counting.pyx":74
  * 		finding_assoc = True
  * 		j = 0
  * 		while finding_assoc == True:             # <<<<<<<<<<<<<<
@@ -2133,10 +2234,10 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 			#Next site relative to TF1
  */
     while (1) {
-      __pyx_t_8 = ((__pyx_v_finding_assoc == 1) != 0);
-      if (!__pyx_t_8) break;
+      __pyx_t_9 = ((__pyx_v_finding_assoc == 1) != 0);
+      if (!__pyx_t_9) break;
 
-      /* "tfcomb/counting.pyx":66
+      /* "tfcomb/counting.pyx":77
  * 
  * 			#Next site relative to TF1
  * 			j += 1             # <<<<<<<<<<<<<<
@@ -2145,17 +2246,17 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
       __pyx_v_j = (__pyx_v_j + 1);
 
-      /* "tfcomb/counting.pyx":67
+      /* "tfcomb/counting.pyx":78
  * 			#Next site relative to TF1
  * 			j += 1
  * 			if j+i >= n_sites - 1: #next site is beyond end of list, increment i             # <<<<<<<<<<<<<<
  * 				i += 1
  * 				finding_assoc = False #break out of finding_assoc
  */
-      __pyx_t_8 = (((__pyx_v_j + __pyx_v_i) >= (__pyx_v_n_sites - 1)) != 0);
-      if (__pyx_t_8) {
+      __pyx_t_9 = (((__pyx_v_j + __pyx_v_i) >= (__pyx_v_n_sites - 1)) != 0);
+      if (__pyx_t_9) {
 
-        /* "tfcomb/counting.pyx":68
+        /* "tfcomb/counting.pyx":79
  * 			j += 1
  * 			if j+i >= n_sites - 1: #next site is beyond end of list, increment i
  * 				i += 1             # <<<<<<<<<<<<<<
@@ -2164,7 +2265,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
         __pyx_v_i = (__pyx_v_i + 1);
 
-        /* "tfcomb/counting.pyx":69
+        /* "tfcomb/counting.pyx":80
  * 			if j+i >= n_sites - 1: #next site is beyond end of list, increment i
  * 				i += 1
  * 				finding_assoc = False #break out of finding_assoc             # <<<<<<<<<<<<<<
@@ -2173,17 +2274,17 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
         __pyx_v_finding_assoc = 0;
 
-        /* "tfcomb/counting.pyx":67
+        /* "tfcomb/counting.pyx":78
  * 			#Next site relative to TF1
  * 			j += 1
  * 			if j+i >= n_sites - 1: #next site is beyond end of list, increment i             # <<<<<<<<<<<<<<
  * 				i += 1
  * 				finding_assoc = False #break out of finding_assoc
  */
-        goto __pyx_L7;
+        goto __pyx_L9;
       }
 
-      /* "tfcomb/counting.pyx":74
+      /* "tfcomb/counting.pyx":85
  * 
  * 				#Fetch information on TF2-site
  * 				TF2_chr = sites[i+j,0]             # <<<<<<<<<<<<<<
@@ -2191,80 +2292,80 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 				TF2_end = sites[i+j,2]
  */
       /*else*/ {
-        __pyx_t_9 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_10 = 0;
-        __pyx_v_TF2_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_10 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_11 = 0;
+        __pyx_v_TF2_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":75
+        /* "tfcomb/counting.pyx":86
  * 				#Fetch information on TF2-site
  * 				TF2_chr = sites[i+j,0]
  * 				TF2_start = sites[i+j,1]             # <<<<<<<<<<<<<<
  * 				TF2_end = sites[i+j,2]
  * 				TF2_name = sites[i+j,3]
  */
-        __pyx_t_10 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_9 = 1;
-        __pyx_v_TF2_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_11 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_10 = 1;
+        __pyx_v_TF2_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":76
+        /* "tfcomb/counting.pyx":87
  * 				TF2_chr = sites[i+j,0]
  * 				TF2_start = sites[i+j,1]
  * 				TF2_end = sites[i+j,2]             # <<<<<<<<<<<<<<
  * 				TF2_name = sites[i+j,3]
  * 
  */
-        __pyx_t_9 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_10 = 2;
-        __pyx_v_TF2_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_10 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_11 = 2;
+        __pyx_v_TF2_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":77
+        /* "tfcomb/counting.pyx":88
  * 				TF2_start = sites[i+j,1]
  * 				TF2_end = sites[i+j,2]
  * 				TF2_name = sites[i+j,3]             # <<<<<<<<<<<<<<
  * 
- * 				#True if these TFBS co-occur within window
+ * 				if TF1_chr == TF2_chr and (TF2_start - TF1_end <= w): #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
  */
-        __pyx_t_10 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_9 = 3;
-        __pyx_v_TF2_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_11 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_10 = 3;
+        __pyx_v_TF2_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":80
+        /* "tfcomb/counting.pyx":90
+ * 				TF2_name = sites[i+j,3]
  * 
- * 				#True if these TFBS co-occur within window
- * 				if TF1_chr == TF2_chr and (TF2_end - TF1_start <= w):             # <<<<<<<<<<<<<<
+ * 				if TF1_chr == TF2_chr and (TF2_start - TF1_end <= w): #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping             # <<<<<<<<<<<<<<
  * 
  * 					# check if they are overlapping more than the threshold
  */
-        __pyx_t_11 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
-        if (__pyx_t_11) {
+        __pyx_t_15 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
+        if (__pyx_t_15) {
         } else {
-          __pyx_t_8 = __pyx_t_11;
-          goto __pyx_L9_bool_binop_done;
+          __pyx_t_9 = __pyx_t_15;
+          goto __pyx_L11_bool_binop_done;
         }
-        __pyx_t_11 = (((__pyx_v_TF2_end - __pyx_v_TF1_start) <= __pyx_v_w) != 0);
-        __pyx_t_8 = __pyx_t_11;
-        __pyx_L9_bool_binop_done:;
-        if (__pyx_t_8) {
+        __pyx_t_15 = (((__pyx_v_TF2_start - __pyx_v_TF1_end) <= __pyx_v_w) != 0);
+        __pyx_t_9 = __pyx_t_15;
+        __pyx_L11_bool_binop_done:;
+        if (__pyx_t_9) {
 
-          /* "tfcomb/counting.pyx":83
+          /* "tfcomb/counting.pyx":93
  * 
  * 					# check if they are overlapping more than the threshold
  * 					valid_pair = 1             # <<<<<<<<<<<<<<
- * 					overlap_bp = TF1_end - TF2_start
+ * 					overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
  * 
  */
           __pyx_v_valid_pair = 1;
 
-          /* "tfcomb/counting.pyx":84
+          /* "tfcomb/counting.pyx":94
  * 					# check if they are overlapping more than the threshold
  * 					valid_pair = 1
- * 					overlap_bp = TF1_end - TF2_start             # <<<<<<<<<<<<<<
+ * 					overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found             # <<<<<<<<<<<<<<
  * 
  * 					# Get the length of the shorter TF
  */
           __pyx_v_overlap_bp = (__pyx_v_TF1_end - __pyx_v_TF2_start);
 
-          /* "tfcomb/counting.pyx":87
+          /* "tfcomb/counting.pyx":97
  * 
  * 					# Get the length of the shorter TF
  * 					short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])             # <<<<<<<<<<<<<<
@@ -2280,26 +2381,26 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
           }
           __pyx_v_short_bp = __pyx_t_14;
 
-          /* "tfcomb/counting.pyx":90
+          /* "tfcomb/counting.pyx":100
  * 
  * 					#Invalid pair, overlap is higher than threshold
  * 					if overlap_bp / short_bp > max_overlap:             # <<<<<<<<<<<<<<
  * 						valid_pair = 0
  * 
  */
-          __pyx_t_8 = (((__pyx_v_overlap_bp / __pyx_v_short_bp) > __pyx_v_max_overlap) != 0);
-          if (__pyx_t_8) {
+          __pyx_t_9 = (((__pyx_v_overlap_bp / __pyx_v_short_bp) > __pyx_v_max_overlap) != 0);
+          if (__pyx_t_9) {
 
-            /* "tfcomb/counting.pyx":91
+            /* "tfcomb/counting.pyx":101
  * 					#Invalid pair, overlap is higher than threshold
  * 					if overlap_bp / short_bp > max_overlap:
  * 						valid_pair = 0             # <<<<<<<<<<<<<<
  * 
- * 					#Save association
+ * 					#Save counts of association
  */
             __pyx_v_valid_pair = 0;
 
-            /* "tfcomb/counting.pyx":90
+            /* "tfcomb/counting.pyx":100
  * 
  * 					#Invalid pair, overlap is higher than threshold
  * 					if overlap_bp / short_bp > max_overlap:             # <<<<<<<<<<<<<<
@@ -2308,47 +2409,46 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
           }
 
-          /* "tfcomb/counting.pyx":94
+          /* "tfcomb/counting.pyx":104
  * 
- * 					#Save association
+ * 					#Save counts of association
  * 					if valid_pair == 1:             # <<<<<<<<<<<<<<
- * 						pair_count_mat[TF1_name,TF2_name] += 1
+ * 						TF2_counts[TF2_name] += 1
  * 
  */
-          __pyx_t_8 = ((__pyx_v_valid_pair == 1) != 0);
-          if (__pyx_t_8) {
+          __pyx_t_9 = ((__pyx_v_valid_pair == 1) != 0);
+          if (__pyx_t_9) {
 
-            /* "tfcomb/counting.pyx":95
- * 					#Save association
+            /* "tfcomb/counting.pyx":105
+ * 					#Save counts of association
  * 					if valid_pair == 1:
- * 						pair_count_mat[TF1_name,TF2_name] += 1             # <<<<<<<<<<<<<<
+ * 						TF2_counts[TF2_name] += 1             # <<<<<<<<<<<<<<
  * 
  * 				else:
  */
-            __pyx_t_9 = __pyx_v_TF1_name;
             __pyx_t_10 = __pyx_v_TF2_name;
-            *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_pair_count_mat.diminfo[0].strides, __pyx_t_10, __pyx_pybuffernd_pair_count_mat.diminfo[1].strides) += 1;
+            *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_TF2_counts.diminfo[0].strides) += 1;
 
-            /* "tfcomb/counting.pyx":94
+            /* "tfcomb/counting.pyx":104
  * 
- * 					#Save association
+ * 					#Save counts of association
  * 					if valid_pair == 1:             # <<<<<<<<<<<<<<
- * 						pair_count_mat[TF1_name,TF2_name] += 1
+ * 						TF2_counts[TF2_name] += 1
  * 
  */
           }
 
-          /* "tfcomb/counting.pyx":80
+          /* "tfcomb/counting.pyx":90
+ * 				TF2_name = sites[i+j,3]
  * 
- * 				#True if these TFBS co-occur within window
- * 				if TF1_chr == TF2_chr and (TF2_end - TF1_start <= w):             # <<<<<<<<<<<<<<
+ * 				if TF1_chr == TF2_chr and (TF2_start - TF1_end <= w): #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping             # <<<<<<<<<<<<<<
  * 
  * 					# check if they are overlapping more than the threshold
  */
-          goto __pyx_L8;
+          goto __pyx_L10;
         }
 
-        /* "tfcomb/counting.pyx":99
+        /* "tfcomb/counting.pyx":109
  * 				else:
  * 					#The next site is out of window range; increment to next i
  * 					i += 1             # <<<<<<<<<<<<<<
@@ -2358,45 +2458,132 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
         /*else*/ {
           __pyx_v_i = (__pyx_v_i + 1);
 
-          /* "tfcomb/counting.pyx":100
+          /* "tfcomb/counting.pyx":110
  * 					#The next site is out of window range; increment to next i
  * 					i += 1
  * 					finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
  * 
- * 	return((single_count_arr, pair_count_mat))
+ * 		## Done finding TF2's for current TF1
  */
           __pyx_v_finding_assoc = 0;
         }
-        __pyx_L8:;
+        __pyx_L10:;
       }
-      __pyx_L7:;
+      __pyx_L9:;
+    }
+
+    /* "tfcomb/counting.pyx":114
+ * 		## Done finding TF2's for current TF1
+ * 		#Should counts be binary?
+ * 		if binary == 1:	#convert counts to binary             # <<<<<<<<<<<<<<
+ * 			for k in range(n_names):
+ * 				if TF2_counts[k] > 1:
+ */
+    __pyx_t_9 = ((__pyx_v_binary == 1) != 0);
+    if (__pyx_t_9) {
+
+      /* "tfcomb/counting.pyx":115
+ * 		#Should counts be binary?
+ * 		if binary == 1:	#convert counts to binary
+ * 			for k in range(n_names):             # <<<<<<<<<<<<<<
+ * 				if TF2_counts[k] > 1:
+ * 					TF2_counts[k] = 1
+ */
+      __pyx_t_14 = __pyx_v_n_names;
+      __pyx_t_12 = __pyx_t_14;
+      for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
+        __pyx_v_k = __pyx_t_13;
+
+        /* "tfcomb/counting.pyx":116
+ * 		if binary == 1:	#convert counts to binary
+ * 			for k in range(n_names):
+ * 				if TF2_counts[k] > 1:             # <<<<<<<<<<<<<<
+ * 					TF2_counts[k] = 1
+ * 
+ */
+        __pyx_t_10 = __pyx_v_k;
+        __pyx_t_9 = (((*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_TF2_counts.diminfo[0].strides)) > 1) != 0);
+        if (__pyx_t_9) {
+
+          /* "tfcomb/counting.pyx":117
+ * 			for k in range(n_names):
+ * 				if TF2_counts[k] > 1:
+ * 					TF2_counts[k] = 1             # <<<<<<<<<<<<<<
+ * 
+ * 		#Add counts to pair_count_mat
+ */
+          __pyx_t_10 = __pyx_v_k;
+          *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_TF2_counts.diminfo[0].strides) = 1;
+
+          /* "tfcomb/counting.pyx":116
+ * 		if binary == 1:	#convert counts to binary
+ * 			for k in range(n_names):
+ * 				if TF2_counts[k] > 1:             # <<<<<<<<<<<<<<
+ * 					TF2_counts[k] = 1
+ * 
+ */
+        }
+      }
+
+      /* "tfcomb/counting.pyx":114
+ * 		## Done finding TF2's for current TF1
+ * 		#Should counts be binary?
+ * 		if binary == 1:	#convert counts to binary             # <<<<<<<<<<<<<<
+ * 			for k in range(n_names):
+ * 				if TF2_counts[k] > 1:
+ */
+    }
+
+    /* "tfcomb/counting.pyx":120
+ * 
+ * 		#Add counts to pair_count_mat
+ * 		for k in range(n_names):             # <<<<<<<<<<<<<<
+ * 			pair_count_mat[TF1_name, k] += TF2_counts[k]
+ * 
+ */
+    __pyx_t_14 = __pyx_v_n_names;
+    __pyx_t_12 = __pyx_t_14;
+    for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
+      __pyx_v_k = __pyx_t_13;
+
+      /* "tfcomb/counting.pyx":121
+ * 		#Add counts to pair_count_mat
+ * 		for k in range(n_names):
+ * 			pair_count_mat[TF1_name, k] += TF2_counts[k]             # <<<<<<<<<<<<<<
+ * 
+ * 	return((single_count_arr, pair_count_mat))
+ */
+      __pyx_t_10 = __pyx_v_k;
+      __pyx_t_11 = __pyx_v_TF1_name;
+      __pyx_t_16 = __pyx_v_k;
+      *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_pair_count_mat.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_pair_count_mat.diminfo[1].strides) += (*__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf, __pyx_t_10, __pyx_pybuffernd_TF2_counts.diminfo[0].strides));
     }
   }
 
-  /* "tfcomb/counting.pyx":102
- * 					finding_assoc = False   #break out of finding_assoc-loop
+  /* "tfcomb/counting.pyx":123
+ * 			pair_count_mat[TF1_name, k] += TF2_counts[k]
  * 
  * 	return((single_count_arr, pair_count_mat))             # <<<<<<<<<<<<<<
  * 
  * def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 102, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_3 = PyTuple_New(2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
   __Pyx_INCREF(((PyObject *)__pyx_v_single_count_arr));
   __Pyx_GIVEREF(((PyObject *)__pyx_v_single_count_arr));
-  PyTuple_SET_ITEM(__pyx_t_5, 0, ((PyObject *)__pyx_v_single_count_arr));
+  PyTuple_SET_ITEM(__pyx_t_3, 0, ((PyObject *)__pyx_v_single_count_arr));
   __Pyx_INCREF(((PyObject *)__pyx_v_pair_count_mat));
   __Pyx_GIVEREF(((PyObject *)__pyx_v_pair_count_mat));
-  PyTuple_SET_ITEM(__pyx_t_5, 1, ((PyObject *)__pyx_v_pair_count_mat));
-  __pyx_r = __pyx_t_5;
-  __pyx_t_5 = 0;
+  PyTuple_SET_ITEM(__pyx_t_3, 1, ((PyObject *)__pyx_v_pair_count_mat));
+  __pyx_r = __pyx_t_3;
+  __pyx_t_3 = 0;
   goto __pyx_L0;
 
-  /* "tfcomb/counting.pyx":12
+  /* "tfcomb/counting.pyx":13
  * @cython.wraparound(False) 	#dont deal with negative indices
  * @cython.nonecheck(False)
- * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000):             # <<<<<<<<<<<<<<
+ * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000, int binary = 1):             # <<<<<<<<<<<<<<
  * 
  * 	"""
  */
@@ -2411,6 +2598,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
     __Pyx_PyThreadState_declare
     __Pyx_PyThreadState_assign
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_sites.rcbuffer->pybuffer);
@@ -2419,11 +2607,13 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_pair_count_mat.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_single_count_arr.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_sites.rcbuffer->pybuffer);
   __pyx_L2:;
   __Pyx_XDECREF(__pyx_v_count_dict);
+  __Pyx_XDECREF((PyObject *)__pyx_v_TF2_counts);
   __Pyx_XDECREF((PyObject *)__pyx_v_single_count_arr);
   __Pyx_XDECREF((PyObject *)__pyx_v_pair_count_mat);
   __Pyx_XGIVEREF(__pyx_r);
@@ -2431,7 +2621,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   return __pyx_r;
 }
 
-/* "tfcomb/counting.pyx":104
+/* "tfcomb/counting.pyx":125
  * 	return((single_count_arr, pair_count_mat))
  * 
  * def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):             # <<<<<<<<<<<<<<
@@ -2450,7 +2640,7 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3get_unique_bp(PyObject *__pyx_self,
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("get_unique_bp (wrapper)", 0);
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sites), __pyx_ptype_5numpy_ndarray, 1, "sites", 0))) __PYX_ERR(0, 104, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sites), __pyx_ptype_5numpy_ndarray, 1, "sites", 0))) __PYX_ERR(0, 125, __pyx_L1_error)
   __pyx_r = __pyx_pf_6tfcomb_8counting_2get_unique_bp(__pyx_self, ((PyArrayObject *)__pyx_v_sites));
 
   /* function exit code */
@@ -2492,21 +2682,21 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
   __pyx_pybuffernd_sites.rcbuffer = &__pyx_pybuffer_sites;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sites.rcbuffer->pybuffer, (PyObject*)__pyx_v_sites, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 104, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sites.rcbuffer->pybuffer, (PyObject*)__pyx_v_sites, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 125, __pyx_L1_error)
   }
   __pyx_pybuffernd_sites.diminfo[0].strides = __pyx_pybuffernd_sites.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_sites.diminfo[0].shape = __pyx_pybuffernd_sites.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_sites.diminfo[1].strides = __pyx_pybuffernd_sites.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_sites.diminfo[1].shape = __pyx_pybuffernd_sites.rcbuffer->pybuffer.shape[1];
 
-  /* "tfcomb/counting.pyx":109
+  /* "tfcomb/counting.pyx":130
  * 	"""
  * 
  * 	cdef int n_sites = len(sites)             # <<<<<<<<<<<<<<
  * 	cdef int total_bp = 0
  * 	cdef int current_chrom, current_start, current_end
  */
-  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_sites)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 109, __pyx_L1_error)
+  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_sites)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 130, __pyx_L1_error)
   __pyx_v_n_sites = __pyx_t_1;
 
-  /* "tfcomb/counting.pyx":110
+  /* "tfcomb/counting.pyx":131
  * 
  * 	cdef int n_sites = len(sites)
  * 	cdef int total_bp = 0             # <<<<<<<<<<<<<<
@@ -2515,7 +2705,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
  */
   __pyx_v_total_bp = 0;
 
-  /* "tfcomb/counting.pyx":113
+  /* "tfcomb/counting.pyx":134
  * 	cdef int current_chrom, current_start, current_end
  * 
  * 	cdef int previous_start = sites[0,1]             # <<<<<<<<<<<<<<
@@ -2535,11 +2725,11 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
   } else if (unlikely(__pyx_t_3 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_4 = 1;
   if (unlikely(__pyx_t_4 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_4);
-    __PYX_ERR(0, 113, __pyx_L1_error)
+    __PYX_ERR(0, 134, __pyx_L1_error)
   }
   __pyx_v_previous_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_2, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_3, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-  /* "tfcomb/counting.pyx":114
+  /* "tfcomb/counting.pyx":135
  * 
  * 	cdef int previous_start = sites[0,1]
  * 	cdef int previous_end = sites[0,2]             # <<<<<<<<<<<<<<
@@ -2559,11 +2749,11 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
   } else if (unlikely(__pyx_t_2 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_4 = 1;
   if (unlikely(__pyx_t_4 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_4);
-    __PYX_ERR(0, 114, __pyx_L1_error)
+    __PYX_ERR(0, 135, __pyx_L1_error)
   }
   __pyx_v_previous_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_3, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_2, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-  /* "tfcomb/counting.pyx":115
+  /* "tfcomb/counting.pyx":136
  * 	cdef int previous_start = sites[0,1]
  * 	cdef int previous_end = sites[0,2]
  * 	cdef int i = 1             # <<<<<<<<<<<<<<
@@ -2572,7 +2762,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
  */
   __pyx_v_i = 1;
 
-  /* "tfcomb/counting.pyx":118
+  /* "tfcomb/counting.pyx":139
  * 
  * 	#Loop over all sites
  * 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites             # <<<<<<<<<<<<<<
@@ -2583,7 +2773,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     __pyx_t_5 = ((__pyx_v_i < __pyx_v_n_sites) != 0);
     if (!__pyx_t_5) break;
 
-    /* "tfcomb/counting.pyx":120
+    /* "tfcomb/counting.pyx":141
  * 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
  * 
  * 		current_chrom = sites[i,0]             # <<<<<<<<<<<<<<
@@ -2603,11 +2793,11 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     } else if (unlikely(__pyx_t_3 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_4 = 1;
     if (unlikely(__pyx_t_4 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_4);
-      __PYX_ERR(0, 120, __pyx_L1_error)
+      __PYX_ERR(0, 141, __pyx_L1_error)
     }
     __pyx_v_current_chrom = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_2, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_3, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":121
+    /* "tfcomb/counting.pyx":142
  * 
  * 		current_chrom = sites[i,0]
  * 		current_start = sites[i,1]             # <<<<<<<<<<<<<<
@@ -2627,11 +2817,11 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     } else if (unlikely(__pyx_t_2 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_4 = 1;
     if (unlikely(__pyx_t_4 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_4);
-      __PYX_ERR(0, 121, __pyx_L1_error)
+      __PYX_ERR(0, 142, __pyx_L1_error)
     }
     __pyx_v_current_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_3, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_2, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":122
+    /* "tfcomb/counting.pyx":143
  * 		current_chrom = sites[i,0]
  * 		current_start = sites[i,1]
  * 		current_end = sites[i,2]             # <<<<<<<<<<<<<<
@@ -2651,11 +2841,11 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     } else if (unlikely(__pyx_t_3 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_4 = 1;
     if (unlikely(__pyx_t_4 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_4);
-      __PYX_ERR(0, 122, __pyx_L1_error)
+      __PYX_ERR(0, 143, __pyx_L1_error)
     }
     __pyx_v_current_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_2, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_3, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":124
+    /* "tfcomb/counting.pyx":145
  * 		current_end = sites[i,2]
  * 
  * 		if current_start > previous_end:             # <<<<<<<<<<<<<<
@@ -2665,7 +2855,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     __pyx_t_5 = ((__pyx_v_current_start > __pyx_v_previous_end) != 0);
     if (__pyx_t_5) {
 
-      /* "tfcomb/counting.pyx":126
+      /* "tfcomb/counting.pyx":147
  * 		if current_start > previous_end:
  * 			#Gap; add to total_bp
  * 			stretch_bp = previous_end - previous_start             # <<<<<<<<<<<<<<
@@ -2674,7 +2864,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
  */
       __pyx_v_stretch_bp = (__pyx_v_previous_end - __pyx_v_previous_start);
 
-      /* "tfcomb/counting.pyx":128
+      /* "tfcomb/counting.pyx":149
  * 			stretch_bp = previous_end - previous_start
  * 
  * 			previous_start = current_start             # <<<<<<<<<<<<<<
@@ -2683,7 +2873,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
  */
       __pyx_v_previous_start = __pyx_v_current_start;
 
-      /* "tfcomb/counting.pyx":129
+      /* "tfcomb/counting.pyx":150
  * 
  * 			previous_start = current_start
  * 			previous_end = current_end             # <<<<<<<<<<<<<<
@@ -2692,7 +2882,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
  */
       __pyx_v_previous_end = __pyx_v_current_end;
 
-      /* "tfcomb/counting.pyx":124
+      /* "tfcomb/counting.pyx":145
  * 		current_end = sites[i,2]
  * 
  * 		if current_start > previous_end:             # <<<<<<<<<<<<<<
@@ -2702,7 +2892,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
       goto __pyx_L5;
     }
 
-    /* "tfcomb/counting.pyx":132
+    /* "tfcomb/counting.pyx":153
  * 
  * 		else:
  * 			previous_end = current_end             # <<<<<<<<<<<<<<
@@ -2714,7 +2904,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     }
     __pyx_L5:;
 
-    /* "tfcomb/counting.pyx":137
+    /* "tfcomb/counting.pyx":158
  * 		#previous = ""
  * 
  * 		i += 1             # <<<<<<<<<<<<<<
@@ -2724,7 +2914,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "tfcomb/counting.pyx":140
+  /* "tfcomb/counting.pyx":161
  * 
  * 	#Add last region
  * 	total_bp += previous_end - previous_start             # <<<<<<<<<<<<<<
@@ -2733,19 +2923,19 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2get_unique_bp(CYTHON_UNUSED PyObjec
  */
   __pyx_v_total_bp = (__pyx_v_total_bp + (__pyx_v_previous_end - __pyx_v_previous_start));
 
-  /* "tfcomb/counting.pyx":142
+  /* "tfcomb/counting.pyx":163
  * 	total_bp += previous_end - previous_start
  * 
  * 	return(total_bp)             # <<<<<<<<<<<<<<
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_total_bp); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 142, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_total_bp); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __pyx_r = __pyx_t_6;
   __pyx_t_6 = 0;
   goto __pyx_L0;
 
-  /* "tfcomb/counting.pyx":104
+  /* "tfcomb/counting.pyx":125
  * 	return((single_count_arr, pair_count_mat))
  * 
  * def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):             # <<<<<<<<<<<<<<
@@ -3842,21 +4032,25 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_TF1_name, __pyx_k_TF1_name, sizeof(__pyx_k_TF1_name), 0, 0, 1, 1},
   {&__pyx_n_s_TF1_start, __pyx_k_TF1_start, sizeof(__pyx_k_TF1_start), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_chr, __pyx_k_TF2_chr, sizeof(__pyx_k_TF2_chr), 0, 0, 1, 1},
+  {&__pyx_n_s_TF2_counts, __pyx_k_TF2_counts, sizeof(__pyx_k_TF2_counts), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_end, __pyx_k_TF2_end, sizeof(__pyx_k_TF2_end), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_name, __pyx_k_TF2_name, sizeof(__pyx_k_TF2_name), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_start, __pyx_k_TF2_start, sizeof(__pyx_k_TF2_start), 0, 0, 1, 1},
+  {&__pyx_n_s_binary, __pyx_k_binary, sizeof(__pyx_k_binary), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
   {&__pyx_n_s_count_co_occurrence, __pyx_k_count_co_occurrence, sizeof(__pyx_k_count_co_occurrence), 0, 0, 1, 1},
   {&__pyx_n_s_count_dict, __pyx_k_count_dict, sizeof(__pyx_k_count_dict), 0, 0, 1, 1},
   {&__pyx_n_s_current_chrom, __pyx_k_current_chrom, sizeof(__pyx_k_current_chrom), 0, 0, 1, 1},
   {&__pyx_n_s_current_end, __pyx_k_current_end, sizeof(__pyx_k_current_end), 0, 0, 1, 1},
   {&__pyx_n_s_current_start, __pyx_k_current_start, sizeof(__pyx_k_current_start), 0, 0, 1, 1},
+  {&__pyx_n_s_distance, __pyx_k_distance, sizeof(__pyx_k_distance), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
   {&__pyx_n_s_finding_assoc, __pyx_k_finding_assoc, sizeof(__pyx_k_finding_assoc), 0, 0, 1, 1},
   {&__pyx_n_s_get_unique_bp, __pyx_k_get_unique_bp, sizeof(__pyx_k_get_unique_bp), 0, 0, 1, 1},
   {&__pyx_n_s_i, __pyx_k_i, sizeof(__pyx_k_i), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
   {&__pyx_n_s_j, __pyx_k_j, sizeof(__pyx_k_j), 0, 0, 1, 1},
+  {&__pyx_n_s_k, __pyx_k_k, sizeof(__pyx_k_k), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
   {&__pyx_n_s_max_overlap, __pyx_k_max_overlap, sizeof(__pyx_k_max_overlap), 0, 0, 1, 1},
   {&__pyx_n_s_n_names, __pyx_k_n_names, sizeof(__pyx_k_n_names), 0, 0, 1, 1},
@@ -3870,6 +4064,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_pair_count_mat, __pyx_k_pair_count_mat, sizeof(__pyx_k_pair_count_mat), 0, 0, 1, 1},
   {&__pyx_n_s_previous_end, __pyx_k_previous_end, sizeof(__pyx_k_previous_end), 0, 0, 1, 1},
   {&__pyx_n_s_previous_start, __pyx_k_previous_start, sizeof(__pyx_k_previous_start), 0, 0, 1, 1},
+  {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
   {&__pyx_n_s_short_bp, __pyx_k_short_bp, sizeof(__pyx_k_short_bp), 0, 0, 1, 1},
   {&__pyx_n_s_single_count_arr, __pyx_k_single_count_arr, sizeof(__pyx_k_single_count_arr), 0, 0, 1, 1},
   {&__pyx_n_s_sites, __pyx_k_sites, sizeof(__pyx_k_sites), 0, 0, 1, 1},
@@ -3884,6 +4079,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 68, __pyx_L1_error)
   __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 947, __pyx_L1_error)
   return 0;
   __pyx_L1_error:;
@@ -3916,29 +4112,29 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
 
-  /* "tfcomb/counting.pyx":12
+  /* "tfcomb/counting.pyx":13
  * @cython.wraparound(False) 	#dont deal with negative indices
  * @cython.nonecheck(False)
- * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000):             # <<<<<<<<<<<<<<
+ * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000, int binary = 1):             # <<<<<<<<<<<<<<
  * 
  * 	"""
  */
-  __pyx_tuple__3 = PyTuple_Pack(22, __pyx_n_s_sites, __pyx_n_s_w, __pyx_n_s_max_overlap, __pyx_n_s_n_names, __pyx_n_s_count_dict, __pyx_n_s_n_sites, __pyx_n_s_single_count_arr, __pyx_n_s_pair_count_mat, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_finding_assoc, __pyx_n_s_TF1_chr, __pyx_n_s_TF1_name, __pyx_n_s_TF1_start, __pyx_n_s_TF1_end, __pyx_n_s_TF2_start, __pyx_n_s_TF2_end, __pyx_n_s_overlap_bp, __pyx_n_s_short_bp, __pyx_n_s_valid_pair, __pyx_n_s_TF2_chr, __pyx_n_s_TF2_name); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_tuple__3 = PyTuple_Pack(26, __pyx_n_s_sites, __pyx_n_s_w, __pyx_n_s_max_overlap, __pyx_n_s_n_names, __pyx_n_s_binary, __pyx_n_s_count_dict, __pyx_n_s_n_sites, __pyx_n_s_TF2_counts, __pyx_n_s_single_count_arr, __pyx_n_s_pair_count_mat, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k, __pyx_n_s_finding_assoc, __pyx_n_s_TF1_chr, __pyx_n_s_TF1_name, __pyx_n_s_TF1_start, __pyx_n_s_TF1_end, __pyx_n_s_TF2_start, __pyx_n_s_TF2_end, __pyx_n_s_overlap_bp, __pyx_n_s_short_bp, __pyx_n_s_valid_pair, __pyx_n_s_TF2_chr, __pyx_n_s_TF2_name, __pyx_n_s_distance); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__3);
   __Pyx_GIVEREF(__pyx_tuple__3);
-  __pyx_codeobj__4 = (PyObject*)__Pyx_PyCode_New(4, 0, 22, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__3, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_count_co_occurrence, 12, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_codeobj__4 = (PyObject*)__Pyx_PyCode_New(5, 0, 26, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__3, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_count_co_occurrence, 13, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 13, __pyx_L1_error)
 
-  /* "tfcomb/counting.pyx":104
+  /* "tfcomb/counting.pyx":125
  * 	return((single_count_arr, pair_count_mat))
  * 
  * def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):             # <<<<<<<<<<<<<<
  * 	"""
  * 
  */
-  __pyx_tuple__5 = PyTuple_Pack(10, __pyx_n_s_sites, __pyx_n_s_n_sites, __pyx_n_s_total_bp, __pyx_n_s_current_chrom, __pyx_n_s_current_start, __pyx_n_s_current_end, __pyx_n_s_previous_start, __pyx_n_s_previous_end, __pyx_n_s_i, __pyx_n_s_stretch_bp); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 104, __pyx_L1_error)
+  __pyx_tuple__5 = PyTuple_Pack(10, __pyx_n_s_sites, __pyx_n_s_n_sites, __pyx_n_s_total_bp, __pyx_n_s_current_chrom, __pyx_n_s_current_start, __pyx_n_s_current_end, __pyx_n_s_previous_start, __pyx_n_s_previous_end, __pyx_n_s_i, __pyx_n_s_stretch_bp); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 125, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__5);
   __Pyx_GIVEREF(__pyx_tuple__5);
-  __pyx_codeobj__6 = (PyObject*)__Pyx_PyCode_New(1, 0, 10, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__5, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_get_unique_bp, 104, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__6)) __PYX_ERR(0, 104, __pyx_L1_error)
+  __pyx_codeobj__6 = (PyObject*)__Pyx_PyCode_New(1, 0, 10, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__5, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_get_unique_bp, 125, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__6)) __PYX_ERR(0, 125, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -4283,28 +4479,28 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) __PYX_ERR(0, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tfcomb/counting.pyx":12
+  /* "tfcomb/counting.pyx":13
  * @cython.wraparound(False) 	#dont deal with negative indices
  * @cython.nonecheck(False)
- * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000):             # <<<<<<<<<<<<<<
+ * def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000, int binary = 1):             # <<<<<<<<<<<<<<
  * 
  * 	"""
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6tfcomb_8counting_1count_co_occurrence, NULL, __pyx_n_s_tfcomb_counting); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6tfcomb_8counting_1count_co_occurrence, NULL, __pyx_n_s_tfcomb_counting); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_co_occurrence, __pyx_t_1) < 0) __PYX_ERR(0, 12, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_co_occurrence, __pyx_t_1) < 0) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tfcomb/counting.pyx":104
+  /* "tfcomb/counting.pyx":125
  * 	return((single_count_arr, pair_count_mat))
  * 
  * def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):             # <<<<<<<<<<<<<<
  * 	"""
  * 
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6tfcomb_8counting_3get_unique_bp, NULL, __pyx_n_s_tfcomb_counting); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 104, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6tfcomb_8counting_3get_unique_bp, NULL, __pyx_n_s_tfcomb_counting); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 125, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_get_unique_bp, __pyx_t_1) < 0) __PYX_ERR(0, 104, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_get_unique_bp, __pyx_t_1) < 0) __PYX_ERR(0, 125, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "tfcomb/counting.pyx":1
@@ -4366,6 +4562,34 @@ end:
     return (__Pyx_RefNannyAPIStruct *)r;
 }
 #endif
+
+/* PyObjectGetAttrStr */
+#if CYTHON_USE_TYPE_SLOTS
+static CYTHON_INLINE PyObject* __Pyx_PyObject_GetAttrStr(PyObject* obj, PyObject* attr_name) {
+    PyTypeObject* tp = Py_TYPE(obj);
+    if (likely(tp->tp_getattro))
+        return tp->tp_getattro(obj, attr_name);
+#if PY_MAJOR_VERSION < 3
+    if (likely(tp->tp_getattr))
+        return tp->tp_getattr(obj, PyString_AS_STRING(attr_name));
+#endif
+    return PyObject_GetAttr(obj, attr_name);
+}
+#endif
+
+/* GetBuiltinName */
+static PyObject *__Pyx_GetBuiltinName(PyObject *name) {
+    PyObject* result = __Pyx_PyObject_GetAttrStr(__pyx_b, name);
+    if (unlikely(!result)) {
+        PyErr_Format(PyExc_NameError,
+#if PY_MAJOR_VERSION >= 3
+            "name '%U' is not defined", name);
+#else
+            "name '%.200s' is not defined", PyString_AS_STRING(name));
+#endif
+    }
+    return result;
+}
 
 /* RaiseArgTupleInvalid */
 static void __Pyx_RaiseArgtupleInvalid(
@@ -5088,34 +5312,6 @@ static int __Pyx__GetBufferAndValidate(
 fail:;
   __Pyx_SafeReleaseBuffer(buf);
   return -1;
-}
-
-/* PyObjectGetAttrStr */
-  #if CYTHON_USE_TYPE_SLOTS
-static CYTHON_INLINE PyObject* __Pyx_PyObject_GetAttrStr(PyObject* obj, PyObject* attr_name) {
-    PyTypeObject* tp = Py_TYPE(obj);
-    if (likely(tp->tp_getattro))
-        return tp->tp_getattro(obj, attr_name);
-#if PY_MAJOR_VERSION < 3
-    if (likely(tp->tp_getattr))
-        return tp->tp_getattr(obj, PyString_AS_STRING(attr_name));
-#endif
-    return PyObject_GetAttr(obj, attr_name);
-}
-#endif
-
-/* GetBuiltinName */
-  static PyObject *__Pyx_GetBuiltinName(PyObject *name) {
-    PyObject* result = __Pyx_PyObject_GetAttrStr(__pyx_b, name);
-    if (unlikely(!result)) {
-        PyErr_Format(PyExc_NameError,
-#if PY_MAJOR_VERSION >= 3
-            "name '%U' is not defined", name);
-#else
-            "name '%.200s' is not defined", PyString_AS_STRING(name));
-#endif
-    }
-    return result;
 }
 
 /* PyDictVersioning */

@@ -4,12 +4,13 @@ import numpy as np
 cimport numpy as np
 import cython
 
+
 #---------------------------------------------------------------------------------------#
 @cython.cdivision(True)		#no check for zero division
 @cython.boundscheck(False)	#dont check boundaries
 @cython.wraparound(False) 	#dont deal with negative indices
 @cython.nonecheck(False)
-def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000):
+def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000, int binary = 1):
 
 	"""
 	Superfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction 
@@ -23,10 +24,13 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 		
 	max_overlap (float)
 		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed.
-	output: count_dict   - Dictionary with all TFs and all occuring TF pairs with corresponding count
+
+	binary : int
+		0 or 1 bool integer. If 0; counts are left raw
 
 	Returns:
 	-----------
+	tuple
 
 
 	"""
@@ -35,15 +39,18 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 	cdef int n_sites = len(sites)
 	
 	#Create n x n count matrix
+	cdef np.ndarray[np.int64_t, ndim=1] TF2_counts = np.zeros(n_names, dtype=int) #for counting TF2 during run
 	cdef np.ndarray[np.int64_t, ndim=1] single_count_arr = np.zeros(n_names, dtype=int)
 	cdef np.ndarray[np.int64_t, ndim=2] pair_count_mat = np.zeros((n_names, n_names), dtype=int)
-
+	
 	cdef int i = 0
 	cdef int j = 0
+	cdef int k 
 	cdef bint finding_assoc = True
 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, 
 	cdef int TF2_start, TF2_end, overlap_bp, short_bp, valid_pair
 	cdef int TF2_chr, TF2_name
+	cdef int distance
 
 	#Loop over all sites
 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
@@ -56,6 +63,10 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 
 		#Count TF1
 		single_count_arr[TF1_name] += 1
+
+		#Initialize array to 0 for counting TF2-counts
+		for k in range(n_names):
+			TF2_counts[k] = 0
 
 		#Find possible associations with TF1 within window 
 		finding_assoc = True
@@ -75,13 +86,12 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 				TF2_start = sites[i+j,1]
 				TF2_end = sites[i+j,2]
 				TF2_name = sites[i+j,3]
-
-				#True if these TFBS co-occur within window
-				if TF1_chr == TF2_chr and (TF2_end - TF1_start <= w):
-					
+				
+				if TF1_chr == TF2_chr and (TF2_start - TF1_end <= w): #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+						
 					# check if they are overlapping more than the threshold
 					valid_pair = 1
-					overlap_bp = TF1_end - TF2_start
+					overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
 					
 					# Get the length of the shorter TF
 					short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
@@ -90,15 +100,26 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 					if overlap_bp / short_bp > max_overlap: 
 						valid_pair = 0
 
-					#Save association
+					#Save counts of association
 					if valid_pair == 1:
-						pair_count_mat[TF1_name,TF2_name] += 1
+						TF2_counts[TF2_name] += 1
 			
 				else:
 					#The next site is out of window range; increment to next i
 					i += 1
 					finding_assoc = False   #break out of finding_assoc-loop
-	
+
+		## Done finding TF2's for current TF1
+		#Should counts be binary?
+		if binary == 1:	#convert counts to binary
+			for k in range(n_names):
+				if TF2_counts[k] > 1:
+					TF2_counts[k] = 1
+
+		#Add counts to pair_count_mat
+		for k in range(n_names):
+			pair_count_mat[TF1_name, k] += TF2_counts[k] 
+
 	return((single_count_arr, pair_count_mat))
 
 def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
