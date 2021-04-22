@@ -147,7 +147,7 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 #------------------------ Directionality analysis ---------------------------#
 
 
-def directionality_analysis():
+def directionality_analysis(rules):
 	""" 
 	Perform directionality analysis on the TF pairs in edges table 
 
@@ -236,12 +236,20 @@ def _is_symmetric(a, rtol=1e-05, atol=1e-08):
 
 
 
-def build_network(table, weight="cosine", multi=True):
+def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 	""" 
-	Table is the .table from .market_basket()
+	Table is the .rules from .market_basket()
 	
-	multi : bool
+	Parameters
+	----------
+	weight : str
+		The column to get the "weight" from
+
+	directed : 
+
+	multi : bool, optional
 		Allow multiple edges between two vertices. If false, 
+
 	"""
 	
 	table = table.copy()
@@ -300,6 +308,7 @@ def build_network(table, weight="cosine", multi=True):
 
 
 
+
 #Graph partitioning 
 def get_partitions(network):
 	"""
@@ -332,14 +341,16 @@ def annotate_peaks(regions, gtf, config=None, copy=None):
 	"""
 	Annotate regions with genes from .gtf using UROPA. 
 
-
-
 	Parameters
 	----------
 	regions : tobias.utils.regions.RegionList()
 		A RegionList object
 	gtf : str
 		path to gtf file
+
+	Reference
+	----------
+
 	
 	"""
 	
@@ -389,5 +400,3 @@ def annotate_peaks(regions, gtf, config=None, copy=None):
 		region.annotation = best_annotations[i]
 	
 	#Return None; alters peaks in place
-
-

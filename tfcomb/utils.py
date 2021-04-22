@@ -10,10 +10,8 @@ def _get_background(matrix, TF1_idx, TF2_idx):
 	""" Fetches the background values from a matrix for a particular set of TFs"""
 
 	#Collect values for background
-	TF1_background = list(matrix[TF1_idx,])
-	#TF1_background = 
-
-	TF2_background = list(matrix[:,TF2_idx])
+	TF1_background = list(matrix[TF1_idx,~TF2_idx])
+	TF2_background = list(matrix[~TF1_idx,TF2_idx])
 
 	background = TF1_background + TF2_background
 
@@ -21,14 +19,16 @@ def _get_background(matrix, TF1_idx, TF2_idx):
 
 def _calculate_pvalue(table, measure="cosine", alternative="greater"):
 	"""
-	.table of either DiffObj or DiffCombObj
-	
-	adds pvalue to table
-	
+
+
 	Parameters
 	------------
+	table : pd.DataFrame
+		The table from '.rules' of DiffObj or DiffCombObj
+	measure : str
+		The measure to calculate pvalue for
 	alternative : str
-		one of: 'two-sided', 'greater', 'less'
+		One of: 'two-sided', 'greater', 'less'
 
 	Returns
 	--------
@@ -95,14 +95,6 @@ def _calculate_pvalue(table, measure="cosine", alternative="greater"):
 
 	#Adjust pvalues
 	#table["pvalue_adj"] = statsmodels.stats.multitest.multipletests(table["pvalue"], method="Bonferroni")[1]
-
-
-
-def find_knee(x, y):
-	""" Find knee in knee-plot using x,y coordinates """
-	knee = ""
-
-	return(knee)
 
 def make_symmetric(matrix):
 	"""

@@ -2,6 +2,7 @@ import nxviz
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import seaborn as sns
 
 
@@ -59,13 +60,13 @@ def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_su
 	return(ax)
 
 
-def heatmap(edges_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(8,8)):
+def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(8,8)):
 	"""
 	Plot heatmap with TF1 and TF2 on rows and columns respectively. Heatmap colormap is chosen by .color_by.
 
 	Parameters
 	----------
-	edges_table : pandas.DataFrame
+	rules_table : pandas.DataFrame
 	columns : str, optional
 	rows : str, optional
 	color_by : str, optional
@@ -75,14 +76,14 @@ def heatmap(edges_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	
 
 	# Create support table for the heatmap
-	pivot_table = edges_table.pivot(index=rows, columns=columns, values=color_by)
+	pivot_table = rules_table.pivot(index=rows, columns=columns, values=color_by)
 
 	#Mask any NA values
 	mask = np.zeros_like(pivot_table)
 	mask[np.isnan(pivot_table)] = True
 
 	#Choose cmap based on values of 'color_by' columns
-	colorby_values = edges_table[color_by]
+	colorby_values = rules_table[color_by]
 	if np.min(colorby_values) < 0:
 		cmap = "bwr"	#divergent colormap
 		center = 0
@@ -112,7 +113,7 @@ def heatmap(edges_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	#plt.title("Top {0} association rules".format(n_rules))
 	#plt.tight_layout()
 
-	return(fig)
+	#return(fig)
 
 def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None):
 	"""
@@ -120,6 +121,8 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 
 	Parameters
 	-----------
+	table : pd.DataFrame
+		
 	measure : str
 		The measure to show on the x-axis
 	pvalue : str
@@ -262,7 +265,7 @@ def network(network, layout="spring_layout", color_edge_by=None, color_node_by=N
 	]
 	
 	if layout not in available_layouts:
-		raise ValueError()
+		raise ValueError("Layout '{0}' is not a valid networkx layout".format(layout))
 
 	#Check if input network is a graph
 
