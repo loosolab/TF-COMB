@@ -5,6 +5,7 @@ import pkg_resources
 import pandas as pd
 import numpy as np
 import itertools
+import scipy
 
 #Network analysis
 import networkx as nx
@@ -146,87 +147,90 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 
 #------------------------ Directionality analysis ---------------------------#
 
+def get_scenario_keys(TF1, TF2, scenario):
+		
+	scenario_keys = {
+					 "scenario1": [(TF1, "+", TF2, "+"), 
+								   (TF2, "-", TF1, "-")],
+					 "scenario2": [(TF2, "+", TF1, "+"), 
+								   (TF1, "-", TF2, "-")],
+					 "scenario3": [(TF1, "+", TF2, "-"), 
+								   (TF2, "+", TF1, "-")],
+					 "scenario4": [(TF1, "-", TF2, "+"), 
+								   (TF2, "-", TF1, "+")]
+					}
 
-def directionality_analysis(rules):
-	""" 
-	Perform directionality analysis on the TF pairs in edges table 
+	return(scenario_keys[scenario])
 
-	1. TF1-TF2: |TF1+>    |TF2+>   =   <TF2-|   <TF1-|
-	2. TF2-TF1: |TF2+>    |TF1+>   =   <TF1-|   <TF2-|
-	3. against: |TF1+>    <TF2-|   =   |TF2+>   <TF1-|
-	4. away:    <TF1-|    |TF2+>   =   <TF2-|   |TF1+>
-	
+def get_directionality(rules):
 	"""
+	Perform directionality analysis on the TF pairs in directional / strand-specific table 
 
-	#4 different scenarios
-	table[["TF1_name", "TF1_strand"]] = table["TF1"].str.split("(", expand=True)
-	table["TF1_strand"] = table["TF1_strand"].str.replace(")", "")
+	1. TF1-TF2:  |TF1+>    |TF2+>   =   <TF2-|   <TF1-| 
+	2. TF2-TF1:  |TF2+>    |TF1+>   =   <TF1-|   <TF2-| 
+	3. convergent: |TF1+>    <TF2-|   =   |TF2+>   <TF1-|
+	4. divergent:    <TF1-|    |TF2+>   =   <TF2-|   |TF1+>
 
-	table[["TF2_name", "TF2_strand"]] = table["TF2"].str.split("(", expand=True)
-	table["TF2_strand"] = table["TF2_strand"].str.replace(")", "")
+	Returns
+	--------
+	pd.DataFrame
+		Percentages of pairs related to each scenario
 
 
-	#Convert counts to dictionary:
-	keys = table[["TF1_name", "TF1_strand","TF2_name", "TF2_strand"]].apply(tuple, axis=1) 
-	values = table[["TF1_TF2_count","TF1_count","TF2_count"]].apply(np.array, axis=1) 
-	pair_dict = dict(zip(keys, values))
+	"""
+	
+	#TODO: Test that input is stranded and directional
+	
+	rules = rules.copy() #ensures that rules-table is not changed
+	
+	#Split TF names from strands
+	rules[["TF1_name", "TF1_strand"]] = rules["TF1"].str.split("(", expand=True)
+	rules["TF1_strand"] = rules["TF1_strand"].str.replace(")", "", regex=False)
 
-	TFs = set(table["TF1_name"].tolist() + table["TF2_name"].tolist())
-
-	for TF1 in TFs:
-		for TF2 in TFs:
-			for TF1_strand in ["+","-"]:
-				for TF2_strand in ["+","-"]:
-					key = (TF1, TF1_strand, TF2, TF2_strand)
-					if not key in pair_dict:
-						pair_dict[key] = np.array([0,0,0])
-
-	null = np.array([0,0,0])
+	rules[["TF2_name", "TF2_strand"]] = rules["TF2"].str.split("(", expand=True)
+	rules["TF2_strand"] = rules["TF2_strand"].str.replace(")", "", regex=False)
+	
+	#Setup count dictionary
+	keys = tuples = [tuple(x) for x in rules[["TF1_name", "TF1_strand", "TF2_name", "TF2_strand"]].values]
+	counts = rules["TF1_TF2_count"].tolist()
+	count_dict = dict(zip(keys, counts))
+	
+	#Get all possible TF1-TF2 pairs
+	pairs = list(zip(rules["TF1_name"], rules["TF2_name"]))
+	pairs += [pair[::-1] for pair in pairs]
+	pairs = list(set(pairs))
+	
+	scenarios = ["scenario" + str(i) for i in range(1,5)]
 	lines = []
-	for pair in itertools.combinations(TFs, 2):
+	for (TF1, TF2) in pairs:
 		
-		TF1, TF2 = pair
+		counts = []
+		for scenario in scenarios:
+			keys = get_scenario_keys(TF1, TF2, scenario)
+			count = np.sum([count_dict.get(key, 0) for key in keys]) #sum of counts
+			counts.append(count)
 		
-		#Scenario 1
-		keys = [(TF1, "+", TF2, "+"), (TF2, "-", TF1, "-")] 
-		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
-		sce1 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
-		sce1 = market_basket(sce1)
+		#Normalize to sum of 1
+		total_counts = np.sum(counts)
+		normalized_counts = [c / total_counts if total_counts > 0 else 0 for c in counts]
 		
-		#Scenario 2
-		keys = [(TF2, "+", TF1, "+"), (TF1, "-", TF2, "-")]
-		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
-		sce2 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
-		sce2 = market_basket(sce2)
-		
-		#Scenario 3
-		keys = [(TF1, "+", TF2, "-"), (TF2, "+", TF1, "-")]
-		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
-		sce3 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
-		sce3 = market_basket(sce3)
-		
-		#Scenario 4
-		keys = [(TF1, "-", TF2, "+"), (TF2, "-", TF1, "+")]
-		arr = np.sum([pair_dict.get(key, null) for key in keys], axis=0) #list of values
-		sce4 = pd.Series(arr, index=["TF1_TF2_count", "TF1_count", "TF2_count"])
-		sce4 = market_basket(sce4)
-		
-		## Calculate variance between lifts
-		lifts = [series["lift"] for series in [sce1, sce2, sce3, sce4]]
-		total = sum([series["TF1_TF2_count"] for series in [sce1, sce2, sce3, sce4]])
-		
-		line = [TF1, TF2] + lifts + [total]
-		lines.append(line)
+		## Collect results in table
+		line = [TF1, TF2, total_counts] + normalized_counts
+		lines.append(line)       
 
-	frame = pd.DataFrame(lines)
-	frame.fillna(0, inplace=True)
+	columns = ["TF1", "TF2", "TF1_TF2_count"] + scenarios
+	frame = pd.DataFrame(lines, columns=columns)
+	
+	#Calculate standard deviation
+	frame["std"] = frame[scenarios].std(axis=1)
+	frame.sort_values("std", ascending=False, inplace=True) #sort by standard deviation
+	
+	return(frame)
 
 
 
 #----------------------------- Network analysis -----------------------------#
 
-#tfcomb.analysis.build_network(edges_table) #, node1=node1, node2=node2)
-#edges_to_network()
 
 def _is_symmetric(a, rtol=1e-05, atol=1e-08):
 	""" Utility to check if a matrix is symmetric. 
@@ -245,7 +249,8 @@ def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 	weight : str
 		The column to get the "weight" from
 
-	directed : 
+	directed : bool, optional
+
 
 	multi : bool, optional
 		Allow multiple edges between two vertices. If false, 
@@ -255,39 +260,52 @@ def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 	table = table.copy()
 	
 	#Find out if table is undirected or directed in terms of weight
-	pivot = pd.pivot_table(table, values=weight, index="TF1", columns="TF2")
+	pivot = pd.pivot_table(table, values=weight, index=node1, columns=node2)
 	matrix = np.nan_to_num(pivot.to_numpy())
 	symmetric = _is_symmetric(matrix) #if table is symmetric, the network is undirected
 	
 	######### Setup node attributes #########
-	attribute_columns = [col for col in table.columns if col not in ["TF1", "TF2"]]
+	attribute_columns = [col for col in table.columns if col not in [node1, node2]]
+	factorized = table.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
+	factorized = factorized[:100000] #subset in interest of performance
+
+	#Establish node1 and node2 attributes
+	node_attributes = {}
+	for node in [node1, node2]:
+		node_attributes[node] = []
+		
+		for attribute in attribute_columns:
+			p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+			if p == 1.0: #columns are fully correlated; save to node attribute
+				node_attributes[node] += [attribute]
 	
-	node1_attributes = ["TF1_count", "TF1_support"]
-	node2_attributes = ["TF2_count", "TF2_support"]
-	node_attributes = node1_attributes + node2_attributes
+	#Setup tables for node1 and node2 information
+	node1_attributes = node_attributes[node1]
+	node2_attributes = node_attributes[node2]
 	
-	TF1_table = table[["TF1"] + node1_attributes].drop_duplicates()
-	TF1_table.set_index("TF1", inplace=True)
-	TF2_table = table[["TF2"] + node2_attributes].drop_duplicates()
-	TF2_table.set_index("TF2", inplace=True)
-	
-	node_table = pd.concat([TF1_table, TF2_table], axis=1)
+	node1_table = table[[node1] + node1_attributes].set_index(node1)
+	node2_table = table[[node2] + node2_attributes].set_index(node2)
+
+	#Merge node information to dict for network
+	node_table = node1_table.merge(node2_table, left_index=True, right_index=True)
+	node_table.fillna(0, inplace=True)
+	node_attributes = node_table.columns
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
 	
 	######## Setup edge attributes #######
 	#Remove duplicated TF1-TF2 / TF2-TF1 pairs if matrix is symmetric
-	if len(table) > 1 and symmetric == True: #table is always symmetric if there is only one edge; but this is not an issue
-		TFs = list(set(table["TF1"]))
+	if len(table) > 1 and symmetric == True: #table is already symmetric and unique if there is only one edge
+		TFs = list(set(table[node1]))
 		unique_pairs = list(itertools.combinations(TFs, 2))
-		table.set_index(["TF1", "TF2"], inplace=True)
+		table.set_index([node1, node2], inplace=True)
 		available_keys = list(table.index)
 		unique_pairs = [pair for pair in unique_pairs if pair in available_keys] #only use pairs present in table
 
 		table = table.loc[unique_pairs]
 		table.reset_index(inplace=True)
 	
-	edge_attributes = ["TF1_TF2_count", "TF1_TF2_support", "confidence", "lift", "cosine", "jaccard"]
-	edges = [(row["TF1"], row["TF2"], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
+	edge_attributes = [col for col in attribute_columns if col not in node_attribute_dict]
+	edges = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
 	for edge in edges:
 		edge[-1]["weight"] = edge[-1][weight]
 	
@@ -304,9 +322,42 @@ def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 
 	return(G)
 
+
+def get_degree(G, weight=None):
+	"""
+	Get degree per node in graph. If weight is given, the degree is the sum of weighted edges
+
+	Parameters
+	-----------
+	G : networkx.Graph
+
+	weight : str, optional
+		Default: None
+
+	Returns
+	--------
+
+	"""
+	
+	if weight is None:
+		unweighted = dict(G.degree())
+		df = pd.DataFrame.from_dict(unweighted, orient="index")
+		
+	else:
+		edge_attributes = list(list(G.edges(data=True))[0][-1].keys())
+		if weight in edge_attributes:
+			weighted = dict(G.degree(weight=weight))
+			df = pd.DataFrame.from_dict(weighted, orient="index")
+		else:
+			raise ValueError()
+	
+	df.columns = ["degree"] 
+	df.sort_values("degree", inplace=True, ascending=False)    
+
+	return(df)
+
+
 #Center-piece subgraphs
-
-
 
 
 #Graph partitioning 
@@ -322,16 +373,16 @@ def get_partitions(network):
 
 	#network must be undirected
 	#if graph.is_directed():
-    #raise TypeError("Bad graph type, use only non directed graph")
+	#raise TypeError("Bad graph type, use only non directed graph")
 
 
 	partition_dict = community_louvain.best_partition(network)
-	partition_dict_fmt = {key: {"partition": value} for key, value in partition_dict.items()}
+	partition_dict_fmt = {key:{"partition": value} for key, value in partition_dict.items()}
 
 	#Add partition information to each node
 	nx.set_node_attributes(network, partition_dict_fmt)
 
-	#return(partition)
+	return(partition)
 
 
 
