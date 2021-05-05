@@ -1,21 +1,119 @@
 from kneed import DataGenerator, KneeLocator
 from tobias.utils.regions import OneRegion, RegionList
+from tobias.utils.motifs import MotifList
 from copy import deepcopy
 import pandas as pd
 import statsmodels.stats.multitest
 import numpy as np
 import scipy.stats
+import pysam
 
 def _get_background(matrix, TF1_idx, TF2_idx):
 	""" Fetches the background values from a matrix for a particular set of TFs"""
 
 	#Collect values for background
-	TF1_background = list(matrix[TF1_idx,~TF2_idx])
-	TF2_background = list(matrix[~TF1_idx,TF2_idx])
+	TF1_background = matrix[TF1_idx,:]
+	TF1_background = np.delete(TF1_background, TF2_idx, 0) #exclude TF1-TF2
 
-	background = TF1_background + TF2_background
+	TF2_background = matrix[:,TF2_idx]
+	TF2_background = np.delete(TF2_background, TF1_idx, 0) #exclude TF1-TF2
+
+	background = list(TF1_background) + list(TF2_background)
 
 	return(background)
+
+
+def prepare_motifs(motifs_file, motif_pvalue=0.0001, motif_naming="name"):
+	""" Read """
+
+	#Read and prepare motifs
+	motifs_obj = MotifList().from_file(motifs_file)
+
+	_ = [motif.get_threshold(motif_pvalue) for motif in motifs_obj]
+	_ = [motif.set_prefix(motif_naming) for motif in motifs_obj] #using naming from args
+
+	return(motifs_obj)
+
+def open_genome(genome_f):	
+	""" """
+	genome_obj = pysam.FastaFile(genome_f)
+	return(genome_obj)
+
+def calculate_TFBS(regions, motifs, genome):
+	"""
+	Multiprocessing-safe function to scan for motif occurrences
+
+	Parameters
+	----------
+	genome : str or 
+		If string , genome will be opened 
+	
+	regions : RegionList()
+		A RegionList() object of regions 
+
+	Returns
+	----------
+	RegionList of TFBS within regions
+
+	"""
+
+	#open the genome given
+	if isinstance(genome, str):
+		genome_obj = open_genome(genome)
+	else:
+		genome_obj = genome
+
+	TFBS = RegionList()
+
+	for region in regions:
+		seq = genome_obj.fetch(region.chrom, region.start, region.end)
+		region_TFBS = motifs.scan_sequence(seq, region)
+		region_TFBS.loc_sort()
+
+		TFBS += region_TFBS
+
+	if isinstance(genome, str):
+		genome_obj.close()
+
+	return(TFBS)
+
+def merge_regions(regions):
+	"""	Merge overlapping coordinates within regions """
+
+	regions.loc_sort()
+	merged = []
+	for region in regions:
+		pass
+
+	return(merged)
+
+
+def remove_duplicates(TFBS):
+	""" """
+
+	filtered = TFBS
+
+	return(filtered)
+
+
+def resolve_overlapping(TFBS):
+	""" Remove self overlapping regions """
+
+	#Split TFBS into dict per name
+	sites_per_name = {}
+	for site in TFBS:
+		if site.name not in sites_per_name:
+			sites_per_name[site.name] = RegionList()
+		sites_per_name[site.name].append(site)
+
+	#Resolve overlaps
+	resolved = RegionList()
+	for name in sites_per_name:
+		resolved.extend(sites_per_name[name].resolve_overlaps())
+	resolved.loc_sort()
+	
+	return(resolved)
+
 
 def _calculate_pvalue(table, measure="cosine", alternative="greater"):
 	"""

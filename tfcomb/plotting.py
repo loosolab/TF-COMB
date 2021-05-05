@@ -1,12 +1,13 @@
 import nxviz
 import networkx as nx
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import seaborn as sns
 
 
-def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_support", figsize=(7,7), ax=None):
+def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_support", figsize=(6,6), ax=None):
 	""" 
 	Plot bubble plot with TF1-TF2 pairs on the x-axis and a choice of measure on the y-axis, as well as color and size of bubbles. 
 
@@ -60,7 +61,7 @@ def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_su
 	return(ax)
 
 
-def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(8,8)):
+def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(6,6)):
 	"""
 	Plot heatmap with TF1 and TF2 on rows and columns respectively. Heatmap colormap is chosen by .color_by.
 
@@ -78,7 +79,10 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	# Create support table for the heatmap
 	pivot_table = rules_table.pivot(index=rows, columns=columns, values=color_by)
 
-	#Mask any NA values
+	#Convert any NaN to null
+	pivot_table = pivot_table.fillna(0)
+
+	#Mask any NaN/0 values
 	mask = np.zeros_like(pivot_table)
 	mask[np.isnan(pivot_table)] = True
 
@@ -93,14 +97,14 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 
 	#Plot heatmap
 	#fig, ax = plt.subplots(figsize=figsize) 
-	h = sns.clustermap(pivot_table, annot=False, 
-										mask=mask,
-										cbar=True, 
-										cmap=cmap,
-										center=center,
-										cbar_kws={'label': color_by}, 
-										xticklabels=True,
-										yticklabels=True
+	h = sns.clustermap(pivot_table, 
+								mask=mask,
+								cbar=True, 
+								cmap=cmap,
+								center=center,
+								cbar_kws={'label': color_by}, 
+								xticklabels=True,
+								yticklabels=True
 					)
 
 	xticklabels = h.ax_heatmap.axes.get_xticklabels()
@@ -127,7 +131,8 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 		The measure to show on the x-axis
 	pvalue : str
 		The column containing pvalues
-	measure_threshold : float
+
+	measure_threshold : float or list of floats
 
 	pvalue_threshold : float between 0-1
 		Default is 0.05
@@ -141,21 +146,33 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 	g = sns.jointplot(data=table, x=measure, y=pval_col, space=0) #, joint_kws={"s": 100})
 
 	#Plot thresholds
-	g.ax_joint.axhline(-np.log10(pvalue_threshold), linestyle="--", color="grey")
-	g.ax_joint.axvline(measure_threshold, linestyle="--", color="grey")
+	if pvalue_threshold is not None:
+		g.ax_joint.axhline(-np.log10(pvalue_threshold), linestyle="--", color="grey")
+		g.ax_marg_y.axhline(-np.log10(pvalue_threshold), linestyle="--", color="grey") #y-axis (pvalue)
 
-	g.ax_marg_y.axhline(-np.log10(pvalue_threshold), linestyle="--", color="grey") #y-axis (pvalue)
-	g.ax_marg_x.axvline(measure_threshold, linestyle="--", color="grey")	#x-axis (measure) threshold
+	if measure_threshold is not None:
+		
+		#if measure_threshold
+
+		g.ax_joint.axvline(measure_threshold, linestyle="--", color="grey")
+		g.ax_marg_x.axvline(measure_threshold, linestyle="--", color="grey")	#x-axis (measure) threshold
 
 	## Create selection of pairs below above thresholds
-	selection = table[(table[measure] >= measure_threshold) & (table[pvalue] <= pvalue_threshold)]
-	n_selected = len(selection)
+	if measure_threshold is not None or pvalue_threshold is not None:
 
-	#Mark chosen TF pairs in red
-	xvals = selection[measure]
-	yvals = selection[pval_col]
-	_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", 
-                		label="Selection (n={0})".format(n_selected))
+		#Set threshold to minimum if not set
+		pvalue_threshold = np.min(table[pval_col]) if pvalue_threshold is None else pvalue_threshold
+		measure_threshold = np.min(table[measure]) if measure_threshold is None else measure_threshold
+
+		selection = table[(table[measure] >= measure_threshold) & 
+						  (table[pvalue] <= pvalue_threshold)]
+		n_selected = len(selection)
+
+		#Mark chosen TF pairs in red
+		xvals = selection[measure]
+		yvals = selection[pval_col]
+		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", 
+							label="Selection (n={0})".format(n_selected))
 
 	
 
@@ -217,7 +234,7 @@ def _truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 	return new_cmap
 
 
-def network(network, layout="spring_layout", color_edge_by=None, color_node_by=None):
+def network(G, layout="spring_layout", color_edge_by=None, color_node_by=None, figsize=(6,6)):
 	""" 
 	Plot network of a networkx object.
 
@@ -228,6 +245,7 @@ def network(network, layout="spring_layout", color_edge_by=None, color_node_by=N
 	layout : str
 		Must be one of ....
 	color_edge_by : str
+		
 
 	color_node_by : str
 
@@ -269,23 +287,35 @@ def network(network, layout="spring_layout", color_edge_by=None, color_node_by=N
 
 	#Check if input network is a graph
 
+	#available edge attributes
+	edge_attributes = list(list(G.edges(data=True))[0][-1].keys())
+	node_attributes = list(list(G.nodes(data=True))[0][-1].keys())
+	
+	for edge_attribute in [color_edge_by]:
+		if edge_attribute is not None:
+			if edge_attribute not in edge_attributes:
+				raise ValueError()
+	for node_attribute in [color_node_by]:
+		if node_attribute is not None:
+			if node_attribute not in node_attributes:
+				raise ValueError()
 
 	
-	################# Decide what colormaps to use based on data ##################+
-
-	edge_weights = "" # fetch from network
-
-	edge_color = "red" if color_edge_by == None else edge_table[color_edge_by].tolist()
-	node_color = "grey" if color_node_by == None else node_table[color_node_by].tolist()
+	################# Decide what colormaps to use based on data ##################
 
 	colormap_red = _truncate_colormap(plt.cm.Reds, 0.3)
 	colormap_blue = _truncate_colormap(plt.cm.Blues_r, maxval=0.7)
 
-	#Edge color
+	#Establish color of edge
 	edge_cmap = None
-	if color_edge_by != None:
-		edge_weights = edge_table[color_edge_by]
-		
+	edge_vmin, edge_vmax = None, None
+	if color_edge_by is None:
+		edge_color = "red"
+	else:
+		edge_weights = [data[color_edge_by] for (_, _, data) in G.edges.data()]
+		node_vmin = np.min(edge_weights)
+		node_vmax = np.max(edge_weights)
+
 		if np.min(edge_weights) < 0 and np.max(edge_weights) > 0: #divergent colormap
 			edge_cmap = plt.cm.bwr
 			
@@ -297,12 +327,18 @@ def network(network, layout="spring_layout", color_edge_by=None, color_node_by=N
 			edge_cmap = colormap_blue
 		else:
 			edge_cmap = colormap_red
-	
-	#Node color
+
+		edge_color = edge_weights
+
+	#Establish color of nodes
+	node_cmap = None
 	node_vmin, node_vmax = None, None 
-	if color_node_by != None:
-		node_weights = node_table.loc[nodes, color_node_by]
-		node_color = node_weights.tolist()
+	if color_node_by == None:
+		node_color = "grey"
+	else:
+		node_weights = [data[color_node_by] for (_, data) in G.nodes.data()]
+		node_vmin = np.min(node_weights)
+		node_vmax = np.max(node_weights)
 		
 		if np.min(node_weights) < 0 and np.max(node_weights) > 0: #divergent colormap
 			node_cmap = plt.cm.coolwarm
@@ -311,25 +347,25 @@ def network(network, layout="spring_layout", color_edge_by=None, color_node_by=N
 			abs_max = np.max(np.abs(node_weights))
 			node_vmin = -abs_max
 			node_vmax = abs_max
-		elif np.min(edge_weights) < 0:
+		elif np.min(node_weights) < 0:
 			node_cmap = colormap_blue
 		else:
-			node_vmin = np.min(node_weights)
-			node_vmax = np.max(node_weights)
 			node_cmap = colormap_red
-	
+
+		node_color = node_weights
+
 
 	######################## Draw network graph ########################
 
 	#Setup figure
-	fig = plt.figure(figsize=figsize)
+	fig, ax = plt.subplots(figsize=figsize, frameon=False)
 
 	#Establish layout
 	layout_function = getattr(nx, layout)
 	pos = layout_function(G, scale=1.5)
 
 	#Draw nodes
-	nx_nodes = nx.draw_networkx_nodes(G, pos, node_color=node_color, cmap = node_cmap, node_size=node_size,
+	nx_nodes = nx.draw_networkx_nodes(G, pos, node_color=node_color, cmap=node_cmap, #node_size=node_size,
 													 vmin=node_vmin, vmax=node_vmax) #, node_size=0, alpha=0.4, edge_color="r", font_size=16, with_labels=True)
 	
 	#Draw node labels
@@ -337,24 +373,27 @@ def network(network, layout="spring_layout", color_edge_by=None, color_node_by=N
 	nx.draw_networkx_labels(G, pos = {k:([v[0], v[1]+y_off]) for k,v in pos.items()})
 	
 	#Draw edges
-	nx_edges = nx.draw_networkx_edges(G, pos, edge_color = edge_color, edge_cmap = edge_cmap, node_size=node_size)
+	nx_edges = nx.draw_networkx_edges(G, pos, edge_color = edge_color, edge_cmap = edge_cmap) # node_size=node_size)
 	
 
 	####################### Add colorbars to plot ##########################
 
 	if color_edge_by != None:
-		pc = mpl.collections.PatchCollection(nx_edges, cmap=edge_cmap)
-		pc.set_array(edge_weights)
-		cbar = plt.colorbar(pc)
+		sm = plt.cm.ScalarMappable(cmap=edge_cmap, norm=plt.Normalize(vmin=edge_vmin, vmax=edge_vmax))
+		sm.set_array([])
+		cbar = plt.colorbar(sm)
 		cbar.ax.set_title("Edge color:\n" + color_edge_by, rotation=45, ha="left")
 		
 	if color_node_by != None:
-		pc = mpl.collections.PatchCollection(nx_edges, cmap=node_cmap)
-		pc.set_array(np.linspace(node_vmin, node_vmax, 100))
-		cbar = plt.colorbar(pc)
+		sm = plt.cm.ScalarMappable(cmap=edge_cmap, norm=plt.Normalize(vmin=node_vmin, vmax=node_vmax))
+		sm.set_array([])
+		cbar = plt.colorbar(sm)
 		cbar.ax.set_title("Node color:\n" + color_node_by, rotation=45, ha="left")
 
-	return(fig)
+	ax.set_aspect(1)
+	ax.axis('off')
+	#plt.tight_layout()
+	#return(fig)
 
 
 def circos(network, color_edge_by="lift", size_edge_by="lift", color_node_by=None, size_node_by=None):

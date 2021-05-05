@@ -10,7 +10,7 @@ import cython
 @cython.boundscheck(False)	#dont check boundaries
 @cython.wraparound(False) 	#dont deal with negative indices
 @cython.nonecheck(False)
-def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000, int binary = 1):
+def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overlap, int n_names = 1000):
 
 	"""
 	Superfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction 
@@ -21,8 +21,14 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
 	w : int
 		Windowsize
+
+	min_distance : int
+		Minimum allowed distance between two TFs. Default : 0
+
+	max_distance : int
 		
-	max_overlap (float)
+
+	max_overlap (float) : 
 		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed.
 
 	binary : int
@@ -110,12 +116,6 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, int w, int max_overl
 					finding_assoc = False   #break out of finding_assoc-loop
 
 		## Done finding TF2's for current TF1
-		#Should counts be binary?
-		if binary == 1:	#convert counts to binary
-			for k in range(n_names):
-				if TF2_counts[k] > 1:
-					TF2_counts[k] = 1
-
 		#Add counts to pair_count_mat
 		for k in range(n_names):
 			pair_count_mat[TF1_name, k] += TF2_counts[k] 
