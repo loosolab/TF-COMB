@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import itertools
 import scipy
+from tfcomb.utils import check_columns
 
 #Network analysis
 import networkx as nx
@@ -44,25 +45,34 @@ def _fmt_field(v):
 		s = v
 	return(s)
 
-
 def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 	"""
-	Perform go_enrichment on the gene ids given
+	Perform a GO-term enrichment based on the input gene_ids. 
 
 	Parameters
 	-----------
 	gene_ids : list
 		A list of gene ids
 	organism : :obj:`str`, optional
-		The organism. Defaults to "human".
-	background_gene_ids : list
-		Defaults to uniprot proteins.
+		The organism of which the gene_ids originate. If organism 'background_gene_ids' are given, organism is not needed. Defaults to 'human'.
+	background_gene_ids : list, optional
+		A specific list of background gene ids to use. Default: uniprot proteins of the 'organism' given. 
+
+	See also
+	---------
+	tfcomb.plotting.go_bubble
+
+	Returns
+	--------
+	pd.DataFrame
+
+	Reference
+	----------
 
 	"""
 	
 	#verbosity 0/1/2
 	#setup logger
-	
 	
 	#Gene_ids must be a list
 	
@@ -145,9 +155,11 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None):
 
 	return(table)
 
-#------------------------ Directionality analysis ---------------------------#
+#-------------------------------------------------------------------------------#
+#-------------------------- Directionality analysis ----------------------------#
+#-------------------------------------------------------------------------------#
 
-def get_scenario_keys(TF1, TF2, scenario):
+def _get_scenario_keys(TF1, TF2, scenario):
 		
 	scenario_keys = {
 					 "scenario1": [(TF1, "+", TF2, "+"), 
@@ -162,11 +174,11 @@ def get_scenario_keys(TF1, TF2, scenario):
 
 	return(scenario_keys[scenario])
 
-def get_directionality(rules):
+def directionality(rules):
 	"""
-	Perform directionality analysis on the TF pairs in directional / strand-specific table 
+	Perform directionality analysis on the TF pairs in directional / strand-specific table.
 
-	1. TF1-TF2:  |TF1+>    |TF2+>   =   <TF2-|   <TF1-| 
+	1. TF1-TF2:  |---TF1(+)--->   |---TF2(+)--->   =   <TF2-|   <TF1-| 
 	2. TF2-TF1:  |TF2+>    |TF1+>   =   <TF1-|   <TF2-| 
 	3. convergent: |TF1+>    <TF2-|   =   |TF2+>   <TF1-|
 	4. divergent:    <TF1-|    |TF2+>   =   <TF2-|   |TF1+>
@@ -175,7 +187,6 @@ def get_directionality(rules):
 	--------
 	pd.DataFrame
 		Percentages of pairs related to each scenario
-
 
 	"""
 	
@@ -206,7 +217,7 @@ def get_directionality(rules):
 		
 		counts = []
 		for scenario in scenarios:
-			keys = get_scenario_keys(TF1, TF2, scenario)
+			keys = _get_scenario_keys(TF1, TF2, scenario)
 			count = np.sum([count_dict.get(key, 0) for key in keys]) #sum of counts
 			counts.append(count)
 		
@@ -214,6 +225,9 @@ def get_directionality(rules):
 		total_counts = np.sum(counts)
 		normalized_counts = [c / total_counts if total_counts > 0 else 0 for c in counts]
 		
+		#todo: chisquare
+
+
 		## Collect results in table
 		line = [TF1, TF2, total_counts] + normalized_counts
 		lines.append(line)       
@@ -227,10 +241,9 @@ def get_directionality(rules):
 	
 	return(frame)
 
-
-
-#----------------------------- Network analysis -----------------------------#
-
+#-------------------------------------------------------------------------------#
+#------------------------------- Network analysis ------------------------------#
+#-------------------------------------------------------------------------------#
 
 def _is_symmetric(a, rtol=1e-05, atol=1e-08):
 	""" Utility to check if a matrix is symmetric. 
@@ -238,51 +251,62 @@ def _is_symmetric(a, rtol=1e-05, atol=1e-08):
 	"""
 	return np.allclose(a, a.T, rtol=rtol, atol=atol)
 
-
-
-def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
+def build_network(table, node1="TF1", node2="TF2", weight=None, multi=True):
 	""" 
-	Table is the .rules from .market_basket()
+	Build a networkx network from a table containing node1, node2 and other node/edge attribute columns, e.g. as from CombObj.market_basket() analysis.
 	
 	Parameters
 	----------
+	table : pd.DataFrame 
+
 	weight : str
 		The column to get the "weight" from
 
 	directed : bool, optional
 
-
 	multi : bool, optional
 		Allow multiple edges between two vertices. If false, 
 
+	Returns
+	---------
+	networkx.Graph
 	"""
 	
 	table = table.copy()
-	
+	check_columns(table, [node1, node2, weight])
+
 	#Find out if table is undirected or directed in terms of weight
-	pivot = pd.pivot_table(table, values=weight, index=node1, columns=node2)
-	matrix = np.nan_to_num(pivot.to_numpy())
-	symmetric = _is_symmetric(matrix) #if table is symmetric, the network is undirected
-	
+	if weight is not None:
+		pivot = pd.pivot_table(table, values=weight, index=node1, columns=node2)
+		matrix = np.nan_to_num(pivot.to_numpy())
+		symmetric = _is_symmetric(matrix) #if table is symmetric, the network is undirected
+	else:
+		symmetric = False
+
 	######### Setup node attributes #########
 	attribute_columns = [col for col in table.columns if col not in [node1, node2]]
-	factorized = table.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
-	factorized = factorized[:100000] #subset in interest of performance
+	sub = table[:100000] #subset in interest of performance
+	factorized = sub.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
 
 	#Establish node1 and node2 attributes
 	node_attributes = {}
+	columns_to_assign = attribute_columns[:]
 	for node in [node1, node2]:
 		node_attributes[node] = []
 		
-		for attribute in attribute_columns:
+		for attribute in columns_to_assign:
 			p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
 			if p == 1.0: #columns are fully correlated; save to node attribute
 				node_attributes[node] += [attribute]
+		
+		#Remove attributes from columns_to_assign (prevents the same columns from being assigned to both TF1 and TF2)
+		for att in node_attributes[node]:
+			columns_to_assign.remove(att)
 	
 	#Setup tables for node1 and node2 information
 	node1_attributes = node_attributes[node1]
 	node2_attributes = node_attributes[node2]
-	
+
 	node1_table = table[[node1] + node1_attributes].set_index(node1)
 	node2_table = table[[node2] + node2_attributes].set_index(node2)
 
@@ -291,7 +315,7 @@ def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 	node_table.fillna(0, inplace=True)
 	node_attributes = node_table.columns
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
-	
+
 	######## Setup edge attributes #######
 	#Remove duplicated TF1-TF2 / TF2-TF1 pairs if matrix is symmetric
 	if len(table) > 1 and symmetric == True: #table is already symmetric and unique if there is only one edge
@@ -306,14 +330,16 @@ def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 	
 	edge_attributes = [col for col in attribute_columns if col not in node_attribute_dict]
 	edges = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
-	for edge in edges:
-		edge[-1]["weight"] = edge[-1][weight]
-	
+
+	if weight is not None:
+		for edge in edges:
+			edge[-1]["weight"] = edge[-1][weight]
+		
 	############ Setup Graph ############
 	if symmetric == True:
 		G = nx.Graph()
 		G.add_edges_from(edges)
-	else:       
+	else:
 		G = nx.MultiDiGraph()
 		G.add_edges_from(edges)
 	
@@ -325,17 +351,18 @@ def build_network(table, node1="TF1", node2="TF2", weight="cosine", multi=True):
 
 def get_degree(G, weight=None):
 	"""
-	Get degree per node in graph. If weight is given, the degree is the sum of weighted edges
+	Get degree per node in graph. If weight is given, the degree is the sum of weighted edges.
 
 	Parameters
 	-----------
 	G : networkx.Graph
 
 	weight : str, optional
-		Default: None
+		Name of an edge attribute within network. Default: None
 
 	Returns
 	--------
+	DataFrame
 
 	"""
 	
@@ -349,16 +376,17 @@ def get_degree(G, weight=None):
 			weighted = dict(G.degree(weight=weight))
 			df = pd.DataFrame.from_dict(weighted, orient="index")
 		else:
-			raise ValueError()
+			raise ValueError("Weight '{0}' is not an edge attribute of given network. Available attributes are: {1}".format(weight, edge_attributes))
 	
 	df.columns = ["degree"] 
 	df.sort_values("degree", inplace=True, ascending=False)    
 
 	return(df)
 
+#.group_TFs (based on network)
+	#although it is only pairs, hubs can be found of TF-cocktails. 
 
 #Center-piece subgraphs
-
 
 #Graph partitioning 
 def get_partitions(network):
@@ -368,7 +396,7 @@ def get_partitions(network):
 	Parameters
 	----------
 	network : networkx.Graph 
-
+	
 	"""
 
 	#network must be undirected
@@ -386,11 +414,13 @@ def get_partitions(network):
 
 
 
+#-------------------------------------------------------------------------------#
 #----------------------------- Annotation of sites -----------------------------#
+#-------------------------------------------------------------------------------#
 
-def annotate_peaks(regions, gtf, config=None, copy=None):
+def annotate_peaks(regions, gtf, config=None):
 	"""
-	Annotate regions with genes from .gtf using UROPA. 
+	Annotate regions with genes from .gtf using UROPA _[1]. 
 
 	Parameters
 	----------
@@ -398,10 +428,19 @@ def annotate_peaks(regions, gtf, config=None, copy=None):
 		A RegionList object
 	gtf : str
 		path to gtf file
+	config : dict
+
+
+	Returns
+	--------
+	None
+
+
 
 	Reference
 	----------
-
+	.. [1] Kondili M, Fust A, Preussner J, Kuenne C, Braun T, and Looso M. 
+	UROPA: a tool for Universal RObust Peak Annotation. Scientific Reports 7 (2017), doi: 10.1038/s41598-017-02464-y
 	
 	"""
 	

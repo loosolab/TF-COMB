@@ -8,6 +8,17 @@ import numpy as np
 import scipy.stats
 import pysam
 
+def check_columns(df, columns):
+	""" Utility to check whether columns are found within df """
+	
+	df_columns = df.columns
+
+	for column in columns:
+		if column is not None:
+			if column not in df_columns:
+				raise ValueError("Column '{0}' is not found in dataframe. Available columns are: {1}".format(column, df_columns))
+
+
 def _get_background(matrix, TF1_idx, TF2_idx):
 	""" Fetches the background values from a matrix for a particular set of TFs"""
 
@@ -118,7 +129,6 @@ def resolve_overlapping(TFBS):
 def _calculate_pvalue(table, measure="cosine", alternative="greater"):
 	"""
 
-
 	Parameters
 	------------
 	table : pd.DataFrame
@@ -131,7 +141,6 @@ def _calculate_pvalue(table, measure="cosine", alternative="greater"):
 	Returns
 	--------
 	List of p-values in order of input table
-	
 
 	"""
 	
@@ -203,7 +212,7 @@ def make_symmetric(matrix):
 	return(symmetric)
 
 
-def assign_sites_to_regions(sites, regions, verbosity=3):
+def assign_sites_to_regions(sites, regions):
 	"""
 	Assign sites to each region by overlapping. Used for the tfcomb.ComObj.count_between() function to assign .TFBS to regions.
 
@@ -218,7 +227,6 @@ def assign_sites_to_regions(sites, regions, verbosity=3):
 	-------
 	dict 
 		Dictionary of format {(chr,start,stop}: RegionList(<site1>, <site2>) (...)}
-
 	"""
 	
 	if not isinstance(sites, RegionList):

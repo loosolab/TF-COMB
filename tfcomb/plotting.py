@@ -1,3 +1,4 @@
+import os
 import nxviz
 import networkx as nx
 import numpy as np
@@ -5,54 +6,55 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import seaborn as sns
+import graphviz
+
+from tfcomb.utils import check_columns
 
 
-def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_support", figsize=(6,6), ax=None):
+def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,7), save=None):
 	""" 
 	Plot bubble plot with TF1-TF2 pairs on the x-axis and a choice of measure on the y-axis, as well as color and size of bubbles. 
 
 	Parameters
 	----------
-	edges_table : pandas.DataFrame
+	rules_table : pandas.DataFrame
 		Dataframe containing 
 	yaxis : str, optional
-		Defaults to "confidence"
-	color_by : str
-		Defaults to "lift"
+		Default: "confidence".
 	size_by : str
-		Defaults to "TF1_TF2_support"
+		Default: "TF1_TF2_support".
+	color_by : str
+		Default: None
 	figsize : tuple
+		Default: (7,7).
+	save : str, optional
+		Save the plot to the file given in 'save'. Default: None.
 
-
-	Return
-	-------
-
-
+	Returns
+	--------
+	ax
 	"""
 
-	#Setup figure
-	if ax == None:
-		fig, ax = plt.subplots(figsize=figsize) 
+	check_columns(rules_table, [yaxis, color_by, size_by])	
+
+	fig, ax = plt.subplots(figsize=figsize) 
 
 	with sns.axes_style("whitegrid"):
 		
 		ax = sns.scatterplot(
-							data=edges_table,
+							data=rules_table,
 							ax=ax,
-							x=edges_table.index, 
+							x=rules_table.index, 
 							y=yaxis, 
 							hue=color_by, 
 							size=size_by,
 							palette="PuBu", 
 							edgecolor=".7",
-							#height=6, 
-							#sizes=(50, 250),
-							#aspect=1.5
 		)
 
 	ax.grid()
 
-	labels = list(edges_table.index)
+	labels = list(rules_table.index)
 
 	# Tweak the figure to finalize
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
@@ -61,20 +63,29 @@ def bubble(edges_table, yaxis="confidence", color_by="lift", size_by="TF1_TF2_su
 	return(ax)
 
 
-def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(6,6)):
+def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(7,7), save=None):
 	"""
 	Plot heatmap with TF1 and TF2 on rows and columns respectively. Heatmap colormap is chosen by .color_by.
 
 	Parameters
 	----------
 	rules_table : pandas.DataFrame
+
 	columns : str, optional
+
 	rows : str, optional
+
 	color_by : str, optional
+
+	figsize : tuple
+		. Default: (7,7)
+
+	save : str
+		Save the plot to the file given in 'save'. Default: None.
 	"""
 
 	#Test input format
-	
+	check_columns(rules_table, [columns, rows, color_by])	
 
 	# Create support table for the heatmap
 	pivot_table = rules_table.pivot(index=rows, columns=columns, values=color_by)
@@ -96,7 +107,6 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 		center = None
 
 	#Plot heatmap
-	#fig, ax = plt.subplots(figsize=figsize) 
 	h = sns.clustermap(pivot_table, 
 								mask=mask,
 								cbar=True, 
@@ -104,7 +114,8 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 								center=center,
 								cbar_kws={'label': color_by}, 
 								xticklabels=True,
-								yticklabels=True
+								yticklabels=True,
+								figsize=figsize
 					)
 
 	xticklabels = h.ax_heatmap.axes.get_xticklabels()
@@ -117,26 +128,29 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	#plt.title("Top {0} association rules".format(n_rules))
 	#plt.tight_layout()
 
-	#return(fig)
+	if save is not None:
+
+	return(h)
 
 def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None):
 	"""
-	Plot volcano-style plots combining one measure and the pvalue
+	Plot volcano-style plots combining a measure and a pvalue.
 
 	Parameters
 	-----------
 	table : pd.DataFrame
-		
+		A table containing columns of 'measure' and 'pvalue'.
 	measure : str
-		The measure to show on the x-axis
+		The measure to show on the x-axis.
 	pvalue : str
-		The column containing pvalues
-
+		The column containing p-values (without any log-transformation).
 	measure_threshold : float or list of floats
 
 	pvalue_threshold : float between 0-1
-		Default is 0.05
+		Default: 0.05.
 	"""
+
+	check_columns(table, [measure, pvalue])	
 
 	#Convert pvalue to -log10
 	table = table.copy() #ensures that we don't change the table in place
@@ -174,26 +188,37 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", 
 							label="Selection (n={0})".format(n_selected))
 
-	
+	if save is not None:
+		pass
 
-def plot_go_enrichment(table, aspect="MF", n_terms=20, threshold=0.05):
-	"""
+	return(g)
 	
+def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
+	"""
+	Plot a bubble-style plot of GO-enrichment results.
+
 	Parameters
 	--------------
 	table : pandas.DataFrame 
-		The output of tfcomb.analysis.go_enrichment 
+		The output of tfcomb.analysis.go_enrichment.
 	aspect : str
-		One of ["MF", "BP", ""]
-
+		One of ["MF", "BP", "CC"]
+	n_terms : int
+		Maximum number of terms to show in graph. Default: 20
+	threshold : float between 0-1
+		The p-value-threshold to show in plot.
+	save : str, optional
+		""
 
 	Returns
 	----------
 	ax
 
 	"""
+	
 	#aspect has to be one of {'BP', 'CC', 'MF'}
 	
+
 	#Choose aspect
 	aspect_table = table[table["NS"] == aspect]
 	aspect_table.loc[:,"-log(p-value)"] = -np.log(aspect_table["p_fdr_bh"])
@@ -233,193 +258,172 @@ def _truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 		cmap(np.linspace(minval, maxval, n)))
 	return new_cmap
 
+def _rgb_to_hex(rgb):
+	return '#%02x%02x%02x' % rgb
 
-def network(G, layout="spring_layout", color_edge_by=None, color_node_by=None, figsize=(6,6)):
-	""" 
-	Plot network of a networkx object.
+def _values_to_cmap(values, plt_cmap=None):
+	""" Map values onto a cmap function taking value and returning hex color """
+
+	#Decide which colormap to use
+	colormap_red = _truncate_colormap(plt.cm.Reds, minval=0.3, maxval=0.7)
+	colormap_blue = _truncate_colormap(plt.cm.Blues_r, minval=0.3, maxval=0.7)
+	colormap_divergent = _truncate_colormap(plt.cm.bwr, minval=0.1, maxval=0.9)
+	
+	vmin, vmax = np.min(values), np.max(values)
+	if plt_cmap != None: #plt_cmap is given explicitly
+		pass #todo: check that plt_cmap is a colormap
+	elif vmin >= 0 and vmax >= 0:
+		plt_cmap = colormap_red
+	elif vmin < 0 and vmax < 0:
+		plt_cmap = colormap_blue
+	elif vmin < 0 and vmax >= 0:
+		plt_cmap = colormap_divergent
+		
+	#Normalize values and create cmap
+	norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
+	sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
+	cmap = sm.get_cmap()
+	color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
+	return(color_func)
+	
+
+def network(network, 
+				color_node_by=None,
+				color_edge_by=None,
+				size_node_by=None, 
+				size_edge_by=None,
+				engine="sfdp", 
+				size="8,8", 
+				save=None):
+	"""
+	Plot network of a networkx object using Graphviz for python.
 
 	Parameters
 	-----------
 	network : networkx.Graph
-
-	layout : str
-		Must be one of ....
-	color_edge_by : str
-		
-
-	color_node_by : str
-
+	color_node_by : str, optional
+		The name of a node attribute
+	color_edge_by : str, optional
+		The name of an edge attribute
+	size_node_by : str, optional
+		The name of a node attribute
+	size_edge_by : str, optional
+		The name of an edge attribute
+	engine : str, optional
+		The graphviz engine to use for finding network layout. Default: "sfdp".
+	size : str, optional
+		Size of the output figure. Default: "8,8".
+	save : str, optional
+		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
+	
 	Raises
 	-------
 	TypeError
-		if network is not a 
-	KeyError
-		#
+		If network is not a 
 	ValueError 
-		If layout string is not valid
-
-	See also
-	--------
-	tfcomb.analysis.build_network()
-
+		If any of 'color_node_by', 'color_edge_by' or 'size_edge_by' is not in node/edge attributes, or if 'engine' is not a valid graphviz engine.
 	"""
-
-	################# Check input validity #################
-
-	available_layouts = [
-		#"bipartite_layout",
-		"circular_layout",
-		"kamada_kawai_layout",
-		#"random_layout",
-		#"rescale_layout",
-		#"rescale_layout_dict",
-		"shell_layout",
-		"spring_layout",
-		"spectral_layout",
-		#"planar_layout",
-		"fruchterman_reingold_layout",
-		"spiral_layout",
-		#"multipartite_layout",
-	]
-	
-	if layout not in available_layouts:
-		raise ValueError("Layout '{0}' is not a valid networkx layout".format(layout))
-
-	#Check if input network is a graph
-
-	#available edge attributes
-	edge_attributes = list(list(G.edges(data=True))[0][-1].keys())
-	node_attributes = list(list(G.nodes(data=True))[0][-1].keys())
-	
-	for edge_attribute in [color_edge_by]:
-		if edge_attribute is not None:
-			if edge_attribute not in edge_attributes:
-				raise ValueError()
-	for node_attribute in [color_node_by]:
-		if node_attribute is not None:
-			if node_attribute not in node_attributes:
-				raise ValueError()
-
-	
-	################# Decide what colormaps to use based on data ##################
-
-	colormap_red = _truncate_colormap(plt.cm.Reds, 0.3)
-	colormap_blue = _truncate_colormap(plt.cm.Blues_r, maxval=0.7)
-
-	#Establish color of edge
-	edge_cmap = None
-	edge_vmin, edge_vmax = None, None
-	if color_edge_by is None:
-		edge_color = "red"
-	else:
-		edge_weights = [data[color_edge_by] for (_, _, data) in G.edges.data()]
-		node_vmin = np.min(edge_weights)
-		node_vmax = np.max(edge_weights)
-
-		if np.min(edge_weights) < 0 and np.max(edge_weights) > 0: #divergent colormap
-			edge_cmap = plt.cm.bwr
-			
-			#Ensure center at 0
-			abs_max = np.max(np.abs(edge_weights))
-			edge_vmin = -abs_max
-			edge_vmax = abs_max
-		elif np.min(edge_weights) < 0:
-			edge_cmap = colormap_blue
-		else:
-			edge_cmap = colormap_red
-
-		edge_color = edge_weights
-
-	#Establish color of nodes
-	node_cmap = None
-	node_vmin, node_vmax = None, None 
-	if color_node_by == None:
-		node_color = "grey"
-	else:
-		node_weights = [data[color_node_by] for (_, data) in G.nodes.data()]
-		node_vmin = np.min(node_weights)
-		node_vmax = np.max(node_weights)
 		
-		if np.min(node_weights) < 0 and np.max(node_weights) > 0: #divergent colormap
-			node_cmap = plt.cm.coolwarm
-			
-			#Ensure center at 0
-			abs_max = np.max(np.abs(node_weights))
-			node_vmin = -abs_max
-			node_vmax = abs_max
-		elif np.min(node_weights) < 0:
-			node_cmap = colormap_blue
-		else:
-			node_cmap = colormap_red
-
-		node_color = node_weights
-
-
-	######################## Draw network graph ########################
-
-	#Setup figure
-	fig, ax = plt.subplots(figsize=figsize, frameon=False)
-
-	#Establish layout
-	layout_function = getattr(nx, layout)
-	pos = layout_function(G, scale=1.5)
-
-	#Draw nodes
-	nx_nodes = nx.draw_networkx_nodes(G, pos, node_color=node_color, cmap=node_cmap, #node_size=node_size,
-													 vmin=node_vmin, vmax=node_vmax) #, node_size=0, alpha=0.4, edge_color="r", font_size=16, with_labels=True)
+	############### Test input ###############
 	
-	#Draw node labels
-	y_off = 0.15
-	nx.draw_networkx_labels(G, pos = {k:([v[0], v[1]+y_off]) for k,v in pos.items()})
-	
-	#Draw edges
-	nx_edges = nx.draw_networkx_edges(G, pos, edge_color = edge_color, edge_cmap = edge_cmap) # node_size=node_size)
-	
+	#Read nodes and edges from graph
+	node_view = network.nodes(data=True)
+	edge_view = network.edges(data=True)
 
-	####################### Add colorbars to plot ##########################
-
-	if color_edge_by != None:
-		sm = plt.cm.ScalarMappable(cmap=edge_cmap, norm=plt.Normalize(vmin=edge_vmin, vmax=edge_vmax))
-		sm.set_array([])
-		cbar = plt.colorbar(sm)
-		cbar.ax.set_title("Edge color:\n" + color_edge_by, rotation=45, ha="left")
-		
+	node_attributes = list(list(node_view)[0][-1].keys())    
+	edge_attributes = list(list(edge_view)[0][-1].keys())
+	
+	if engine not in graphviz.ENGINES:
+		raise ValueError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
+	
+	#todo: check size with re
+	
+	############### Initialize graph ###############
+	
+	dot = graphviz.Graph(engine=engine)
+	dot.attr(size=size)
+	
+	############ Setup colormaps/sizemaps ############
+	map_value = {}
+	
+	#Node color
 	if color_node_by != None:
-		sm = plt.cm.ScalarMappable(cmap=edge_cmap, norm=plt.Normalize(vmin=node_vmin, vmax=node_vmax))
-		sm.set_array([])
-		cbar = plt.colorbar(sm)
-		cbar.ax.set_title("Node color:\n" + color_node_by, rotation=45, ha="left")
-
-	ax.set_aspect(1)
-	ax.axis('off')
-	#plt.tight_layout()
-	#return(fig)
-
-
-def circos(network, color_edge_by="lift", size_edge_by="lift", color_node_by=None, size_node_by=None):
-	"""
-
-	Plot circos plot from networkx network object
-
-	Parameters
-	-----------
-	color_edge_by : str
-		string must be the name of an edge attribute
-	size_edge_by : str
-		string must be the name of an edge attribute
-	color_node_by : str
-		string must be the name of a node attribute
-	size_node_by : str
-		string must be the name of a node attribute
+		all_values = [node[-1][color_node_by] for node in node_view]
+		map_value["node_color"] = _values_to_cmap(all_values)
 	
-	Returns
-	--------
+	#Edge color
+	if color_edge_by != None:
+		all_values = [edge[-1][color_edge_by] for edge in edge_view]
+		map_value["edge_color"] = _values_to_cmap(all_values)
+	
+	#Node size
+	if size_node_by != None:
+		all_values = [node[-1][size_node_by] for node in node_view]
+		nmin, nmax = np.min(all_values), np.max(all_values)
+		na, nb = 14, 20
+		map_value["node_size"] = lambda value: np.round((value-nmin)/(nmax-nmin)*(nb-na)+na, 2)
+	
+	#Edge size
+	if size_edge_by != None:
+		all_values = [edge[-1][size_edge_by] for edge in edge_view]
+		vmin, vmax = np.min(all_values), np.max(all_values)
+		a, b = 1, 8
+		map_value["edge_size"] = lambda value: np.round((value-vmin)/(vmax-vmin)*(b-a)+a, 2)
 
-	"""
+	
+	############### Add nodes to network ##############
+	for node in node_view:
+	
+		node_name = node[0]
+		node_att = node[1]
+		
+		attributes = {} #attributes for dot
 
-	#G = tfcomb.analysis.build_network(edges_table) #, node1=node1, node2=node2)
-	#edge_width = edges_table[size_edge_by]
+		#Set node color
+		if color_node_by != None:
+			attributes["style"] = "filled"     
+			value = node_att[color_node_by]
+			attributes["color"] = map_value["node_color"](value)
+			
+		#Set node size
+		if size_node_by != None:
+			value = node_att[size_node_by]
+			attributes["fontsize"] = str(map_value["node_size"](value))
+		
+		#After collecting all attributes; add node with attribute dict
+		if len(attributes) > 0:
+			dot.node(node_name, _attributes=attributes)
+		else:
+			dot.node(node_name)
 
-	#Plot circos of G
-	c = nxviz.CircosPlot(network, node_labels=True, fontfamily="sans-serif", edge_width=size_edge_by) #, edge_width=size_edge_by)  #, node_color='affiliation', node_grouping='affiliation')
-	c.draw()	
+	############### Add edges to network ###############
+	for edge in edge_view:
+	
+		node1, node2 = edge[:2]
+		edge_att = edge[-1]
+		
+		attributes = {}
+		
+		#Set edge color
+		if color_edge_by != None:
+			value = edge_att[color_edge_by]
+			attributes["color"] = map_value["edge_color"](value)
+		
+		#Set edge size
+		if size_edge_by != None:
+			value = edge_att[size_edge_by]
+			attributes["penwidth"] = str(map_value["edge_size"](value))
+	   
+		dot.edge(node1, node2, _attributes=attributes)
+	
+	############### Save to file ###############
+	if save != None:
+		splt = os.path.splitext(save)
+		file_prefix = "".join(splt[:-1])
+		fmt = splt[-1].replace(".", "")
+		
+		if fmt not in graphviz.FORMATS:
+			fmt = "pdf"
+		dot.render(filename=file_prefix, format=fmt, cleanup=True)
+	
+	return(dot)
