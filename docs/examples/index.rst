@@ -14,4 +14,6 @@ The usage of TF-comb is split into three main parts:
     :maxdepth: 1
     :glob:
 
+    Predefined_TFBS
+    TFBS_from_motifs
     *

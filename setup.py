@@ -47,7 +47,7 @@ def readme():
 	with open('README.md') as f:
 		return f.read()
 
-setup(name='TF-comb',
+setup(name='TF-COMB',
 		version=find_version(os.path.join(setupdir, "tfcomb", "__init__.py")),	#get version from __init__.py
 		description='Transcription Factor Co-Occurrence using Market Basket analysis',
 		long_description=readme(),
