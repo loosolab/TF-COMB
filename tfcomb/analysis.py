@@ -7,6 +7,7 @@ import numpy as np
 import itertools
 import scipy
 from tfcomb.utils import check_columns
+from scipy.stats import chisquare
 
 #Network analysis
 import networkx as nx
@@ -176,7 +177,7 @@ def _get_scenario_keys(TF1, TF2, scenario):
 
 def directionality(rules):
 	"""
-	Perform directionality analysis on the TF pairs in directional / strand-specific table.
+	Perform directionality analysis on the TF pairs in a directional / strand-specific table.
 
 	1. TF1-TF2:  |---TF1(+)--->   |---TF2(+)--->   =   <TF2-|   <TF1-| 
 	2. TF2-TF1:  |TF2+>    |TF1+>   =   <TF1-|   <TF2-| 
@@ -187,6 +188,15 @@ def directionality(rules):
 	--------
 	pd.DataFrame
 		Percentages of pairs related to each scenario
+
+		The dataframe has the following columns:
+			- TF1: name of the first TF in pair
+			- TF2: name of the second TF in pair
+			- TF1_TF2_count: 
+			- scenario1_TF1_TF2
+			- scenario2_TF2_TF1
+			- scenario3_convergent
+			- scenario4_divergent
 
 	"""
 	
@@ -208,9 +218,15 @@ def directionality(rules):
 	
 	#Get all possible TF1-TF2 pairs
 	pairs = list(zip(rules["TF1_name"], rules["TF2_name"]))
-	pairs += [pair[::-1] for pair in pairs]
 	pairs = list(set(pairs))
-	
+
+	#Remove TF2-TF1 duplicates
+	seen = {}
+	for pair in pairs:
+		if pair[::-1] not in seen: #the reverse TF2-TF1 pair has not been seen yet
+			seen[pair] = ""
+	pairs = list(seen.keys())
+
 	scenarios = ["scenario" + str(i) for i in range(1,5)]
 	lines = []
 	for (TF1, TF2) in pairs:
@@ -223,22 +239,49 @@ def directionality(rules):
 		
 		#Normalize to sum of 1
 		total_counts = np.sum(counts)
-		normalized_counts = [c / total_counts if total_counts > 0 else 0 for c in counts]
-		
-		#todo: chisquare
-
 
 		## Collect results in table
-		line = [TF1, TF2, total_counts] + normalized_counts
+		line = [TF1, TF2, total_counts] + counts
 		lines.append(line)       
 
 	columns = ["TF1", "TF2", "TF1_TF2_count"] + scenarios
 	frame = pd.DataFrame(lines, columns=columns)
 	
+	#Calculate chisquare
+	unique = frame[scenarios].drop_duplicates()
+	mat = unique.to_numpy()
+	rows, cols = mat.shape
+	pvalues = [0]*rows
+	for row in range(rows):
+		n = mat[row,:]
+		s, p = chisquare(n)
+		pvalues[row] = p
+	unique["pvalue"] = pvalues
+	
+	#Merge unique to frame
+	frame = frame.merge(unique, left_on=scenarios, right_on=scenarios, how="left")
+
+	#Normalize counts to sum of 1
+	n = frame["TF1_TF2_count"].tolist()
+	for scenario in scenarios:
+		frame[scenario] = frame[scenario] / frame["TF1_TF2_count"]
+		frame[scenario] = frame[scenario].replace(np.inf, 0)
+
 	#Calculate standard deviation
 	frame["std"] = frame[scenarios].std(axis=1)
-	frame.sort_values("std", ascending=False, inplace=True) #sort by standard deviation
-	
+	frame = frame[columns + ["std", "pvalue"]] #reorder columns
+
+	#Sort by pvalue and number of co-occurrences found
+	frame["s"] = -frame["TF1_TF2_count"]
+	frame.sort_values(["pvalue", "s"], inplace=True)
+	frame.drop(columns=["s"], inplace=True)
+
+	#Rename scenarios
+	frame.rename(columns={"scenario1": "scenario1_TF1-TF2",
+				  "scenario2": "scenario2_TF2-TF1",
+				  "scenario3": "scenario3_convergent",
+				  "scenario4": "scenario4_divergent"}, inplace=True) 
+
 	return(frame)
 
 #-------------------------------------------------------------------------------#
@@ -251,37 +294,46 @@ def _is_symmetric(a, rtol=1e-05, atol=1e-08):
 	"""
 	return np.allclose(a, a.T, rtol=rtol, atol=atol)
 
-def build_network(table, node1="TF1", node2="TF2", weight=None, multi=True):
+def build_network(table, node1="TF1", node2="TF2", directed=False, multi=False):
 	""" 
 	Build a networkx network from a table containing node1, node2 and other node/edge attribute columns, e.g. as from CombObj.market_basket() analysis.
 	
 	Parameters
 	----------
 	table : pd.DataFrame 
-
-	weight : str
-		The column to get the "weight" from
-
+		Edges table including node/edge attributes.
+	node1 : str, optional
+		The column to use as node1 ID. Default: "TF1".
+	node2 : str, optional
+		The column to use as node2 ID. Default: "TF2".
 	directed : bool, optional
-
+		Whether edges are directed or not. Default: False.
 	multi : bool, optional
-		Allow multiple edges between two vertices. If false, 
+		Allow multiple edges between two vertices. If false, the first occurrence of TF1-TF2/TF2-TF1 in the table is used. Default: False.
 
 	Returns
 	---------
-	networkx.Graph
+	networkx.Graph / networkx.diGraph / networkx.MultiGraph / networkx.MultiDiGraph - depending on parameters given
 	"""
 	
 	table = table.copy()
-	check_columns(table, [node1, node2, weight])
+	check_columns(table, [node1, node2])
 
-	#Find out if table is undirected or directed in terms of weight
-	if weight is not None:
-		pivot = pd.pivot_table(table, values=weight, index=node1, columns=node2)
-		matrix = np.nan_to_num(pivot.to_numpy())
-		symmetric = _is_symmetric(matrix) #if table is symmetric, the network is undirected
-	else:
-		symmetric = False
+	# Subset edges based on multi
+	if multi == False:
+
+		table.set_index([node1, node2], inplace=True)
+		pairs = table.index
+
+		#Collect unique pairs (first occurrence is kept)
+		to_keep = {}
+		for pair in pairs:
+			if not pair[::-1] in to_keep: #if opposite was not already found
+				to_keep[pair] = ""
+
+		#Subset table
+		table = table.loc[list(to_keep.keys())]
+		table.reset_index(inplace=True)
 
 	######### Setup node attributes #########
 	attribute_columns = [col for col in table.columns if col not in [node1, node2]]
@@ -311,37 +363,30 @@ def build_network(table, node1="TF1", node2="TF2", weight=None, multi=True):
 	node2_table = table[[node2] + node2_attributes].set_index(node2)
 
 	#Merge node information to dict for network
-	node_table = node1_table.merge(node2_table, left_index=True, right_index=True)
+	node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
 	node_table.fillna(0, inplace=True)
 	node_attributes = node_table.columns
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
 
-	######## Setup edge attributes #######
-	#Remove duplicated TF1-TF2 / TF2-TF1 pairs if matrix is symmetric
-	if len(table) > 1 and symmetric == True: #table is already symmetric and unique if there is only one edge
-		TFs = list(set(table[node1]))
-		unique_pairs = list(itertools.combinations(TFs, 2))
-		table.set_index([node1, node2], inplace=True)
-		available_keys = list(table.index)
-		unique_pairs = [pair for pair in unique_pairs if pair in available_keys] #only use pairs present in table
-
-		table = table.loc[unique_pairs]
-		table.reset_index(inplace=True)
-	
+	######## Setup edge attributes #######	
 	edge_attributes = [col for col in attribute_columns if col not in node_attribute_dict]
 	edges = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
-
-	if weight is not None:
-		for edge in edges:
-			edge[-1]["weight"] = edge[-1][weight]
 		
 	############ Setup Graph ############
-	if symmetric == True:
-		G = nx.Graph()
-		G.add_edges_from(edges)
+	
+	if multi == True:
+		if directed == True:
+			G = nx.MultiDiGraph()
+		else:
+			G = nx.MultiGraph()
 	else:
-		G = nx.MultiDiGraph()
-		G.add_edges_from(edges)
+		if directed == True:
+			G = nx.diGraph()
+		else:
+			G = nx.Graph()
+
+	#Add collected edges
+	G.add_edges_from(edges)
 	
 	#Add node attributes
 	nx.set_node_attributes(G, node_attribute_dict)
@@ -396,7 +441,7 @@ def get_partitions(network):
 	Parameters
 	----------
 	network : networkx.Graph 
-	
+
 	"""
 
 	#network must be undirected

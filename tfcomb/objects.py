@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 #Utilities from TOBIAS
+import tobias
 from tobias.utils.motifs import MotifList
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.utilities import merge_dicts, run_parallel, check_required
@@ -43,9 +44,8 @@ from tfcomb.utils import *
 from kneed import KneeLocator
 
 class CombObj(): 
-
 	"""
-	The main class for collecting and working with co-occurring TFs
+	The main class for collecting and working with co-occurring TFs.
 
 	Examples
     ----------
@@ -56,16 +56,16 @@ class CombObj():
 
 	"""
 
-	def __init__(self, verbosity = 2): #set verbosity 
+	def __init__(self, verbosity = 1): #set verbosity 
 
 		#Function and run parameters
-		self.verbosity = verbosity  #0: error, 1:warning, 2:info, 3:debug, 4:spam-debug
+		self.verbosity = verbosity  #0: error, 1:info, 2:debug, 3:spam-debug
 		self.logger = TFcombLogger(self.verbosity)
 		
 		#Variables for storing data
 		self.prefix = None 	#is used when objects are added to a DiffCombObj
 		self.TF_names = []		#List of TF names
-		self.TF_counts = None 	#numpy array
+		self.TF_counts = None 	#numpy array of size n_TFs
 		self.pair_counts = None	#numpy matrix of size n_TFs x n_TFs
 		self.n_bp = 0			#predict the number of baskets 
 		self.TFBS = RegionList() #None RegionList() of TFBS
@@ -90,15 +90,16 @@ class CombObj():
 	
 	def __add__(self, obj):
 		"""
-		Internal method to add two CombObj together using: `CombObj1 + CombObj2 = new_CombObj`
+		Internal method to add two CombObj together using: `CombObj1 + CombObj2 = new_CombObj`. This merges the .TFBS of both objects under the hood.
 		
 		Parameters:
 		----------
-			obj : CombObj 
-		
+		obj : CombObj 
+			A CombObj to add.
+
 		Returns:
 		----------
-			A merged CombObj
+			A merged CombObj.
 		"""
 
 		combined = CombObj(self.verbosity) #initialize empty combobj
@@ -114,6 +115,7 @@ class CombObj():
 		""" Returns a copy of the CombObj """
 
 		copied = copy.deepcopy(self)
+		copied.logger = TFcombLogger(self.verbosity) #receives its own logger
 		return(copied)
 	
 	def set_verbosity(self, level):
@@ -122,7 +124,7 @@ class CombObj():
 		Parameters
 		----------
 		level : int
-			A value between 0-4 where 0 (only errors), 1 (warning), 2 (info - default), 3 (debug), 4 (spam debug)
+			A value between 0-3 where 0 (only errors), 1 (info), 2 (debug), 3 (spam debug). Default: 1.
 		"""
 
 		self.verbosity = level
@@ -151,17 +153,17 @@ class CombObj():
 
 	def from_pickle(self, path):
 		"""
-		Import a CombObj from a pickle file
+		Import a CombObj from a pickle file.
 
 		Parameters
 		-----------
 		path : str
-			Path to an existing pickle file to read
+			Path to an existing pickle file to read.
 
 		Raises
 		-------
 		TypeError
-			If read object is not an instance of CombObj 
+			If read object is not an instance of CombObj .
 		
 		See also
 		----------
@@ -171,7 +173,7 @@ class CombObj():
 		filehandler = open(path, 'r') 
 		obj = pickle.load(filehandler)
 
-		#todo: Check if object is CombObj
+		#Check if object is CombObj
 		if not isinstance(obj, CombObj):
 			raise TypeError("Read object from '{0}' is not a CombObj".format(path))
 
@@ -190,25 +192,25 @@ class CombObj():
 								threads = 1):
 
 		"""
-		Function to calculate TFBS from motifs and genome fasta
+		Function to calculate TFBS from motifs and genome fasta.
 
 		Parameters
 		-----------
 		regions : str or tobias.utils.regions.RegionList
 			Path to a .bed-file containing regions or a tobias-format RegionList object. 
-		motifs : tobias.utils.motifs.MotifList or str 
+		motifs : str or tobias.utils.motifs.MotifList
 			Path to a file containing JASPAR/MEME-style motifs or a tobias-format MotifList object.
 		genome : str
 			Path to the genome fasta-file to use for scan.
-		motif_pvalue : float
+		motif_pvalue : float, optional
 			Set the pvalue for the motif search. Default: 0.0001.
-		motif_naming : str
-			How to name TFs based on input motifs. Must be one of "name" (...).
-		gc : float between 0-1
+		motif_naming : str, optional
+			How to name TFs based on input motifs. Must be one of "name", ". Default: "name".
+		gc : float between 0-1, optional
 			Set GC-content for the background model. Default: 0.5.
-		keep_overlap : bool
+		keep_overlap : bool, optional
 			Whether to keep overlapping occurrences of the same TFBS. Setting 'False' removes overlapping TFBS keeping the TFBS with the highest match score. Default: False.
-		threads : int
+		threads : int, optional
 			How many threads to use for multiprocessing. Default: 1. 
 
 		Returns
@@ -233,6 +235,10 @@ class CombObj():
 			motifs_f = motifs
 			motifs = tfcomb.utils.prepare_motifs(motifs_f, motif_pvalue, motif_naming)
 			self.logger.debug("Read {0} motifs from '{1}'".format(len(motifs), motifs_f))
+		else:
+			pass
+			#todo: check that given motifs have pvalues/prefix set
+
 
 		#Get ready to collect TFBS
 		self.TFBS = RegionList()	#initialize empty list
@@ -354,6 +360,41 @@ class CombObj():
 		self.logger.info("Read {0} sites from condition '{1}'".format(len(self.TFBS), condition))
 		
 
+	def cluster_TFBS(self, threshold=0.5):
+		""" Cluster TFBS based on overlap 
+		
+		Parameters
+		------------
+		threshold : float
+		
+		"""
+
+		overlap_dict = self.TFBS.count_overlaps()
+		
+		#Setup cluster object
+		clust = tobias.utils.regions.RegionCluster(overlap_dict)
+		clust.cluster(threshold=threshold)
+
+		#Create name -> new name dict
+		conversion = {}
+		for cluster_idx in clust.clusters:
+			
+			members = clust.clusters[cluster_idx]["member_names"]
+
+			if len(members) > 1:
+				new_name = "/".join(sorted(members))
+				for member in members:
+					conversion[member] = new_name
+			else:
+				conversion[members[0]] = members[0]
+
+		#Convert TFBS names
+		for site in self.TFBS:
+			site.name = conversion[site.name]
+
+		self.logger.info("")
+
+
 	def subset_TFBS(self, regions, bedpe=False):
 		"""
 		Subset .TFBS in object to specific regions. Can be used to select only a subset of TFBS (e.g. only in promoters) to run analysis on.
@@ -404,15 +445,22 @@ class CombObj():
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 
-	def count_within(self, window = 100, max_overlap = 0, stranded = False, directional = False):
+	def count_within(self, min_distance = 0, 
+						   max_distance = 100, 
+						   max_overlap = 0, 
+						   stranded = False, 
+						   directional = False, 
+						   binarize = False):
 		""" 
-		Count co-occurrences between TFBS. This function requires .TFBS to be filled by either `TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`.
+		Count co-occurrences between TFBS. This function requires .TFBS to be filled by either `TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`. 
+		This function can be followed by .market_basket to calculate association rules.
 		
 		Parameters
 		-----------
-		window : int
-			The window size to search for co-occurrences within. Distances are calculated from end-to-end of regions, e.g. the smallest possible distance.
-			Default: 100.
+		min_distance : int
+			Minimum distance between two TFBS to be counted as co-occurring. Distances are calculated from end-to-end of regions, e.g. the smallest possible distance. Default: 0.
+		max_distance : int
+			Maximum distance between two TFBS to be counted as co-occurring. Distances are calculated from end-to-end of regions, e.g. the smallest possible distance. Default: 100.
 		max_overlap : float between 0-1
 			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
 			Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
@@ -421,11 +469,13 @@ class CombObj():
 		directional : bool
 			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
 			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
+		binarize : bool, optional
+			Whether to count a TF1-TF2 more than once per window (e.g. in the case of "<TF1> <TF2> <TF2> (...)"). Default: False.
 
 		Returns
 		----------
 		None 
-			Fills the object variable .TF_counts and .pair_counts.
+			Fills the object variables .TF_counts and .pair_counts.
 		
 		Raises
 		--------
@@ -435,7 +485,7 @@ class CombObj():
 
 		#Check that TFBS exist and that it is RegionList
 		if self.TFBS is None or not isinstance(self.TFBS, RegionList):
-			raise ValueError("No TFBS available in .TFBS . TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS")
+			raise ValueError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS")
 			
 		self.logger.info("Counting co-occurring TFs from .TFBS...")
 
@@ -449,7 +499,7 @@ class CombObj():
 		self.TF_names = sorted(list(set([site.name for site in TFBS]))) #ensures that the same TF order is used across cores/subsets
 		n_TFs = len(self.TF_names)
 		self.logger.debug("Found {0} TF names in TFBS".format(n_TFs))
-		self.logger.spam("TFBS names: {0}".format(self.TF_names))
+		#self.logger.spam("TFBS names: {0}".format(self.TF_names))
 
 		#Convert TFBS to internal numpy integer format
 		chromosomes = {site.chrom:"" for site in TFBS}.keys()
@@ -463,7 +513,12 @@ class CombObj():
 		#---------- Count co-occurrences within TFBS ---------#
 
 		self.logger.debug("Counting co-occurrences within sites")
-		TF_counts, pair_counts = count_co_occurrence(sites, window, max_overlap, n_TFs)
+		binary = 0 if binarize == False else 1
+		TF_counts, pair_counts = count_co_occurrence(sites, min_distance,
+															max_distance,
+															max_overlap, 
+															binary, 
+															n_TFs)
 		pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
 
 		self.TF_counts = TF_counts
@@ -476,7 +531,7 @@ class CombObj():
 	def count_between(self, bedpe_file, directional=False):
 		"""
 		Function to count co-occurring TFs between paired regions, e.g. promoter-enhancer interactions. This function requires .TFBS to be filled by either 
-		`TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`.
+		`TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`. This function can be followed by .market_basket to calculate association rules.
 
 		Parameters
 		-----------
@@ -561,8 +616,8 @@ class CombObj():
 		self.logger.info("Finished .count_between()! Run .market_basket() to estimate significant pairs")
 
 
-	def get_pair_locations(self, TF1, TF2, window = 100, max_overlap = 0):
-		""" Get genomic locations of a particular motif pair. Requires .TFBS to be filled.
+	def get_pair_locations(self, TF1, TF2, min_distance=0, max_distance=100, max_overlap = 0):
+		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
 		
 		Parameters
 		----------
@@ -570,15 +625,23 @@ class CombObj():
 			Name of TF1 in pair.
 		TF2 : str 
 			Name of TF2 in pair.
-		window : int
+		TF1_strand : str
+			Strand of TF1 in pair. Default: None (strand is not taken into account).
+		TF2_strand : str
+			Strand of TF2 in pair. Default: None (strand is not taken into account).
+		min_distance : int
+			Default: 0
+		max_distance : int
 			Default: 100
 		max_overlap : float
 			Default: 0
-		
+		directional : bool
+			Default: False
+
 		Returns
 		-------
 		RegionList()
-			All locations of TF1-TF2 (range is TF1(start)->TF2(end)
+			All locations of TF1-TF2 (range is TF1(start)->TF2(end))
 
 		See also
 		---------
@@ -591,7 +654,7 @@ class CombObj():
 		locations = RegionList() #empty regionlist
 
 		TFs = (TF1, TF2)
-		w = window
+		w = max_distance
 		sites = self.TFBS
 		n_sites = len(sites)
 
@@ -600,9 +663,9 @@ class CombObj():
 		while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
 			
 			#Get current TF information
-			TF1_chr, TF1_start, TF1_end, TF1_name = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name
+			TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
 
-			if TF1_name not in TFs:
+			if not (TF1_name == TF1 and TF1_strand_i == TF1_strand) and not (TF1_name == TF2 and TF1_strand_i == TF1_strand):
 				i += 1
 				continue #next i_site
 	
@@ -620,30 +683,36 @@ class CombObj():
 				else:	#There are still sites available
 
 					#Fetch information on TF2-site
-					TF2_chr, TF2_start, TF2_end, TF2_name = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name
-					
-					if TF2_name not in TFs:
+					TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].name
+					TF1
+
+					if not (TF2_name == TF1 and TF2_strand_i == TF1_strand) and not (TF2_name == TF2 and TF2_strand_i == TF1_strand):
 						j += 1
 						continue #next j in finding_assoc
-
+					
 					#True if these TFBS co-occur within window
-					if TF1_chr == TF2_chr and (TF2_end - TF1_start <= w):
-						
-						# check if they are overlapping more than the threshold
-						valid_pair = 1
-						overlap_bp = TF1_end - TF2_start
-						
-						# Get the length of the shorter TF
-						short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-						
-						#Invalid pair, overlap is higher than threshold
-						if overlap_bp / short_bp > max_overlap: 
-							valid_pair = 0
+					distance = TF2_end - TF1_start
+					distance = 0 if distance < 0 else distance
 
-						#Save association
-						if valid_pair == 1:
-							location = OneRegion([TF1_chr, TF1_start, TF2_end, TF1_name + "_" + TF2_name])
-							locations.append(location)
+					if TF1_chr == TF2_chr and (distance <= max_distance):
+
+						if distance >= min_distance:
+						
+							# check if they are overlapping more than the threshold
+							valid_pair = 1
+							overlap_bp = TF1_end - TF2_start
+							
+							# Get the length of the shorter TF
+							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+							
+							#Invalid pair, overlap is higher than threshold
+							if overlap_bp / short_bp > max_overlap: 
+								valid_pair = 0
+
+							#Save association
+							if valid_pair == 1:
+								location = OneRegion([TF1_chr, TF1_start, TF2_end]) #, TF1_name + "_" + TF2_name])
+								locations.append(location)
 
 					else:
 						#The next site is out of window range; increment to next i
@@ -658,27 +727,26 @@ class CombObj():
 
 	def market_basket(self, sort_by="cosine", threads = 1):
 		"""
-		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_between() or .count_within().
+		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within() or .count_between().
 	
 		Parameters
 		-----------
-		sort_by : str
+		sort_by : str, optional
 			Measure to sort the final rules by. Default: 'cosine'.
-		threads : int
+		threads : int, optional
 			Threads to use for multiprocessing. Default: 1.
 
 		Raises
 		-------
 		ValueError 
-			If no TF counts are available
+			If no TF counts are available.
 		"""
 
 		#Check that TF counts are available
 		if (self.TF_counts is None) or (self.pair_counts is None):
-			raise ValueError("No counts available. Please run either .count_between() or .count_within()")
+			raise ValueError("No counts available. Please run either .count_within() or .count_between()")
 
 		##### Calculate market basket analysis #####
-
 		#Estimate the number of baskets
 		n_baskets = self.TFBS_bp
 
@@ -704,7 +772,7 @@ class CombObj():
 		table["confidence"] = table["TF1_TF2_support"] / table["TF1_support"]
 		table["lift"] = table["confidence"] / table["TF2_support"]
 		table["cosine"] = table["TF1_TF2_support"] / np.sqrt(table["TF1_support"] * table["TF2_support"])
-		table["jaccard"] = table["TF1_TF2_support"] / (table["TF1_support"] + table["TF2_support"] - table["TF1_TF2_support"])
+		#table["jaccard"] = table["TF1_TF2_support"] / (table["TF1_support"] + table["TF2_support"] - table["TF1_TF2_support"])
 		
 		#Remove rows with TF1_TF2_count == 0
 		table = table[table["TF1_TF2_count"] != 0]
@@ -728,7 +796,8 @@ class CombObj():
 							pvalue="cosine_pvalue", 
 							measure_threshold=None,
 							pvalue_threshold=0.05,
-							plot=True):
+							plot=True, 
+							**kwargs):
 
 		"""
 		Make selection of rules based on distribution of measure and pvalue.
@@ -740,12 +809,13 @@ class CombObj():
 		pvalue : str, optional
 			Column 'cosine_pvalue'
 		measure_threshold : float, optional
-			A minimum threshold for the measure to be selected. If None, the threshold will be estimated through a knee-plot of the available values. 
-			Default: None.
+			A minimum threshold for the measure to be selected. If None, the threshold will be estimated through a knee-plot of the available values. Default: None.
 		pvalue_threshold : float, optional
 			A p-value threshold for selecting rules. Default: 0.05.
 		plot : bool, optional
 			Whether to show the 'measure vs. pvalue'-plot or not. Default: True.
+		kwargs : arguments
+			Additional arguments are forwarded to tfcomb.plotting.volcano
 
 		Returns
 		--------
@@ -789,7 +859,8 @@ class CombObj():
 			tfcomb.plotting.volcano(self.rules, measure = measure, 
 												pvalue = pvalue, 
 												measure_threshold = measure_threshold,
-												pvalue_threshold = pvalue_threshold)
+												pvalue_threshold = pvalue_threshold,
+												**kwargs)
 
 		return(selected)
 
@@ -797,6 +868,12 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 	#-------------------------------- Plotting functionality  --------------------------------#
 	#-----------------------------------------------------------------------------------------#
+
+	def plot_background(self, TF1, TF2):
+		pass
+
+
+
 
 	def plot_heatmap(self, n_rules=20, color_by="cosine", sort_by=None, **kwargs):
 		"""
@@ -806,7 +883,7 @@ class CombObj():
 		-----------
 		n_rules : int
 			The number of rules to show. The first `n_rules` rules of .rules are taken. Default: 20.
-		color_by : str
+		color_by : str, optional
 			A column within .rules to color the heatmap by. Note: Can be different than sort_by. Default: "cosine".
 		sort_by : str, optional
 			A column within .rules to sort by before choosing n_rules. Default: None (rules are not sorted before selection).
@@ -840,22 +917,25 @@ class CombObj():
 		h = tfcomb.plotting.heatmap(chosen_associations, color_by=color_by, **kwargs)
 
 
-	def plot_bubble(self, n_rules=20, yaxis="cosine", color_by="confidence", size_by="TF1_TF2_support", sort_by=None, **kwargs):
+	def plot_bubble(self, n_rules=20, yaxis="cosine", color_by="confidence", size_by="TF1_TF2_support", sort_by=None, 
+					unique = True, **kwargs):
 		"""
 		Plot a bubble-style scatterplot of the object rules. This is a wrapper for the plotting function `tfcomb.plotting.bubble`.
 		
 		Parameters
 		-----------
-		n_rules : int
+		n_rules : int, optional
 			The number of rules to show. The first `n_rules` rules of .rules are taken. Default: 20.
-		yaxis : str 
+		yaxis : str, optional
 			A column within .rules to depict on the y-axis of the plot. Default: "cosine".	
-		color_by : str
+		color_by : str, optional
 			A column within .rules to color points in the plot by. Default: "confidence".
-		size_by : str
+		size_by : str, optional
 			A column within .rules to size points in the plot by. Default: "TF1_TF2_support".
-		sort_by : str
+		sort_by : str, optional
 			A column within .rules to sort by before choosing n_rules. Default: None (rules are not sorted before selection).
+		unique : bool, optional
+			Only show unique pairs in plot, e.g. only the first occurrence of TF1-TF2 / TF2-TF1. Default: True.
 		kwargs : arguments
 			Any additional arguments are passed to tfcomb.plotting.bubble.
 
@@ -868,6 +948,21 @@ class CombObj():
 		table = self.rules.copy()
 		if sort_by is not None:
 			table = table.sort_values(sort_by, ascending=False)
+
+		#Whether to keep TF1-TF2 and TF2-TF1 pairs (or whether to only show unique)
+		if unique == True:
+			table.set_index(["TF1", "TF2"], inplace=True)
+			pairs = table.index
+
+			#Collect unique pairs (first occurrence is kept)
+			to_keep = {}
+			for pair in pairs:
+				if not pair[::-1] in to_keep: #if opposite was not already found
+					to_keep[pair] = ""
+
+			#Subset table
+			table = table.loc[list(to_keep.keys())]
+			table.reset_index(inplace=True)
 
 		#Select n top rules
 		top_rules = table.head(n_rules)
@@ -889,20 +984,21 @@ class CombObj():
 						   size_edge_by="TF1_TF2_count",
 						   **kwargs): 
 		"""
-		Plot the rules in .rules as a network using Graphviz for python.
+		Plot the rules in .rules as a network using Graphviz for python. This function is a wrapper for 
+		building the network (using tfcomb.analysis.build_network) and subsequently plotting the network (using tfcomb.plotting.network).
 
 		Parameters
 		-----------
-		n_rules : int
+		n_rules : int, optional
 			The number of rules to show within network (selected as the top 'n_rules' within .rules). Default: 100.
-		color_node_by : str
+		color_node_by : str, optional
 			A column in .rules to color nodes by. Default: 'TF1_count'.
-		color_edge_by : str
+		color_edge_by : str, optional
 			A column in .rules to color edges by. Default: 'cosine'.
 		size_edge_by : str
 			A column in rules to size edge width by. Default: 'TF1_TF2_count'.
 		kwargs : arguments
-			All other arguments are passed to tfcomb.plotting.network
+			All other arguments are passed to tfcomb.plotting.network.
 
 		See also
 		--------
@@ -916,7 +1012,8 @@ class CombObj():
 		G = tfcomb.analysis.build_network(selected)
 		
 		#Plot network
-		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, color_edge_by=color_edge_by, size_edge_by=size_edge_by, **kwargs)
+		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
+										 verbosity=self.verbosity, **kwargs)
 
 		return(dot)
 
@@ -925,7 +1022,7 @@ class CombObj():
 	#------------------------------ Comparison to other objects ------------------------------#
 	#-----------------------------------------------------------------------------------------#
 
-	def compare(self, obj_to_compare, normalize=True):
+	def compare(self, obj_to_compare, measure="cosine", normalize=True):
 		"""
 		Utility function to create a DiffCombObj directly from a comparison between self and another CombObj. Requires .market_basket() run on both objects.
 		Runs DiffCombObj.normalize (if chosen), DiffCombObj.calculate_foldchanges() under the hood. 
@@ -939,9 +1036,9 @@ class CombObj():
 		obj_to_compare : tfcomb.objects.CombObj
 			Another CombObj to compare to the 
 		measure : str
-			Default: 'cosine'.
+			The measure to compare between objects. Default: 'cosine'.
 		normalize : bool
-			Whether to normalize values
+			Whether to normalize values between objects
 
 		Return
 		-------
@@ -951,12 +1048,12 @@ class CombObj():
 		#TODO: Check that market basket was run on both objects
 
 		
-		diff = DiffCombObj([self, obj_to_compare])
+		diff = DiffCombObj([self, obj_to_compare], verbosity=self.verbosity)
 
 		if normalize == True:
-			diff.normalize("cosine")
+			diff.normalize()
 
-		diff.calculate_foldchanges(normalize=normalize) #also calculates p-values
+		diff.calculate_foldchanges() #also calculates p-values
 
 		return(diff)
 
@@ -969,13 +1066,17 @@ class CombObj():
 
 class DiffCombObj():
 
-	def __init__(self, objects = []):
+	def __init__(self, objects = [], measure='cosine', verbosity=1):
 		""" Initializes a DiffCombObj object for doing differential analysis between CombObj's.
 
 		Parameters
     	----------
-		objects : list
-			A list of CombObj instances
+		objects : list, optional
+			A list of CombObj instances. If list is empty, an DiffCombObj will be created. Default: [].
+		measure : str, optional
+			The measure to compare between objects. Must be a column within .rules for each object. Default: 'cosine'
+		verbosity : int, optional
+			The verbosity of the output logging. Default: 1.
 
 		See also
 		---------
@@ -986,10 +1087,10 @@ class DiffCombObj():
 		#Initialize object variables
 		self.n_objects = 0
 		self.prefixes = [] #filled by ".add_object"
-		self.measures_to_keep = ["confidence", "lift", "cosine"] #list of measures to keep when adding together objects
+		self.measure = measure	#the measure
 
 		#Setup logger
-		self.verbosity = 3
+		self.verbosity = verbosity
 		self.logger = TFcombLogger(self.verbosity)
 
 		#Add objects one-by-one
@@ -1002,7 +1103,7 @@ class DiffCombObj():
 
 	def add_object(self, obj):
 		"""
-		Add one CombObj to the DiffCombObj 
+		Add one CombObj to the DiffCombObj.
 
 		Parameters
 		-----------
@@ -1020,9 +1121,9 @@ class DiffCombObj():
 			#logger warning
 
 		#Format table from obj to contain TF1/TF2 + measures with prefix
-		columns_to_keep = ["TF1", "TF2"] + self.measures_to_keep
+		columns_to_keep = ["TF1", "TF2"] + [self.measure]
 		obj_table = obj.rules[columns_to_keep] #only keep necessary columns
-		obj_table.rename(columns={col: str(prefix) + "_" + col for col in self.measures_to_keep}, inplace=True)
+		obj_table.rename(columns={self.measure: str(prefix) + "_" + self.measure}, inplace=True)
 
 		#Initialize table if this is the first object
 		if self.n_objects == 0: 
@@ -1037,69 +1138,67 @@ class DiffCombObj():
 		self.prefixes.append(prefix)
 		
 
-	def normalize(self, measure):
+	def normalize(self):
 		"""
-		Normalize the values for the given measure using quantile normalization
-
-		Parameters
-		-----------
-		measure : str
+		Normalize the values for the given measure using quantile normalization. 
+		Overwrites the <prefix>_<measure> columns in .rules with the normalized values.
 		"""
-		
-		#TODO: check available measures
-		#available measures = 
 
 		#Establish input/output columns
-		measure_columns = [prefix + "_" + measure for prefix in self.prefixes]
-		measure_columns_norm = [col + "_norm" for col in measure_columns]
-
+		measure_columns = [prefix + "_" + self.measure for prefix in self.prefixes]
+		
 		#Normalize values
-		self.rules[measure_columns_norm] = qnorm.quantile_normalize(self.rules[measure_columns], axis=1)
+		self.rules[measure_columns] = qnorm.quantile_normalize(self.rules[measure_columns], axis=1)
+
+		#Ensure that original 0 values are kept at 0
 
 
-	def calculate_foldchanges(self, measure="cosine", normalize=False, pseudo = 1):
-		""" Calculate foldchanges between objects in DiffCombObj 
+	def calculate_foldchanges(self, pseudo = None):
+		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
 		----------
-		measure : str, optional
-			Column from .rules to calculate foldchange on
-		normalized : bool, optional
-			Whether to use across-object normalized values for the calculation. Default: False.
-		pseudo : float
-			The pseudocount to add to all values before log2-foldchange transformation. Default: 1.
+		pseudo : float, optional
+			Set the pseudocount to add to all values before log2-foldchange transformation. Default: None (pseudocount will be estimated per contrast).
+		threads : int, optional
+			The number of threads to use for calculating foldchanges and p-values
 
 		See also
 		--------
 		tfcomb.DiffCombObj.normalize
 		"""
 
-		table = self.rules
+		measure = self.measure
 
 		#Find all possible combinations of objects
 		combinations = itertools.combinations(self.prefixes, 2)
-		
+		self.contrasts = list(combinations)
+		self.logger.debug("Contrasts: {0}".format(self.contrasts))
+
 		columns = [] #collect the log2fc columns per contrast
-		for p1, p2 in combinations:
-			log2_col = "{0}_{1}_{2}_log2fc".format(p1, p2, measure)
+		for (p1, p2) in self.contrasts:
+			self.logger.info("Calculating contrast: {0} / {1}".format(p1, p2))
+			log2_col = "{0}/{1}_{2}_log2fc".format(p1, p2, measure)
 			columns.append(log2_col)
 
-			if normalize:
-				p1_values = self.rules[p1 + "_" + measure + "_norm"]
-				p2_values = self.rules[p2 + "_" + measure + "_norm"]
-			else:
-				p1_values = self.rules[p1 + "_" + measure]
-				p2_values = self.rules[p2 + "_" + measure]
+			p1_values = self.rules[p1 + "_" + measure]
+			p2_values = self.rules[p2 + "_" + measure]
 
-			pseudo = 1
+			#Estimate pseudocount
+			if pseudo == None:
+				vals = self.rules[[p1 + "_" + measure, p2 + "_" + measure]].values.ravel()
+				pseudo = np.percentile(vals[vals>0], 25) #25th percentile of values >0
+				self.logger.debug("Pseudocount: {0}".format(pseudo))
 
 			self.rules[log2_col] = np.log2((p1_values + pseudo) / (p2_values + pseudo))
 
 			#Calculate p-value of each pair
-			pvalue_col = "{0}_{1}_{2}_pvalue".format(p1, p2, measure)
+			self.logger.debug("Calculating p-value")
+			pvalue_col = "{0}/{1}_{2}_pvalue".format(p1, p2, measure)
 			self.rules[pvalue_col] = tfcomb.utils._calculate_pvalue(self.rules, measure=log2_col, alternative="two-sided")
 
 		#Sort by first contrast log2fc
+		self.logger.debug("columns: {0}".format(columns))
 		self.rules.sort_values(columns[0], inplace=True)
 		
 
@@ -1121,21 +1220,19 @@ class DiffCombObj():
 	#----------------------------- Plots for differential analysis -----------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def plot_correlation(self, measure="cosine", method="pearson"):
+	def plot_correlation(self, method="pearson"):
 		"""
-		Plot correlation between rules across objects for the measure given.
+		Plot correlation between rules across objects.
 
 		Parameters
 		-----------
-		measure : str
-			The measure to correlate across objects. Default: "cosine".
 		method : str
 			Either 'pearson' or 'spearman'. Default: 'pearson'.
 
 		"""
 
 		#Define columns
-		cols = [prefix + "_" + measure for prefix in self.prefixes]
+		cols = [prefix + "_" + self.measure for prefix in self.prefixes]
 
 		#Calculate matrix and plot
 		matrix = self.rules[cols].corr(method=method)
@@ -1143,20 +1240,24 @@ class DiffCombObj():
 							cbar_kws={'label': method})
 
 
-	def plot_heatmap(self, contrast=None, n_rules=10, color_by=None, sort_by=None, **kwargs):
+	def plot_heatmap(self, contrast=None, 
+						   n_rules=10, 
+						   color_by="cosine_log2fc", 
+						   sort_by=None, 
+						   **kwargs):
 		"""
 		Functionality to plot a heatmap of differentially co-occurring TF pairs. 
 
 		Parameters
 		------------
-		contrast : 
-			. Default: None (the first contrast is shown).
+		contrast : tuple
+			Name of the contrast to use in tuple format e.g. (<prefix1>,<prefix2>). Default: None (the first contrast is shown).
 		n_rules : int
 			Number of rules to show from each contrast (default: 10). Note: This is the number of rules either up/down, meaning that the rules shown are n_rules * 2.
 		color_by : str
-
+			Default: "cosine" (converted to "prefix1/prefix2_<color_by>")
 		sort_by : str
-
+			Default: None (keep sort)
 		kwargs : arguments
 			Additional arguments are passed to tfcomb.plotting.heatmap.
 
@@ -1165,14 +1266,15 @@ class DiffCombObj():
 		tfcomb.plotting.heatmap
 		"""
 
+		contrast = tfcomb.utils.set_contrast(contrast, self.contrasts)
+
+		#Decide columns based on color_by / sort_by
+		color_by = "{0}/{1}_{2}".format(contrast[0], contrast[1], color_by)
+		if sort_by is not None:
+			sort_by = "{0}/{1}_{2}".format(contrast[0], contrast[1], sort_by)
+
 		#Check if columns are found in table
 		check_columns(self.rules, [sort_by, color_by])
-
-		#Establish color_by
-		if color_by is None:
-			pass
-			#
-			#color_by = [col for col in self.rules.columns if measure + "_log2fc" in col]
 
 		#Sort by measure
 		associations = self.rules.copy()
@@ -1190,28 +1292,27 @@ class DiffCombObj():
 		#Plot heatmap
 		tfcomb.plotting.heatmap(chosen_associations, color_by=color_by)
 
-
-	def plot_bubble(self, n_rules=20, yaxis="confidence_log2fc",
-										color_by="lift_log2fc", 
-										size_by="lift_log2fc", 
-										sort_by="confidence_log2fc",
-										**kwargs):
+	def plot_bubble(self, contrast=None,
+						  n_rules=20, 
+						  yaxis="cosine_log2fc",
+						  color_by="lift_log2fc", 
+						  size_by="lift_log2fc", 
+						  **kwargs):
 		"""
-		Plot bubble scatterplot of information within .rules
+		Plot bubble scatterplot of information within .rules.
 
 		Parameters
 		-----------
-		contrast : 
-
+		contrast : tuple
+			Name of the contrast to use in tuple format e.g. (<prefix1>,<prefix2>). Default: None (the first contrast is shown).
 		n_rules : int
-
+			Number of rules to show (in each direction). Default: 20.
 		yaxis : str
-
+			Measure to show on the y-axis. Default: "cosine_log2fc".
 		color_by : str
+			If column is not in rules, the string is supposed to be in the form "prefix1/prefix2_<color_by>".
 
 		size_by : str
-
-		sort_by : str
 
 		kwargs : arguments
 
@@ -1220,15 +1321,26 @@ class DiffCombObj():
 		tfcomb.plotting.bubble
 		"""
 
+		contrast = tfcomb.utils.set_contrast(contrast, self.contrasts)
+
+		#Decide column names based on yaxis / color_by / sort_by
+		columns = [yaxis, color_by, size_by]
+		for i, name in enumerate(columns): 
+			if name is not None:
+				if name not in self.rules.columns: #Assume that this is the contrast suffix
+					columns[i] = "{0}/{1}_{2}".format(*contrast, name)
+		yaxis, color_by, size_by = columns
+
 		#Select top/bottom n rules
-		sorted_table = self.rules.sort_values(sort_by, ascending=False)
+		
+		sorted_table = self.rules.sort_values(yaxis, ascending=False)
 		sorted_table.index = sorted_table["TF1"] + " + " + sorted_table["TF2"]
 
 		top_rules = sorted_table.head(n_rules)
 		bottom_rules = sorted_table.tail(n_rules)
 
 		# Draw each cell as a scatter point with varying size and color
-		fig, (ax1, ax2) = plt.subplots(2, figsize=figsize, constrained_layout=True) 
+		fig, (ax1, ax2) = plt.subplots(2, constrained_layout=True) 
 
 		tfcomb.plotting.bubble(data=top_rules, yaxis=yaxis, color_by=color_by, size_by=size_by, ax=ax1)
 		tfcomb.plotting.bubble(data=bottom_rules, yaxis=yaxis, color_by=color_by, size_by=size_by, ax=ax2)
@@ -1237,40 +1349,70 @@ class DiffCombObj():
 
 		return(fig)
 
-	def plot_network(self, n_rules=100, 
+	def plot_network(self, contrast=None,
+							n_rules=100, 
 							color_node_by=None, 
 							size_node_by=None, 
-							color_edge_by=None, 
+							color_edge_by="cosine_log2fc", 
 							size_edge_by=None, 
 							**kwargs):
 		"""
-		Plot network of differential co-occurring TFs.
+		Plot the network of differential co-occurring TFs.
 		
-
 		Parameters
 		-----------
+		contrast : tuple
+			Name of the contrast to use in tuple format e.g. (<prefix1>,<prefix2>). Default: None (the first contrast is shown).
+		n_rules : 100, optional
+			The number of rules to show in either direction. Default: 100.
+		color_node_by : str, optional
+			Name of measure to color node by. If column is not in .rules, the name will be internally converted to "prefix1/prefix2_<color_edge_by>". Default: None.
+		size_node_by : str, optional
+			Column in .rules to size_node_by. 
+		color_edge_by : str, optional
+			The name of measure or column to color edge by. Default: "cosine_log2fc" (will be internally converted to "prefix1/prefix2_<color_edge_by>")
+		size_edge_by : str, optional
 
 		kwargs : arguments
 			Any additional arguments are passed to tfcomb.plotting.network.
 
 		Returns
 		--------
-			dot object
+			dot network object
 
 		See also
 		---------
 		tfcomb.plotting.network
 		"""
+
+		contrast = tfcomb.utils.set_contrast(contrast, self.contrasts)
 		
+		#Adjust column names
+		self.logger.debug("Adjusting column names")
+		columns = [color_node_by, size_node_by, color_edge_by, size_edge_by]
+		for i, name in enumerate(columns): 
+			if name is not None:
+				if name not in self.rules.columns: #Assume that this is the contrast suffix
+					columns[i] = "{0}/{1}_{2}".format(*contrast, name)
+		color_node_by, size_node_by, color_edge_by, size_edge_by = columns
+		self.logger.debug("color_node_by: {0} | size_node_by: {1} | color_edge_by: {2} | size_edge_by: {3}".format(color_node_by,
+											 																	   size_node_by,
+																												   color_edge_by,
+																												   size_edge_by,
+																													))
+
 		#Create subset of rules
-		selected = self.rules[:n_rules] + self.rules[-n_rules:]
+		selected = pd.concat([self.rules[:n_rules], self.rules[-n_rules:]])
 
 		#Build network
+		self.logger.debug("Building network using 'tfcomb.analysis.build_network'")
 		G = tfcomb.analysis.build_network(selected)
 		
 		#Plot network
+		self.logger.debug("Plotting network using 'tfcomb.plotting.network'")
 		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, size_node_by=size_node_by, 
-										 color_edge_by=color_edge_by, size_edge_by=size_edge_by, **kwargs)
+										 color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
+										 verbosity = self.verbosity, **kwargs)
 
 		return(dot)
 

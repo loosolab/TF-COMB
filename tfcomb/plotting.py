@@ -9,6 +9,7 @@ import seaborn as sns
 import graphviz
 
 from tfcomb.utils import check_columns
+from tfcomb.logging import TFcombLogger
 
 
 def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,7), save=None):
@@ -59,6 +60,9 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	# Tweak the figure to finalize
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
 	ax.set_xticklabels(labels, rotation=45, ha="right")
+
+	if save is not None:
+		plt.savefig(save, dpi=600, bbox_inches="tight")
 
 	return(ax)
 
@@ -129,10 +133,11 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	#plt.tight_layout()
 
 	if save is not None:
+		plt.savefig(save, dpi=600)
 
 	return(h)
 
-def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None):
+def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None, save=None):
 	"""
 	Plot volcano-style plots combining a measure and a pvalue.
 
@@ -144,8 +149,8 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 		The measure to show on the x-axis.
 	pvalue : str
 		The column containing p-values (without any log-transformation).
-	measure_threshold : float or list of floats
-
+	measure_threshold : float or list of floats or "off"
+		If 'off', no measure threshold is set
 	pvalue_threshold : float between 0-1
 		Default: 0.05.
 	"""
@@ -157,7 +162,7 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 	pval_col = "-log10({0})".format(pvalue)
 	table[pval_col] = -np.log10(table[pvalue])
 
-	g = sns.jointplot(data=table, x=measure, y=pval_col, space=0) #, joint_kws={"s": 100})
+	g = sns.jointplot(data=table, x=measure, y=pval_col, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if pvalue_threshold is not None:
@@ -185,11 +190,11 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 		#Mark chosen TF pairs in red
 		xvals = selection[measure]
 		yvals = selection[pval_col]
-		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", 
+		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", linewidth=0.2, 
 							label="Selection (n={0})".format(n_selected))
 
 	if save is not None:
-		pass
+		plt.savefig(save, dpi=600)
 
 	return(g)
 	
@@ -209,7 +214,7 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 		The p-value-threshold to show in plot.
 	save : str, optional
 		""
-
+	
 	Returns
 	----------
 	ax
@@ -274,7 +279,7 @@ def _values_to_cmap(values, plt_cmap=None):
 		pass #todo: check that plt_cmap is a colormap
 	elif vmin >= 0 and vmax >= 0:
 		plt_cmap = colormap_red
-	elif vmin < 0 and vmax < 0:
+	elif vmin < 0 and vmax <= 0:
 		plt_cmap = colormap_blue
 	elif vmin < 0 and vmax >= 0:
 		plt_cmap = colormap_divergent
@@ -294,7 +299,12 @@ def network(network,
 				size_edge_by=None,
 				engine="sfdp", 
 				size="8,8", 
-				save=None):
+				min_edge_size=2,
+				max_edge_size=8,
+				min_node_size=14,
+				max_node_size=20,
+				save=None,
+				verbosity = 1):
 	"""
 	Plot network of a networkx object using Graphviz for python.
 
@@ -313,9 +323,19 @@ def network(network,
 		The graphviz engine to use for finding network layout. Default: "sfdp".
 	size : str, optional
 		Size of the output figure. Default: "8,8".
+	min_edge_size : float, optional
+		Default: 2. 
+	max_edge_size : float, optional
+		Default: 8.
+	min_node_size : float, optional
+		Default: 14.
+	max_node_size : float, optional
+		Default: 20.
 	save : str, optional
 		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
-	
+	verbosity : int
+		verbosity of the logging. Default: 1.
+
 	Raises
 	-------
 	TypeError
@@ -324,6 +344,9 @@ def network(network,
 		If any of 'color_node_by', 'color_edge_by' or 'size_edge_by' is not in node/edge attributes, or if 'engine' is not a valid graphviz engine.
 	"""
 		
+	# Setup logger
+	logger = TFcombLogger(verbosity)
+	
 	############### Test input ###############
 	
 	#Read nodes and edges from graph
@@ -342,6 +365,8 @@ def network(network,
 	
 	dot = graphviz.Graph(engine=engine)
 	dot.attr(size=size)
+	dot.attr(outputorder="edgesfirst")
+	dot.attr(overlap="false")
 	
 	############ Setup colormaps/sizemaps ############
 	map_value = {}
@@ -360,28 +385,28 @@ def network(network,
 	if size_node_by != None:
 		all_values = [node[-1][size_node_by] for node in node_view]
 		nmin, nmax = np.min(all_values), np.max(all_values)
-		na, nb = 14, 20
-		map_value["node_size"] = lambda value: np.round((value-nmin)/(nmax-nmin)*(nb-na)+na, 2)
+		map_value["node_size"] = lambda value: np.round((value-nmin)/(nmax-nmin)*(max_node_size-min_node_size)+min_node_size, 2)
 	
 	#Edge size
 	if size_edge_by != None:
 		all_values = [edge[-1][size_edge_by] for edge in edge_view]
 		vmin, vmax = np.min(all_values), np.max(all_values)
-		a, b = 1, 8
-		map_value["edge_size"] = lambda value: np.round((value-vmin)/(vmax-vmin)*(b-a)+a, 2)
+		map_value["edge_size"] = lambda value: np.round((value-vmin)/(vmax-vmin)*(max_edge_size-min_edge_size)+min_edge_size, 2)
 
 	
 	############### Add nodes to network ##############
+
+	logger.debug("Adding nodes to dot network")
 	for node in node_view:
 	
 		node_name = node[0]
 		node_att = node[1]
 		
 		attributes = {} #attributes for dot
+		attributes["style"] = "filled"
 
 		#Set node color
 		if color_node_by != None:
-			attributes["style"] = "filled"     
 			value = node_att[color_node_by]
 			attributes["color"] = map_value["node_color"](value)
 			
@@ -391,18 +416,19 @@ def network(network,
 			attributes["fontsize"] = str(map_value["node_size"](value))
 		
 		#After collecting all attributes; add node with attribute dict
-		if len(attributes) > 0:
-			dot.node(node_name, _attributes=attributes)
-		else:
-			dot.node(node_name)
+		logger.spam("Adding node {0}".format(node_name))
+		dot.node(node_name, _attributes=attributes)
 
 	############### Add edges to network ###############
+	logger.debug("Adding edges to dot network")
+
 	for edge in edge_view:
 	
 		node1, node2 = edge[:2]
 		edge_att = edge[-1]
 		
 		attributes = {}
+		attributes["penwidth"] = str(min_edge_size) #default size; can be overwritten by size_edge_by
 		
 		#Set edge color
 		if color_edge_by != None:
@@ -413,8 +439,10 @@ def network(network,
 		if size_edge_by != None:
 			value = edge_att[size_edge_by]
 			attributes["penwidth"] = str(map_value["edge_size"](value))
-	   
+
+		#After collecting all edge attributes; add edge to dot object
 		dot.edge(node1, node2, _attributes=attributes)
+
 	
 	############### Save to file ###############
 	if save != None:

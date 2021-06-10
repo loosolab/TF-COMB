@@ -128,6 +128,7 @@ def resolve_overlapping(TFBS):
 
 def _calculate_pvalue(table, measure="cosine", alternative="greater"):
 	"""
+	Calculates the p-value of each TF1-TF2 pair for the measure given.
 
 	Parameters
 	------------
@@ -209,6 +210,11 @@ def make_symmetric(matrix):
 	"""
 	matrix_T = matrix.T 
 	symmetric = matrix + matrix_T
+
+	#don't add up diagonal indices
+	di = np.diag_indices(symmetric.shape[0])
+	symmetric[di] = matrix_T[di]
+
 	return(symmetric)
 
 
@@ -311,3 +317,17 @@ def assign_sites_to_regions(sites, regions):
 					reg_i += 1
 
 	return(sites_in_regions)
+
+def set_contrast(contrast, available_contrasts):
+	""" Utility function for the plotting functions of tfcomb.objects.DiffCombObj """
+
+	#Setup contrast to use
+	if contrast == None:
+		contrast = available_contrasts[0]
+
+	else:
+		#Check if contrast is tuple
+		if contrast not in available_contrasts:
+			raise ValueError("Contrast {0} is not valid (available contrasts are {1})".format(contrast, available_contrasts))
+
+	return(contrast)
