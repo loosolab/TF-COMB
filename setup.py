@@ -69,7 +69,12 @@ setup(name='TF-COMB',
 			'pandas',
 			'tobias',
 			'networkx',
-			'python-louvain'
+			'python-louvain',
+			'graphviz',
+			'statsmodels',
+			'goatools',
+			'uropa',
+			'qnorm'
 		],
 		classifiers=[
 			'License :: OSI Approved :: MIT License',

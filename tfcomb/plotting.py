@@ -1,6 +1,4 @@
 import os
-import nxviz
-import networkx as nx
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
