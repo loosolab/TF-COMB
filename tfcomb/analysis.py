@@ -8,6 +8,10 @@ import itertools
 import scipy
 from tfcomb.utils import check_columns
 from scipy.stats import chisquare
+import re
+import graph_tool.all
+import copy
+import multiprocessing as mp
 
 #Network analysis
 import networkx as nx
@@ -19,6 +23,10 @@ from goatools.base import download_go_basic_obo
 from goatools.anno.genetogo_reader import Gene2GoReader
 from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.obo_parser import GODag
+
+#Internal functions
+from tfcomb.logging import TFcombLogger
+from tfcomb.utils import check_columns
 
 #UROPA annotation
 import logging
@@ -294,7 +302,119 @@ def _is_symmetric(a, rtol=1e-05, atol=1e-08):
 	"""
 	return np.allclose(a, a.T, rtol=rtol, atol=atol)
 
-def build_network(table, node1="TF1", node2="TF2", directed=False, multi=False):
+
+def _establish_node_attributes(table, node):
+	""" 
+	Returns a list of columns fitting to 'node' values.
+
+	Parameters
+	----------
+	table : pd.DataFrame 
+		Edges table including node/edge attributes.
+	node : str
+		Name of column contain node names.
+
+	Returns
+	-------
+	list
+		List of column names
+	"""	
+
+	node_attributes = []
+	columns_to_assign = [col for col in table.columns if col != node]
+
+	sub = table[:100000] #subset in interest of performance
+	factorized = sub.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
+
+	for attribute in columns_to_assign:
+		p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+		if p == 1.0: #columns are fully correlated; save to node attribute
+			node_attributes.append(attribute)
+	
+	return(node_attributes)
+
+
+def build_gt_network(table, node1="TF1", node2="TF2", directed=False, verbosity=1):
+	""" Build graph-tool network from table 
+	
+	Parameters
+	-----------
+	table : pd.DataFrame 
+		Edges table including node/edge attributes.
+	node1 : str, optional
+		The column to use as node1 ID. Default: "TF1".
+	node2 : str, optional
+		The column to use as node2 ID. Default: "TF2".
+	directed : bool, optional
+		Whether edges are directed or not. Default: False.
+	verbosity : int, optional
+		Verbosity of logging (0/1/2/3). Default: 1.
+
+	"""
+
+	#Setup logger
+	logger = TFcombLogger(verbosity)
+
+	#Setup graph
+	g = graph_tool.all.Graph(directed=directed)
+
+	#Get dtypes of all attributes
+	columns = table.columns
+	column_dtypes = table.dtypes.values
+	dtype_list = [re.sub(r'[0-9]+', '', str(dtype)) for dtype in column_dtypes]
+	dtype_list = [dtype if dtype != "object" else "string" for dtype in dtype_list]
+	dtype_dict = dict(zip(columns, dtype_list))
+	logger.debug("'dtype_dict': {0}".format(dtype_dict))
+
+	### Setup node/edge attributes ###
+	#node attributes
+	node1_attributes = _establish_node_attributes(table, node1)
+	node2_attributes = _establish_node_attributes(table, node2)
+	node_attributes = list(set(node1_attributes + node2_attributes))
+	for att in node_attributes:
+		eprop = g.new_vertex_property(dtype_dict[att])
+		g.vertex_properties[att] = eprop
+
+	#edge attributes
+	edge_attributes = set(columns) - set(node_attributes)
+	for att in edge_attributes:
+		eprop = g.new_edge_property(dtype_dict[att])
+		g.edge_properties[att] = eprop
+
+	### Build network ###
+
+	## Add nodes with properties
+	node1_table = table[[node1] + node1_attributes].set_index(node1)
+	node2_table = table[[node2] + node2_attributes].set_index(node2)
+	node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
+	node_table.fillna(0, inplace=True)
+	node_table.drop_duplicates(inplace=True)
+	logger.spam("'node_table': {0}".format(node_table.head()))
+
+	name2idx = {} #TF name to idx
+	idx2name = {}
+	for i, row in node_table.to_dict(orient="index").items():
+		v = g.add_vertex()
+		
+		name = i #index is the name of node (TF)
+		name2idx[name] = v #idx of node
+		idx2name[int(v)] = name
+		
+		for prop in g.vertex_properties:
+			g.vertex_properties[prop][v] = row[prop]
+
+	## Add edges with properties
+	for i, row in table.to_dict(orient="index").items(): #loop over all edges in table
+		v1, v2 = name2idx[row[node1]], name2idx[row[node2]]
+		e = g.add_edge(v1, v2)
+		
+		for prop in g.edge_properties:
+			g.edge_properties[prop][e] = row[prop]
+		
+	return(g)
+
+
+def build_nx_network(table, node1="TF1", node2="TF2", directed=False, multi=False):
 	""" 
 	Build a networkx network from a table containing node1, node2 and other node/edge attribute columns, e.g. as from CombObj.market_basket() analysis.
 	
@@ -337,34 +457,20 @@ def build_network(table, node1="TF1", node2="TF2", directed=False, multi=False):
 
 	######### Setup node attributes #########
 	attribute_columns = [col for col in table.columns if col not in [node1, node2]]
-	sub = table[:100000] #subset in interest of performance
-	factorized = sub.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
 
-	#Establish node1 and node2 attributes
-	node_attributes = {}
-	columns_to_assign = attribute_columns[:]
-	for node in [node1, node2]:
-		node_attributes[node] = []
-		
-		for attribute in columns_to_assign:
-			p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
-			if p == 1.0: #columns are fully correlated; save to node attribute
-				node_attributes[node] += [attribute]
-		
-		#Remove attributes from columns_to_assign (prevents the same columns from being assigned to both TF1 and TF2)
-		for att in node_attributes[node]:
-			columns_to_assign.remove(att)
-	
+	#Establish node attributes
+	node1_attributes = _establish_node_attributes(table, node1)
+	node2_attributes = _establish_node_attributes(table, node2)
+	node2_attributes = list(set(node2_attributes) - set(node1_attributes)) #prevent the same columns from being assigned to both TF1 and TF2)
+
 	#Setup tables for node1 and node2 information
-	node1_attributes = node_attributes[node1]
-	node2_attributes = node_attributes[node2]
-
 	node1_table = table[[node1] + node1_attributes].set_index(node1)
 	node2_table = table[[node2] + node2_attributes].set_index(node2)
 
 	#Merge node information to dict for network
 	node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
 	node_table.fillna(0, inplace=True)
+	node_table.drop_duplicates(inplace=True)
 	node_attributes = node_table.columns
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
 
@@ -403,7 +509,7 @@ def get_degree(G, weight=None):
 	G : networkx.Graph
 
 	weight : str, optional
-		Name of an edge attribute within network. Default: None
+		Name of an edge attribute within network. Default: None.
 
 	Returns
 	--------
@@ -458,12 +564,11 @@ def get_partitions(network):
 	return(partition)
 
 
-
 #-------------------------------------------------------------------------------#
 #----------------------------- Annotation of sites -----------------------------#
 #-------------------------------------------------------------------------------#
 
-def annotate_peaks(regions, gtf, config=None):
+def annotate_peaks(regions, gtf, config=None, threads=1, verbosity=1):
 	"""
 	Annotate regions with genes from .gtf using UROPA _[1]. 
 
@@ -475,11 +580,14 @@ def annotate_peaks(regions, gtf, config=None):
 		path to gtf file
 	config : dict
 
+	threads : int
+		Number of threads to use for multiprocessing. Default: 1.
+	verbosity : int
+		Level of verbosity of logger. One of 0,1,2
 
 	Returns
 	--------
 	None
-
 
 
 	Reference
@@ -492,12 +600,20 @@ def annotate_peaks(regions, gtf, config=None):
 	#setup logger
 	logger = logging.getLogger("logger")
 	
-	cfg_dict = {"queries": [{"distance": [10000, 1000], "feature_anchor": "start", "feature": "gene"}],
-				"priority": True, 
-				"show_attributes": "all"}
-	
+	if config is None:
+		cfg_dict = {"queries": [{"distance": [10000, 1000], 
+					"feature_anchor": "start", 
+					"feature": "gene"}],
+					"priority": True, 
+					"show_attributes": "all"}
+	else:
+		cfg_dict = config
+
+	cfg_dict = copy.deepcopy(cfg_dict) #make sure that config is not being changed in place
 	cfg_dict = format_config(cfg_dict, logger=logger)
+
 	#print(cfg_dict)
+	logger.debug("Config dictionary: {0}".format(cfg_dict))
 	
 	#Convert peaks to dict for uropa
 	region_dicts = []
@@ -511,17 +627,65 @@ def annotate_peaks(regions, gtf, config=None):
 		region_dicts.append(d)
 	
 	#Index tabix
-	if not os.path.exists(gtf + ".tbi"):
-		pysam.tabix_index(gtf, preset="gff", keep_original=True)
+	gtf_index = gtf + ".tbi"
+	if not os.path.exists(gtf_index):
+		try:
+			gtf = pysam.tabix_index(gtf, preset="gff", keep_original=True)
+		except OSError: #gtf is already gzipped
+			gtf_gz = gtf + ".gz"
+			gtf_index = gtf_gz + ".tbi"
+			if not os.path.exists(gtf_index):
+				gtf_gz = pysam.tabix_index(gtf_gz, preset="gff", keep_original=True)
+			gtf = gtf_gz
+
+	#Split input regions into cores
+	n_reg = len(region_dicts)
+	per_chunk = int(np.ceil(n_reg/float(threads)))
+	region_dict_chunks = [region_dicts[i:i+per_chunk] for i in range(0, n_reg, per_chunk)]
+
+	#Calculate annotations for each chunk
+	best_annotations = []
+	if threads == 1:
+		for region_chunk in region_dict_chunks:
+			chunk_annotations = _annotate_peaks_chunk(region_chunk, gtf, cfg_dict)
+			best_annotations.extend(chunk_annotations)
+	else:
+		
+		#Start multiprocessing pool
+		pool = mp.Pool(threads)
+
+		#Start job for each chunk
+		jobs = []
+		for region_chunk in region_dict_chunks:
+			job = pool.apply_async(_annotate_peaks_chunk, (region_chunk, gtf, cfg_dict, ))
+			jobs.append(job)
+		pool.close()
 	
+		#TODO: Print progress
+		n_done = [job.ready() for job in jobs]
+
+		#Collect results:
+		best_annotations = []
+		for job in jobs:
+			chunk_annotations = job.get()
+			best_annotations.extend(chunk_annotations)
+
+		pool.join()
+	"""
 	#Open tabix file
-	tabix_obj = pysam.TabixFile(gtf) #, index=gtf_index)
+	tabix_obj = pysam.TabixFile(gtf, index=gtf_index)
 
 	#For each peak in input peaks, collect all_valid_annotations
 	#logger.debug("Annotating peaks in chunk {0}".format(idx))
 	all_valid_annotations = []
-	for region in region_dicts:
+	n_regions = len(region_dicts)
+	n_progress = int(n_regions / 10)
+	for i, region in enumerate(region_dicts):
 		
+		#Print out progress
+		if i + 1 % n_progress == 0:
+			logger.info("Progress: {0}/{1} regions annotated".format(i+1, n_regions))
+
 		#Annotate single peak
 		valid_annotations = annotate_single_peak(region, tabix_obj, cfg_dict, logger=logger)
 		all_valid_annotations.extend(valid_annotations)
@@ -529,9 +693,34 @@ def annotate_peaks(regions, gtf, config=None):
 	tabix_obj.close()
 	
 	best_annotations = [region for region in all_valid_annotations if region.get("best_hit", 0) == 1]
-	
+	"""
 	#Add information to .annotation for each peak
 	for i, region in enumerate(regions):
 		region.annotation = best_annotations[i]
 	
+	logger.info("Attribute '.annotation' was added to each region")
 	#Return None; alters peaks in place
+
+def _annotate_peaks_chunk(region_dicts, gtf, cfg_dict):
+	""" Multiprocessing safe function to annotate a chunk of regions """
+
+	logger = logging.getLogger("logger")
+
+	#Open tabix file
+	tabix_obj = pysam.TabixFile(gtf)
+
+	#For each peak in input peaks, collect all_valid_annotations
+	all_valid_annotations = []
+	n_regions = len(region_dicts)
+	n_progress = int(n_regions / 10)
+	for i, region in enumerate(region_dicts):
+	
+		#Annotate single peak
+		valid_annotations = annotate_single_peak(region, tabix_obj, cfg_dict, logger=logger)
+		all_valid_annotations.extend(valid_annotations)
+
+	tabix_obj.close()
+	
+	best_annotations = [region for region in all_valid_annotations if region.get("best_hit", 0) == 1]
+
+	return(best_annotations)
