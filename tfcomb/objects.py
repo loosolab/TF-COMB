@@ -52,7 +52,8 @@ class CombObj():
 
 	>>> C = tfcomb.objects.CombObj()
 
-	>>> C = tfcomb.objects.CombObj(verbosity=3)
+	#Verbosity of the output log can be set using the 'verbosity' parameter:
+	>>> C = tfcomb.objects.CombObj(verbosity=2)
 
 	"""
 
@@ -275,6 +276,7 @@ class CombObj():
 			
 			#TODO: Print progress
 			results = [job.get() for job in jobs]
+			pool.join()
 
 			#Join all TFBS to one list
 			self.TFBS = RegionList(sum(results, []))
@@ -616,7 +618,12 @@ class CombObj():
 		self.logger.info("Finished .count_between()! Run .market_basket() to estimate significant pairs")
 
 
-	def get_pair_locations(self, TF1, TF2, min_distance=0, max_distance=100, max_overlap = 0):
+	def get_pair_locations(self, TF1, TF2, TF1_strand = None,
+										   TF2_strand = None,
+										   min_distance = 0, 
+										   max_distance = 100, 
+										   max_overlap = 0,
+										   directional = False):
 		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
 		
 		Parameters
@@ -649,14 +656,20 @@ class CombObj():
 
 		"""
 
-		### Check that .TFBS is filled
+		### TODO: Check that .TFBS is filled
 
 		locations = RegionList() #empty regionlist
 
-		TFs = (TF1, TF2)
-		w = max_distance
+		TF1_tup = (TF1, TF1_strand)
+		TF2_tup = (TF2, TF2_strand)
 		sites = self.TFBS
 		n_sites = len(sites)
+
+		#Find out which TF is queried
+		if directional == True:
+			TF1_to_check = [TF1_tup]
+		else:
+			TF1_to_check = [TF1_tup, TF2_tup]
 
 		#Loop over all sites
 		i = 0
@@ -664,61 +677,70 @@ class CombObj():
 			
 			#Get current TF information
 			TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
+			this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
 
-			if not (TF1_name == TF1 and TF1_strand_i == TF1_strand) and not (TF1_name == TF2 and TF1_strand_i == TF1_strand):
-				i += 1
-				continue #next i_site
+			#Check whether TF is valid
+			if this_TF1_tup in TF1_to_check:
 	
-			#Find possible associations with TF1 within window 
-			finding_assoc = True
-			j = 0
-			while finding_assoc == True:
-				
-				#Next site relative to TF1
-				j += 1
-				if j+i >= n_sites - 1: #next site is beyond end of list, increment i
-					i += 1
-					finding_assoc = False #break out of finding_assoc
-
-				else:	#There are still sites available
-
-					#Fetch information on TF2-site
-					TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].name
-					TF1
-
-					if not (TF2_name == TF1 and TF2_strand_i == TF1_strand) and not (TF2_name == TF2 and TF2_strand_i == TF1_strand):
-						j += 1
-						continue #next j in finding_assoc
+				#Find possible associations with TF1 within window 
+				finding_assoc = True
+				j = 0
+				while finding_assoc == True:
 					
-					#True if these TFBS co-occur within window
-					distance = TF2_end - TF1_start
-					distance = 0 if distance < 0 else distance
-
-					if TF1_chr == TF2_chr and (distance <= max_distance):
-
-						if distance >= min_distance:
-						
-							# check if they are overlapping more than the threshold
-							valid_pair = 1
-							overlap_bp = TF1_end - TF2_start
-							
-							# Get the length of the shorter TF
-							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-							
-							#Invalid pair, overlap is higher than threshold
-							if overlap_bp / short_bp > max_overlap: 
-								valid_pair = 0
-
-							#Save association
-							if valid_pair == 1:
-								location = OneRegion([TF1_chr, TF1_start, TF2_end]) #, TF1_name + "_" + TF2_name])
-								locations.append(location)
-
-					else:
-						#The next site is out of window range; increment to next i
+					#Next site relative to TF1
+					j += 1
+					if j+i >= n_sites - 1: #next site is beyond end of list, increment i
 						i += 1
-						finding_assoc = False   #break out of finding_assoc-loop
-		
+						finding_assoc = False #break out of finding_assoc
+
+					else:	#There are still sites available
+
+						#Fetch information on TF2-site
+						TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
+						this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
+						
+						#Find out whether this TF2 is TF1/TF2
+						if this_TF1_tup == TF1_tup:
+							to_check = TF2_tup
+						elif this_TF1_tup == TF2_tup:
+							to_check = TF1_tup
+
+						#Check whether TF2 is either TF1/TF2
+						if this_TF2_tup == to_check:
+						
+							#True if these TFBS co-occur within window
+							distance = TF2_start - TF1_end
+							distance = 0 if distance < 0 else distance
+
+							if TF1_chr == TF2_chr and (distance <= max_distance):
+
+								if distance >= min_distance:
+								
+									# check if they are overlapping more than the threshold
+									valid_pair = 1
+									if distance == 0:
+										overlap_bp = TF1_end - TF2_start
+										
+										# Get the length of the shorter TF
+										short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+										
+										#Invalid pair, overlap is higher than threshold
+										if overlap_bp / (short_bp*1.0) > max_overlap: 
+											valid_pair = 0
+
+									#Save association
+									if valid_pair == 1:
+										location = OneRegion([TF1_chr, TF1_start, TF2_end, TF1_name + "_" + TF2_name])
+										locations.append(location)
+
+							else:
+								#The next site is out of window range; increment to next i
+								i += 1
+								finding_assoc = False   #break out of finding_assoc-loop
+			
+			else: #current TF1 is not TF1/TF2; go to next site
+				i += 1
+
 		return(locations)
 
 	#-----------------------------------------------------------------------------------------#
@@ -809,7 +831,7 @@ class CombObj():
 		pvalue : str, optional
 			Column 'cosine_pvalue'
 		measure_threshold : float, optional
-			A minimum threshold for the measure to be selected. If None, the threshold will be estimated through a knee-plot of the available values. Default: None.
+			A minimum threshold for the measure to be selected. If None, the threshold will be estimated through a knee-plot of the cumulative sum of values. Default: None.
 		pvalue_threshold : float, optional
 			A p-value threshold for selecting rules. Default: 0.05.
 		plot : bool, optional
@@ -826,7 +848,6 @@ class CombObj():
 		---------
 		tfcomb.plotting.volcano
 		"""
-
 
 		#Check if measure are in columns
 		if measure not in self.rules.columns:
@@ -845,10 +866,10 @@ class CombObj():
 			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
 			
 			#Compute distribution histogram of measure values
-			y, x = np.histogram(self.rules[measure], bins=1000)
+			y, x = np.histogram(self.rules[measure], bins=100)
 			x = [np.mean([x[i], x[i+1]]) for i in range(len(x)-1)] #Get mid of start/end of each bin
 			y = np.cumsum(y)
-			kneedle = KneeLocator(x, y, curve="concave", direction="increasing")
+			kneedle = KneeLocator(x, y, curve="concave", direction="increasing", interp_method="polynomial")
 			measure_threshold = kneedle.knee
 
 		#Set threshold on table
@@ -862,7 +883,15 @@ class CombObj():
 												pvalue_threshold = pvalue_threshold,
 												**kwargs)
 
-		return(selected)
+		#Create a CombObj with the subset of TFBS and rules
+		self.logger.info("Creating subset of TFBS and rules using thresholds")
+		new_obj = self.copy()
+		new_obj.rules = selected
+
+		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
+		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+
+		return(new_obj)
 
 
 	#-----------------------------------------------------------------------------------------#
@@ -971,7 +1000,6 @@ class CombObj():
 		#Plot
 		ax = tfcomb.plotting.bubble(top_rules, yaxis=yaxis, color_by=color_by, size_by=size_by, **kwargs)
 
-		#return(ax)
 	
 
 	#-------------------------------------------------------------------------------------------#
@@ -1009,7 +1037,7 @@ class CombObj():
 		selected = self.rules[:n_rules]
 
 		#Build network
-		G = tfcomb.analysis.build_network(selected)
+		G = tfcomb.analysis.build_nx_network(selected)
 		
 		#Plot network
 		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
@@ -1113,6 +1141,8 @@ class DiffCombObj():
 
 		#TODO: Check that object is an instance of CombObj
 
+		#TODO: check that prefixes are unique; otherwise, throw error 
+
 		#Check if prefix is set - otherwise, set to obj<int>
 		if obj.prefix is not None:
 			prefix = obj.prefix
@@ -1150,7 +1180,8 @@ class DiffCombObj():
 		#Normalize values
 		self.rules[measure_columns] = qnorm.quantile_normalize(self.rules[measure_columns], axis=1)
 
-		#Ensure that original 0 values are kept at 0
+		#TODO: Ensure that original 0 values are kept at 0
+
 
 
 	def calculate_foldchanges(self, pseudo = None):
@@ -1200,16 +1231,29 @@ class DiffCombObj():
 		#Sort by first contrast log2fc
 		self.logger.debug("columns: {0}".format(columns))
 		self.rules.sort_values(columns[0], inplace=True)
+
+		self.logger.info("Please find the calculated log2fc's in the rules table (<DiffCombObj>.rules)")
 		
 
-	def select_rules(self, measure, plot = True):
+	def select_rules(self, contrast=None,
+						   measure="cosine", 
+						   plot = True):
 		"""
-		Select differentially regulated rules on the basis of measure and pvalue
+		Select differentially regulated rules on the basis of measure and pvalue.
+
+		Parameters
+		-----------
+		contrast : tuple
+			Name of the contrast to use in tuple format e.g. (<prefix1>,<prefix2>). Default: None (the first contrast is shown).
+
+		measure : str
+			The measure to use for selecting rules. Default: "cosine".
 
 		See also
 		----------
 		tfcomb.plotting.volcano
 		"""
+
 
 		if plot == True:
 			tfcomb.plotting.volcano(self.rules, measure=measure)
@@ -1228,7 +1272,6 @@ class DiffCombObj():
 		-----------
 		method : str
 			Either 'pearson' or 'spearman'. Default: 'pearson'.
-
 		"""
 
 		#Define columns
@@ -1347,7 +1390,7 @@ class DiffCombObj():
 
 		#Remove x-axis label for upper plot
 
-		return(fig)
+		#return(fig)
 
 	def plot_network(self, contrast=None,
 							n_rules=100, 
@@ -1372,7 +1415,7 @@ class DiffCombObj():
 		color_edge_by : str, optional
 			The name of measure or column to color edge by. Default: "cosine_log2fc" (will be internally converted to "prefix1/prefix2_<color_edge_by>")
 		size_edge_by : str, optional
-
+			The name of measure or column to size edge by. 
 		kwargs : arguments
 			Any additional arguments are passed to tfcomb.plotting.network.
 
@@ -1406,7 +1449,7 @@ class DiffCombObj():
 
 		#Build network
 		self.logger.debug("Building network using 'tfcomb.analysis.build_network'")
-		G = tfcomb.analysis.build_network(selected)
+		G = tfcomb.analysis.build_nx_network(selected)
 		
 		#Plot network
 		self.logger.debug("Plotting network using 'tfcomb.plotting.network'")

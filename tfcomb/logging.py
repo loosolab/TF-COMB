@@ -1,5 +1,5 @@
 import logging
-from logging import ERROR, WARNING, INFO, DEBUG
+from logging import ERROR, INFO, DEBUG
 import sys
 
 

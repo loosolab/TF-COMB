@@ -154,18 +154,19 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 	"""
 
 	check_columns(table, [measure, pvalue])	
+	pseudo = 10**(-300) #smallest pvalue possible
 
 	#Convert pvalue to -log10
 	table = table.copy() #ensures that we don't change the table in place
 	pval_col = "-log10({0})".format(pvalue)
-	table[pval_col] = -np.log10(table[pvalue])
+	table[pval_col] = -np.log10(table[pvalue] + pseudo)
 
 	g = sns.jointplot(data=table, x=measure, y=pval_col, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if pvalue_threshold is not None:
-		g.ax_joint.axhline(-np.log10(pvalue_threshold), linestyle="--", color="grey")
-		g.ax_marg_y.axhline(-np.log10(pvalue_threshold), linestyle="--", color="grey") #y-axis (pvalue)
+		g.ax_joint.axhline(-np.log10(pvalue_threshold + pseudo), linestyle="--", color="grey")
+		g.ax_marg_y.axhline(-np.log10(pvalue_threshold + pseudo), linestyle="--", color="grey") #y-axis (pvalue)
 
 	if measure_threshold is not None:
 		
