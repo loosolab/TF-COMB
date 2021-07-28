@@ -77,11 +77,10 @@ class CombObj():
 		self._motifs_obj = None
 
 	def __str__(self):
-
+		
 		s = "Instance of CombObj:\n"
-		#s += "- genome: {0}\n".format(self.genome)
-		#s += "- motifs: {0}\n".format(self.motifs, )
 
+		#TODO rules info
 		s += "- TFBS: {0}".format(len(self.TFBS))
 		#s += "- Market basket analysis: {0}\n".format(self.mb_analysis) 
 		return(s)
@@ -298,7 +297,7 @@ class CombObj():
 		Fill the .TFBS attribute using a precalculated set of binding sites.
 
 		Parameters
-		---------------
+		-------------
 		bed_f : str 
 			A path to a .bed-file with precalculated binding sites.
 
@@ -363,7 +362,7 @@ class CombObj():
 		
 
 	def cluster_TFBS(self, threshold=0.5):
-		""" Cluster TFBS based on overlap 
+		""" Cluster TFBS based on overlap of individual binding sites. This can be used to pre-process TFBS into TF "families" of TFs with similar motifs.
 		
 		Parameters
 		------------
@@ -526,7 +525,14 @@ class CombObj():
 		self.TF_counts = TF_counts
 		self.pair_counts = pair_counts
 
+		#Update object variables
 		self.rules = None 	#Remove .rules if market_basket() was previously run
+		self.min_distance = min_distance
+		self.max_distance = max_distance
+		self.stranded = stranded
+		self.directional = directional
+		self.max_overlap = max_overlap
+
 		self.logger.info("Done finding co-occurrences! Run .market_basket() to estimate significant pairs")
 
 
@@ -647,8 +653,8 @@ class CombObj():
 
 		Returns
 		-------
-		RegionList()
-			All locations of TF1-TF2 (range is TF1(start)->TF2(end))
+		List of RegionList() tuples
+			TODO: Each entry in the list is a tuple of RegionList() objects given the locations of TF1/TF2 
 
 		See also
 		---------
@@ -749,7 +755,7 @@ class CombObj():
 
 	def market_basket(self, sort_by="cosine", threads = 1):
 		"""
-		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within() or .count_between().
+		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within().
 	
 		Parameters
 		-----------
@@ -803,6 +809,12 @@ class CombObj():
 		table.sort_values(sort_by, ascending=False, inplace=True)
 		table.reset_index(inplace=True, drop=True)
 
+		#Todo: calculate pvalues for the measure given
+
+		#Create internal node table for future network analysis
+		self.TF_table = single_counts
+		self.TF_table.set_index("TF", inplace=True)
+
 		#Market basket is done; save to .rules
 		self.logger.info("Market basket analysis is done! Results are found in .rules")
 		self.rules = table
@@ -814,11 +826,22 @@ class CombObj():
 		self.logger.debug("Calculating p-value for {0} rules".format(len(self.rules)))
 		self.rules[measure + "_pvalue"] = tfcomb.utils._calculate_pvalue(self.rules, measure=measure)
 
+	#-----------------------------------------------------------------------------------------#
+	#------------------------------ Selecting significant rules ------------------------------#
+	#-----------------------------------------------------------------------------------------#
+
+	def select_rules_powerlaw():
+		pass
+
+	def select_n_rules():
+		pass
+
 	def select_rules(self, measure="cosine", 
 							pvalue="cosine_pvalue", 
 							measure_threshold=None,
 							pvalue_threshold=0.05,
 							plot=True, 
+							n_rules = None,
 							**kwargs):
 
 		"""
@@ -826,6 +849,7 @@ class CombObj():
 
 		Parameters
 		-----------
+
 		measure : str, optional
 			Default: 'cosine'
 		pvalue : str, optional
@@ -836,13 +860,15 @@ class CombObj():
 			A p-value threshold for selecting rules. Default: 0.05.
 		plot : bool, optional
 			Whether to show the 'measure vs. pvalue'-plot or not. Default: True.
+		n_rules : int, optional
+			The number of rules to show within network (selected as the top 'n_rules' within .rules). Default: None (all rules are shown).
 		kwargs : arguments
 			Additional arguments are forwarded to tfcomb.plotting.volcano
 
 		Returns
 		--------
-		Pandas.DataFrame()
-			A subset of <obj>.rules
+		tfcomb.objects.CombObj()
+			An object containing a subset of <obj>.rules
 
 		See also
 		---------
@@ -900,7 +926,6 @@ class CombObj():
 
 	def plot_background(self, TF1, TF2):
 		pass
-
 
 
 
@@ -1000,31 +1025,82 @@ class CombObj():
 		#Plot
 		ax = tfcomb.plotting.bubble(top_rules, yaxis=yaxis, color_by=color_by, size_by=size_by, **kwargs)
 
-	
-
 	#-------------------------------------------------------------------------------------------#
-	#------------------------------------ Network analysis -------------------------------------#	
+	#----------------------------------- In-depth analysis -------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def plot_network(self, n_rules=100, 
-						   color_node_by="TF1_count",
+	def analyze_distances():
+		pass
+
+
+	#-------------------------------------------------------------------------------------------#
+	#------------------------------------ Network analysis -------------------------------------#
+	#-------------------------------------------------------------------------------------------#
+
+	def build_network(self):
+		""" Builds a TF-TF co-occurrence network for the rules within object. This is a wrapper for the tfcomb.analysis.build_nx_network() function, 
+		 	which uses the python networkx package. 
+			 
+		Returns
+		-------
+		None - fills the .network attribute of the `CombObj` with a networkx.Graph object
+		"""
+
+		#Build network
+		self.logger.debug("Building network using tfcomb.analysis.build_nx_network")
+		self.network = tfcomb.analysis.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+		
+
+	def partition_network(self, method="louvain"):
+		"""
+		Creates a partition of nodes within network
+		
+		Note: Requires build_network 
+		Adds a new node attribute to network
+
+		Parameters
+		-----------
+		method : str, one of ["louvain"]
+			Currently only supports "louvain". Default: "louvain".
+
+		"""
+		#Fetch network from object
+		if self.network is None:
+			build_network()
+			raise ValueError("The .network attribute is not set yet - please run .build_network() first.")
+
+		if method == "louvain":
+			table = tfcomb.analysis.partition_louvain(self.network)
+		elif method == "":
+			
+			#Create gt network
+			
+
+			#add information to nx network
+			table = ""
+
+		return(table)
+
+
+	def plot_network(self, color_node_by="count",
 						   color_edge_by="cosine", 
 						   size_edge_by="TF1_TF2_count",
 						   **kwargs): 
 		"""
 		Plot the rules in .rules as a network using Graphviz for python. This function is a wrapper for 
 		building the network (using tfcomb.analysis.build_network) and subsequently plotting the network (using tfcomb.plotting.network).
+		Requires build_network() to be run.
 
 		Parameters
 		-----------
-		n_rules : int, optional
-			The number of rules to show within network (selected as the top 'n_rules' within .rules). Default: 100.
 		color_node_by : str, optional
 			A column in .rules to color nodes by. Default: 'TF1_count'.
 		color_edge_by : str, optional
 			A column in .rules to color edges by. Default: 'cosine'.
 		size_edge_by : str
 			A column in rules to size edge width by. Default: 'TF1_TF2_count'.
+		n_rules : int, optional
+			The number of rules to show within network (selected as the top 'n_rules' within .rules). Default: None (all rules are shown).
 		kwargs : arguments
 			All other arguments are passed to tfcomb.plotting.network.
 
@@ -1033,12 +1109,13 @@ class CombObj():
 		tfcomb.analysis.build_network and tfcomb.plotting.network
 		"""
 
-		#Create subset of rules
-		selected = self.rules[:n_rules]
+		#Fetch network from object
+		if self.network is None:
+			self.build_network()			#running build network()
+			raise ValueError("The .network attribute is not set yet - please run .build_network() to able to plot network.")
 
-		#Build network
-		G = tfcomb.analysis.build_nx_network(selected)
-		
+		G = self.network 
+
 		#Plot network
 		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
 										 verbosity=self.verbosity, **kwargs)
@@ -1253,7 +1330,6 @@ class DiffCombObj():
 		----------
 		tfcomb.plotting.volcano
 		"""
-
 
 		if plot == True:
 			tfcomb.plotting.volcano(self.rules, measure=measure)
