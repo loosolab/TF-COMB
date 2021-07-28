@@ -653,8 +653,8 @@ class CombObj():
 
 		Returns
 		-------
-		List of RegionList() tuples
-			TODO: Each entry in the list is a tuple of RegionList() objects given the locations of TF1/TF2 
+		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
+			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
 
 		See also
 		---------
@@ -736,7 +736,11 @@ class CombObj():
 
 									#Save association
 									if valid_pair == 1:
-										location = OneRegion([TF1_chr, TF1_start, TF2_end, TF1_name + "_" + TF2_name])
+
+										#Save location
+										reg1 = OneRegion([TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i])
+										reg2 = OneRegion([TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i])
+										location = (reg1, reg2, distance)
 										locations.append(location)
 
 							else:
@@ -1066,17 +1070,17 @@ class CombObj():
 		"""
 		#Fetch network from object
 		if self.network is None:
-			build_network()
-			raise ValueError("The .network attribute is not set yet - please run .build_network() first.")
+			self.build_network()
+			self.logger.info("The .network attribute is not available - running .build_network()")
 
+		#Decide method of partitioning
 		if method == "louvain":
-			table = tfcomb.analysis.partition_louvain(self.network)
+			table = tfcomb.analysis.partition_louvain(self.network) #this adds "partition" to the network
+		
 		elif method == "":
-			
+			#todo
 			#Create gt network
-			
-
-			#add information to nx network
+			#Add information to nx network
 			table = ""
 
 		return(table)
