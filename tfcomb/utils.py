@@ -18,6 +18,26 @@ def check_columns(df, columns):
 			if column not in df_columns:
 				raise ValueError("Column '{0}' is not found in dataframe. Available columns are: {1}".format(column, df_columns))
 
+def check_type(obj, types):
+	"""
+	Parameters:
+	----------
+	obj : object
+		Object to check type on
+	types : list
+		A list of allowed object types
+	"""
+	
+	#Check if any of the types fit
+	flag = 0
+	for t in types:
+		if isinstance(obj, t):
+			flag = 1
+
+	#Raise valueError if none of the types fit
+	if flag == 0:	
+		raise ValueError("Object has type '{0}', but must be one of: {1}".format(type(obj), types))
+
 
 def _get_background(matrix, TF1_idx, TF2_idx):
 	""" Fetches the background values from a matrix for a particular set of TFs"""

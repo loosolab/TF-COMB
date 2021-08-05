@@ -334,7 +334,13 @@ def _establish_node_attributes(table, node):
 	return(node_attributes)
 
 
-def build_gt_network(table, node1="TF1", node2="TF2", directed=False, verbosity=1):
+def build_gt_network(table, 
+					node1="TF1", 
+					node2="TF2", 
+					node_table=None,
+					directed=False, verbosity=1, 
+					node1_attributes=None, 
+					node2_attributes=None):
 	""" Build graph-tool network from table 
 	
 	Parameters
@@ -349,6 +355,10 @@ def build_gt_network(table, node1="TF1", node2="TF2", directed=False, verbosity=
 		Whether edges are directed or not. Default: False.
 	verbosity : int, optional
 		Verbosity of logging (0/1/2/3). Default: 1.
+	node1_attributes : list, optional
+		A list of columns to use for node1 attributes. Default: is estimated from data.
+	node2_attributes : list, optional
+		A list of columns to use for node2 attributes. Default: is estimated from data.
 
 	"""
 
@@ -366,31 +376,49 @@ def build_gt_network(table, node1="TF1", node2="TF2", directed=False, verbosity=
 	dtype_dict = dict(zip(columns, dtype_list))
 	logger.debug("'dtype_dict': {0}".format(dtype_dict))
 
+	## Setup node table
+	if node_table is None:
+
+		node1_attributes = _establish_node_attributes(table, node1)
+		node2_attributes = _establish_node_attributes(table, node2)
+		node1_table = table[[node1] + node1_attributes].set_index(node1, drop=False)
+		node2_table = table[[node2] + node2_attributes].set_index(node2, drop=False)
+		node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
+		node_table.fillna(0, inplace=True)
+		node_table.drop_duplicates(inplace=True)
+		logger.spam("'node_table': {0}".format(node_table.head()))
+
 	### Setup node/edge attributes ###
-	#node attributes
-	node1_attributes = _establish_node_attributes(table, node1)
-	node2_attributes = _establish_node_attributes(table, node2)
+	## node attributes
+	
+	
 	node_attributes = list(set(node1_attributes + node2_attributes))
+	for att in node_attributes:	#check that node attributes are in table
+		if att not in columns:
+			raise ValueError("Given node attribute '{0}' is not in table columns.")
+
+	node_attributes = [node1, node2] + node_attributes
+	logger.debug("Node attributes: {0}".format(node_attributes))
 	for att in node_attributes:
 		eprop = g.new_vertex_property(dtype_dict[att])
 		g.vertex_properties[att] = eprop
 
-	#edge attributes
-	edge_attributes = set(columns) - set(node_attributes)
+	## edge attributes - the remaining columns
+	edge_attributes = list(set(columns) - set(node_attributes))
+	for att in edge_attributes:
+		if att not in columns:
+			raise ValueError("Given edge attribute '{0}' is not in table columns.") 
+
+	logger.debug("Edge attributes: {0}".format(edge_attributes))
 	for att in edge_attributes:
 		eprop = g.new_edge_property(dtype_dict[att])
 		g.edge_properties[att] = eprop
 
 	### Build network ###
 
-	## Add nodes with properties
-	node1_table = table[[node1] + node1_attributes].set_index(node1)
-	node2_table = table[[node2] + node2_attributes].set_index(node2)
-	node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
-	node_table.fillna(0, inplace=True)
-	node_table.drop_duplicates(inplace=True)
-	logger.spam("'node_table': {0}".format(node_table.head()))
+	
 
+	## Add nodes with properties
 	name2idx = {} #TF name to idx
 	idx2name = {}
 	for i, row in node_table.to_dict(orient="index").items():
@@ -413,30 +441,44 @@ def build_gt_network(table, node1="TF1", node2="TF2", directed=False, verbosity=
 		
 	return(g)
 
-
-def build_nx_network(table, node1="TF1", node2="TF2", directed=False, multi=False):
+def build_nx_network(edge_table, 
+						node1="TF1", 
+						node2="TF2", 
+						node_table=None,
+						directed=False, 
+						multi=False, 
+						verbosity=1 
+						):
 	""" 
 	Build a networkx network from a table containing node1, node2 and other node/edge attribute columns, e.g. as from CombObj.market_basket() analysis.
 	
 	Parameters
 	----------
-	table : pd.DataFrame 
-		Edges table including node/edge attributes.
+	edge_table : pd.DataFrame 
+		Edge table including node1/node2 attributes.
 	node1 : str, optional
-		The column to use as node1 ID. Default: "TF1".
+		The column within edges_table to use as node1 ID. Default: "TF1".
 	node2 : str, optional
-		The column to use as node2 ID. Default: "TF2".
+		The column within edges_table to use as node2 ID. Default: "TF2".
+	node_table : pd.DataFrame, optional
+		An additional table of attributes to use for nodes. Default: node attributes are estimated from the columns in edge_table.
 	directed : bool, optional
 		Whether edges are directed or not. Default: False.
 	multi : bool, optional
-		Allow multiple edges between two vertices. If false, the first occurrence of TF1-TF2/TF2-TF1 in the table is used. Default: False.
+		Allow multiple edges between two vertices. If False, the first occurrence of TF1-TF2/TF2-TF1 in the table is used. Default: False.
+	verbosity : int, optional
+		Verbosity of logging (0/1/2/3). Default: 1.
 
 	Returns
 	---------
-	networkx.Graph / networkx.diGraph / networkx.MultiGraph / networkx.MultiDiGraph - depending on parameters given
+	networkx.Graph / networkx.DiGraph / networkx.MultiGraph / networkx.MultiDiGraph - depending on parameters given
 	"""
 	
-	table = table.copy()
+	#Setup logger
+	logger = TFcombLogger(verbosity)
+
+	#Setup table
+	table = edge_table.copy()
 	check_columns(table, [node1, node2])
 
 	# Subset edges based on multi
@@ -455,31 +497,47 @@ def build_nx_network(table, node1="TF1", node2="TF2", directed=False, multi=Fals
 		table = table.loc[list(to_keep.keys())]
 		table.reset_index(inplace=True)
 
+		logger.spam("Subset edges (head): {0}".format(table.head()))
+
 	######### Setup node attributes #########
 	attribute_columns = [col for col in table.columns if col not in [node1, node2]]
 
-	#Establish node attributes
-	node1_attributes = _establish_node_attributes(table, node1)
-	node2_attributes = _establish_node_attributes(table, node2)
-	node2_attributes = list(set(node2_attributes) - set(node1_attributes)) #prevent the same columns from being assigned to both TF1 and TF2)
+	if node_table is None:
+		
+		#Establish node attributes
+		node1_attributes = _establish_node_attributes(table, node1)
+		logger.debug("node1_attributes: {0}".format(node1_attributes))
+		
+		node2_attributes = _establish_node_attributes(table, node2)
+		node2_attributes = list(set(node2_attributes) - set(node1_attributes)) #prevent the same columns from being assigned to both TF1 and TF2)
+		logger.debug("node2_attributes: {0}".format(node2_attributes))
 
-	#Setup tables for node1 and node2 information
-	node1_table = table[[node1] + node1_attributes].set_index(node1)
-	node2_table = table[[node2] + node2_attributes].set_index(node2)
+		#Setup tables for node1 and node2 information
+		node1_table = table[[node1] + node1_attributes].set_index(node1, drop=False) #also includes node1
+		node2_table = table[[node2] + node2_attributes].set_index(node2, drop=False) #also includes node2
 
-	#Merge node information to dict for network
-	node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
-	node_table.fillna(0, inplace=True)
-	node_table.drop_duplicates(inplace=True)
-	node_attributes = node_table.columns
+		#Merge node information to dict for network
+		node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
+		#node_table.fillna(0, inplace=True)
+		node_table.drop_duplicates(inplace=True)
+	
+	else:
+		#todo: check that node_table fits with index
+		pass
+
+	logger.spam("node_table head:\n{0}".format(node_table.head()))
+	node_attributes = list(node_table.columns)
+	logger.debug("node_attributes: {0}".format(node_attributes))
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
+	logger.spam("node_attribute_dict: {0} (...)".format({i: node_attribute_dict[i] for i in list(node_attribute_dict.keys())[:5]}))
 
 	######## Setup edge attributes #######	
 	edge_attributes = [col for col in attribute_columns if col not in node_attribute_dict]
-	edges = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
-		
+	logger.debug("edge_attributes: {0}".format(edge_attributes))
+	edges_list = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
+	logger.spam("edges_list: {0} (...)".format(edges_list[:3]))
+
 	############ Setup Graph ############
-	
 	if multi == True:
 		if directed == True:
 			G = nx.MultiDiGraph()
@@ -492,7 +550,7 @@ def build_nx_network(table, node1="TF1", node2="TF2", directed=False, multi=Fals
 			G = nx.Graph()
 
 	#Add collected edges
-	G.add_edges_from(edges)
+	G.add_edges_from(edges_list)
 	
 	#Add node attributes
 	nx.set_node_attributes(G, node_attribute_dict)
@@ -540,7 +598,7 @@ def get_degree(G, weight=None):
 #Center-piece subgraphs
 
 #Graph partitioning 
-def get_partitions(network):
+def partition_louvain(network):
 	"""
 	Partition a network using community louvain.
 
@@ -551,17 +609,24 @@ def get_partitions(network):
 	"""
 
 	#network must be undirected
-	#if graph.is_directed():
-	#raise TypeError("Bad graph type, use only non directed graph")
+	if network.is_directed():
+		raise TypeError("Bad graph type, use only non directed graph")
 
-
+	#Partition network
 	partition_dict = community_louvain.best_partition(network)
-	partition_dict_fmt = {key:{"partition": value} for key, value in partition_dict.items()}
+	partition_dict_fmt = {key:{"partition": str(value + 1)} for key, value in partition_dict.items()}
 
 	#Add partition information to each node
 	nx.set_node_attributes(network, partition_dict_fmt)
 
-	return(partition)
+	#Setup table with partition information
+	table = pd.DataFrame.from_dict(partition_dict_fmt, orient="index")
+
+	return(table)
+
+
+def partition_gt():
+	pass
 
 
 #-------------------------------------------------------------------------------#

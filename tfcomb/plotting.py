@@ -4,9 +4,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import seaborn as sns
+import networkx as nx
 import graphviz
 
-from tfcomb.utils import check_columns
+
+from tfcomb.utils import check_columns, check_type
 from tfcomb.logging import TFcombLogger
 
 
@@ -272,22 +274,35 @@ def _values_to_cmap(values, plt_cmap=None):
 	colormap_red = _truncate_colormap(plt.cm.Reds, minval=0.3, maxval=0.7)
 	colormap_blue = _truncate_colormap(plt.cm.Blues_r, minval=0.3, maxval=0.7)
 	colormap_divergent = _truncate_colormap(plt.cm.bwr, minval=0.1, maxval=0.9)
+	colormap_discrete = _truncate_colormap(plt.cm.jet, minval=0.3, maxval=0.7)
 	
-	vmin, vmax = np.min(values), np.max(values)
-	if plt_cmap != None: #plt_cmap is given explicitly
-		pass #todo: check that plt_cmap is a colormap
-	elif vmin >= 0 and vmax >= 0:
-		plt_cmap = colormap_red
-	elif vmin < 0 and vmax <= 0:
-		plt_cmap = colormap_blue
-	elif vmin < 0 and vmax >= 0:
-		plt_cmap = colormap_divergent
-		
-	#Normalize values and create cmap
-	norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
-	sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
-	cmap = sm.get_cmap()
-	color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
+	#Check if values are strings 
+	if sum([isinstance(s, str) for s in values]) > 0: #values are strings, cmap should be discrete
+		values_unique = list(set(values))
+		floats = np.linspace(0,1,len(values_unique))
+		name2val = dict(zip(values_unique, floats)) #map strings to cmap values
+
+
+		color_func = lambda string: _rgb_to_hex(colormap_discrete(name2val[string], bytes=True)[:3])
+
+	else:
+		vmin, vmax = np.min(values), np.max(values)
+
+		if plt_cmap != None: #plt_cmap is given explicitly
+			pass #todo: check that plt_cmap is a colormap
+		elif vmin >= 0 and vmax >= 0:
+			plt_cmap = colormap_red
+		elif vmin < 0 and vmax <= 0:
+			plt_cmap = colormap_blue
+		elif vmin < 0 and vmax >= 0:
+			plt_cmap = colormap_divergent
+			
+		#Normalize values and create cmap
+		norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
+		sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
+		cmap = sm.get_cmap()
+		color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
+	
 	return(color_func)
 	
 
@@ -338,7 +353,7 @@ def network(network,
 	Raises
 	-------
 	TypeError
-		If network is not a 
+		If network is not a networkx.Graph object
 	ValueError 
 		If any of 'color_node_by', 'color_edge_by' or 'size_edge_by' is not in node/edge attributes, or if 'engine' is not a valid graphviz engine.
 	"""
@@ -348,13 +363,24 @@ def network(network,
 	
 	############### Test input ###############
 	
-	#Read nodes and edges from graph
+	check_type(network, [nx.Graph, nx.DiGraph, nx.MultiGraph, nx.MultiDiGraph])
+
+	#Read nodes and edges from graph and check attributes
 	node_view = network.nodes(data=True)
 	edge_view = network.edges(data=True)
 
 	node_attributes = list(list(node_view)[0][-1].keys())    
 	edge_attributes = list(list(edge_view)[0][-1].keys())
-	
+
+	for att in [color_node_by, size_node_by]:
+		if (att is not None) and (att not in node_attributes):
+			raise ValueError("Attribute '{0}' is not available in the network node attributes. Available attributes are: {1}".format(att, node_attributes))
+
+	for att in [color_edge_by, size_edge_by]:
+		if (att is not None) and (att not in edge_attributes):
+			raise ValueError("Attribute '{0}' is not available in the network edge attributes. Available attributes are: {1}".format(att, edge_attributes))
+
+	#Check if engine is within graphviz
 	if engine not in graphviz.ENGINES:
 		raise ValueError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
 	
@@ -442,7 +468,6 @@ def network(network,
 		#After collecting all edge attributes; add edge to dot object
 		dot.edge(node1, node2, _attributes=attributes)
 
-	
 	############### Save to file ###############
 	if save != None:
 		splt = os.path.splitext(save)
