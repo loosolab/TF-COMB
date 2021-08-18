@@ -201,20 +201,21 @@ def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
 	return(total_bp)
 
 def count_distances(np.ndarray[np.int_t, ndim=2] sites,
-						np.ndarray[np.int_t, ndim=2] rules,
-						int min_distance = 0,
-						int max_distance = 100, 
-						short anchor_mode = 0):
+					np.ndarray[np.int_t, ndim=2] rules,
+					int min_distance = 0,
+					int max_distance = 100, 
+					short anchor_mode = 0):
 
 	"""
 	Superfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction 
 	
 	Parameters:
 	------------
-	sites : np.array
+	sites : np.ndarray
 		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
-	w : int
-		Windowsize
+	
+	rules : np.ndarray
+		List of pairs (tf1 name, tf2 name) encoded as int
 
 	min_distance : int
 		Minimum allowed distance between two TFs. Default: 0
@@ -222,44 +223,41 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 	max_distance : int
 		Maximum allowed distance between two TFs. Default: 100
 
-	max_overlap (float): 
-		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.
-
-	binary : int
-		0 or 1 bool integer. If 0; counts are left raw. If 1; each pair is only counted once per window.
+	anchor_mode : short
+		anchor mode to calculate distance with. One of [0,1,2]. 
+		0 = inner, 1 = outer, 2 = center. Default: 0
 
 	Returns:
 	-----------
-	tuple
+	dist_count_mat: np.ndarray
+		n x (distance range) matrix. 
 
 
 	"""
 
 	cdef int n_sites = len(sites)
 	
-	cdef list pseudo_pairs = list()
+	cdef list pairs = list()
 	cdef np.ndarray[np.int64_t, ndim=1] rule
-	cdef list pair 
 
-	for rule in rules:
-		pseudo_pairs.append([rule[0],rule[1]])
-		#pseudo_pairs.append([pair[1],pair[0]])
-
-	#pseudo_pairs = list(np.unique(pseudo_pairs, axis=0))
-
-	#Create n x n count matrix
-	# 3+max_distance*2 because 2x TFs, 1x Zero, 2x 1-100 (unsigned/signed)
-	cdef np.ndarray[np.int64_t, ndim=3] dist_count_mat = np.zeros((len(pseudo_pairs),len(pseudo_pairs), 1+max_distance*2), dtype=int)
+	#Create n x distance range matrix || +3 for 2 tf names + 1-off
+	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), 3+(max_distance-min_distance)), dtype=int)
 
 	cdef int i = 0
 	cdef int j = 0
-	cdef int k
 	cdef bint finding_assoc = True
 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, TF1_anchor 
 	cdef int TF2_start, TF2_end, TF2_anchor, valid_pair
 	cdef int TF2_chr, TF2_name
 	cdef int distance
-
+	cdef int pair_ind = 0
+	
+	# initialize tfnames
+	for rule in rules:
+		pairs.append([rule[0],rule[1]])
+		dist_count_mat[ind, 0] = rule[0]
+		dist_count_mat[ind, 1] = rule[1]
+		ind += 1
 	#Loop over all sites
 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
 		#Get current TF information
@@ -286,32 +284,36 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 				TF2_end = sites[i+j,2]
 				TF2_name = sites[i+j,3]
 				
-				if (anchor_mode == 1):
+				# Check anchor mode 	
+    			# 1 = outer
+				if (anchor_mode == 1): 
 					TF1_anchor = TF1_start
 					TF2_anchor = TF2_end
+				# 2 = center
 				elif (anchor_mode == 2):
 					TF1_anchor = int(np.ceil((TF1_end - TF1_start) / 2))
 					TF2_anchor = int(np.ceil((TF2_end - TF2_start) / 2))
+				# 0 = inner (default)
 				else:
 					TF1_anchor = TF1_end
 					TF2_anchor = TF2_start
 
 				#Calculate distance between the two sites
 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-
 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
 					if distance >= min_distance: #Check that sites are more than min distance away
-						# check if they are overlapping more than the threshold
 						valid_pair = 0
+						pair_ind = -1
 
-						#Check pairs
-						for pair in pseudo_pairs:
-							if TF1_name == pair[0] and TF2_name == pair[1]:
-								valid_pair = 1
+						if [TF1_name,TF2_name] in pairs:
+							valid_pair = 1
+							pair_ind = pairs.index([TF1_name,TF2_name])
+
 
 						#Save counts of association
 						if valid_pair == 1:
-							dist_count_mat[TF1_name, TF2_name, max_distance + distance] += 1
+							# min_distance is offset (negative min distance adds up, positive decrease the index) || +2 for TF names
+							dist_count_mat[pair_ind, (distance - min_distance)+2] += 1
 			
 				else:
 					#The next site is out of window range; increment to next i
@@ -322,4 +324,3 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 		
 
 	return (dist_count_mat)
-
