@@ -201,7 +201,7 @@ def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
 	return(total_bp)
 
 def count_distances(np.ndarray[np.int_t, ndim=2] sites,
-					np.ndarray[np.int_t, ndim=2] rules,
+					dict rules,
 					int min_distance = 0,
 					int max_distance = 100, 
 					short anchor_mode = 0):
@@ -214,8 +214,8 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 	sites : np.ndarray
 		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
 	
-	rules : np.ndarray
-		List of pairs (tf1 name, tf2 name) encoded as int
+	rules :dict
+		dict of pairs (tf1 name, tf2 name):index with tf1 name, tf2 name encoded as int
 
 	min_distance : int
 		Minimum allowed distance between two TFs. Default: 0
@@ -251,12 +251,12 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 	cdef int TF2_chr, TF2_name
 	cdef int distance
 	cdef int pair_ind = 0
+	cdef int ind = 0
 	
 	# initialize tfnames
-	for rule in rules:
-		pairs.append([rule[0],rule[1]])
-		dist_count_mat[ind, 0] = rule[0]
-		dist_count_mat[ind, 1] = rule[1]
+	for tf1,tf2 in rules:
+		dist_count_mat[ind, 0] = tf1
+		dist_count_mat[ind, 1] = tf2
 		ind += 1
 	#Loop over all sites
 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
@@ -305,9 +305,9 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 						valid_pair = 0
 						pair_ind = -1
 
-						if [TF1_name,TF2_name] in pairs:
+						if (TF1_name,TF2_name) in rules:
 							valid_pair = 1
-							pair_ind = pairs.index([TF1_name,TF2_name])
+							pair_ind = rules[(TF1_name,TF2_name)]
 
 
 						#Save counts of association

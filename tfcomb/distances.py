@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy import stats
 import csv 
 
 #TODO: Include logger
@@ -32,20 +33,26 @@ class DistObj():
         #Variables for storing data
         self.rules = None  		     # Filled in by .fill_rules()
         self.TF_names = []		     # List of TF names
-        self.raw_distances = None 	 # Numpy array of size n_pairs x maxDist
-        self.preferred = None 	     # Numpy array of size n_pairs x n_preferredDistance 
+        self._raw = None
+        self.distances = None 	     # Numpy array of size n_pairs x maxDist
+        self.corrected = None
+        self.peaks = None 	     # Numpy array of size n_pairs x n_preferredDistance 
+        self.linres = None
+        self.peaking_count = None
         self.n_bp = 0			     # Predicted number of baskets 
         self.TFBS = RegionList()     # None RegionList() of TFBS
         self.anchor_mode = 0         # Distance measure mode [0,1,2]
         self.name_to_idx = None      # Mapping TF-names: string <-> int 
+        self.pair_to_idx = None      # Mapping Pairs: tuple(string) <-> int
         self.min_dist = 0            # Minimum distance. Default: 0 
-        self.max_dist = 100          # Maximum distance. Default: 100
-        self.max_overlap = 0         # Maximum overlap. Default: 0            
+        self.max_dist = 300          # Maximum distance. Default: 100
+        self.max_overlap = 0         # Maximum overlap. Default: 0       
+        self.foldchange_thresh = 1     
+        self._PEAK_HEADER = "TF1\tTF2\tDistance\tFoldchange\tThreshold\n"
 
     def __str__(self):
 	    pass
     
-
     def set_verbosity(self, level):
 	    """ Set the verbosity level for logging after creating the CombObj.
 
@@ -56,8 +63,7 @@ class DistObj():
 		"""
 
 	    self.verbosity = level
-	    self.logger = TFcombLogger(self.verbosity) #restart logger with new verbosity
-	    
+	    self.logger = TFcombLogger(self.verbosity) #restart logger with new verbosity	    
     
     def fill_rules(self,comb_obj):
         """ Fill object according to reference object 
@@ -73,7 +79,6 @@ class DistObj():
         self.TF_names = comb_obj.TF_names
         self.TFBS = comb_obj.TFBS 
         # TODO: min/max dist + overlap
-
 
     def set_anchor(self,anchor):
         """ set anchor for distance measure mode
@@ -100,46 +105,176 @@ class DistObj():
         sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
                           for site in self.TFBS]) #numpy integer array
 	
-        pairs = np.array([(self.name_to_idx[rule[0]], self.name_to_idx[rule[1]]) for rule in self.rules[["TF1","TF2"]].to_numpy()])
-        self.raw_distances = count_distances(sites, 
-                                             pairs,
-                                             self.min_dist,
-                                             self.max_dist,
-                                             self.anchor_mode)
+        self.pairs_to_idx = {(self.name_to_idx[tf1],self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
+        self._raw = count_distances(sites, 
+                                    self.pairs_to_idx,
+                                    self.min_dist,
+                                    self.max_dist,
+                                    self.anchor_mode)
+        self._raw_to_human_readable()
     
-    def get_raw_distances(self):
+    def _raw_to_human_readable(self):
         """ Get the raw distance in human readable format
             
             Returns:
 		    ----------
 			pd.Dataframe (TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
         """
+        idx_to_name = {}
+        for k,v in self.name_to_idx.items():
+            idx_to_name[v] = k 
+        
         results = []
-        for index, row in self.rules.iterrows():
-            tf1 = row["TF1"]
-            tf2 = row["TF2"]
-            entry =  [tf1,tf2]
-            entry += self.raw_distances[index][2:].tolist()
+        for row in self._raw:
+            tf1 = idx_to_name[row[0]]
+            tf2 = idx_to_name[row[1]]
+            entry = [tf1,tf2]
+            entry += row[2:].tolist()
             results.append(entry)
                 
-        return pd.DataFrame(results,columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)])
+        self.distances = pd.DataFrame(results,columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)])
 
-    def analyze_distances():
+    def linregress_pair(self,pair,n_bins=None, save = None):
+        if n_bins is None:
+            n_bins = self.max_dist - self.min_dist +1
+        x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
+        #TODO: check pair is valid
+        tf1 = pair[0]
+        tf2 = pair[1]
+        #TODO: check self.distances not None
+        data = self.distances.loc[((self.distances["TF1"]==tf1) &
+               (self.distances["TF2"]==tf2))].iloc[0, 2:]
+        linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(data,dtype = float))
+        if save is not None:
+            plt.hist(range(self.min_dist,self.max_dist+1),weights=data, bins=n_bins, density=False, alpha=0.6)
+            plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
+            title = f"Fit results: pval = {linres.pvalue},  stderr = {linres.stderr}" 
+            plt.title(title)
+            plt.savefig(f'{save}linreg_{tf1}_{tf2}.png', dpi=600)
+            plt.clf()
+        return linres
+    
+    def linregress_all(self,n_bins = None, save = None):
+        #TODO:check self.distances not None
+        linres = {}
+        for idx,row in self.distances.iterrows():
+            tf1 = row["TF1"]
+            tf2 = row["TF2"]
+            res = self.linregress_pair((tf1,tf2),n_bins,save)
+            linres[tf1,tf2]=[tf1,tf2,res]
+        
+        self.linres = pd.DataFrame.from_dict(linres,orient="index",columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
+    
+    def correct_pair(self,pair,linres,n_bins = None, save = None):
+        if n_bins is None:
+            n_bins = self.max_dist - self.min_dist +1
+        #TODO: check pair is valid
+        tf1 = pair[0]
+        tf2 = pair[1]
+        #TODO: check self.distances not None
+        data = self.distances.loc[((self.distances["TF1"]==tf1) &
+               (self.distances["TF2"]==tf2))].iloc[0, 2:]
+        corrected = []
+        x_val = 0
+        #TODO: check linres valid
+        for dist in data:
+            corrected.append(dist-(linres.intercept + linres.slope*x_val))
+            x_val += 1
+
+        if save is not None:
+            x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
+            plt.hist(range(self.min_dist,self.max_dist+1),weights=corrected, bins=n_bins, density=False, alpha=0.6)
+            linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(corrected,dtype = float))
+            plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
+            plt.savefig(f'{save}corrected_{tf1}_{tf2}.png', dpi=600)
+            plt.clf()
+        
+        return corrected
+    
+    def correct_all(self,n_bins = None, save = None):
+        corrected = {}
+        #TODO: check linres not none
+        for idx,row in self.linres.iterrows():
+            tf1,tf2,linres = row
+            res=self.correct_pair((tf1,tf2),linres,n_bins,save)
+            corrected[tf1,tf2]=[tf1,tf2]+res
+        
+        self.corrected = pd.DataFrame.from_dict(corrected,orient="index",columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)]).reset_index(drop=True) 
+        
+    def get_median(self,tf1,tf2):
+        #TODO: Check distance not None
+        data = self.distances.loc[((self.distances["TF1"]==tf1) &
+               (self.distances["TF2"]==tf2))].iloc[0, 2:]
+
+        return data.median()
+
+    def peaks_pair(self,pair,corrected,foldchange_thresh = 1,save = None, new_file = True):
         """ Analyze preferred binding distances, requires count_distances() run.
 
             Returns:
 		    ----------
-            pd.DataFrame (all pairs found periodic)
+            pd.DataFrame 
         """
-        # Statistical test / grid points? 
-        pass
+        #TODO: check pair is valid
+        tf1 = pair[0]
+        tf2 = pair[1]
+        
+        thresh = self.get_median(tf1,tf2)
+        self.foldchange_thresh = foldchange_thresh
+        if save is not None:
+            if new_file:
+                outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','w') 
+                outfile.write(self._PEAK_HEADER)
+            else:
+                outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','a') 
 
+        peaks = []
+        dist = 0
+        for c in corrected:
+            if c > thresh:
+                fold_change = c/thresh
+                if fold_change > foldchange_thresh:
+                    peak = [tf1,tf2,dist,round(fold_change,2),round(thresh,2)]
+                    peaks.append(peak)
+                    if save is not None:
+                        outfile.write('\t'.join(str(x) for x in peak) + '\n')
+            dist += 1
+        if save is not None:
+            outfile.close()
+        return peaks
+    
+    def peaks_all(self,foldchange_thresh = 1,save = None):
+        all_peaks = []
+        #TODO check if corrected not none and check save
+        if save is not None:
+            outfile = open(f'{save}peaks.tsv','w')
+            outfile.write(self._PEAK_HEADER)
+        peaking_count = 0
+        for idx,row in self.corrected.iterrows():
+            tf1 = row["TF1"]
+            tf2 = row["TF2"]
+            corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
+                                           (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+
+            peaks = self.peaks_pair((tf1,tf2),corrected_data,foldchange_thresh = foldchange_thresh,save = None)
+                
+            if len(peaks)>0:
+                for peak in peaks:
+                    all_peaks.append(peak)
+                    if save is not None:    
+                        outfile.write('\t'.join(str(x) for x in peak) + '\n')
+                peaking_count += 1
+        self.peaks = pd.DataFrame(all_peaks,columns=["TF1","TF2","Distance","Fold_change","Threshold"])
+        self.peaking_count = peaking_count
+        if save is not None:
+            outfile.close()
+            
     def check_periodicity(self):
         """ checks periodicity of distances (like 10 bp indicating dna full turn)
 
             Returns:
 		    ----------
-            pd.DataFrame (all pairs found periodic)
+            pd.DataFrame 
         """
         pass
     
@@ -268,7 +403,6 @@ class DistObj():
 
         return(locations)
 
-
     def bed_from_range(self, TF1, TF2, TF1_strand = None,
 									   TF2_strand = None,
 									   directional = False,
@@ -395,7 +529,6 @@ class DistObj():
                 plt.savefig(f'{save}hist_{pair[0]}_{pair[1]}.png', dpi=600)
                 plt.clf()
 
-
     def plot_dens(self,targets,dataSource,bwadjust = 1,save = None):
         """ KDE Plots for a list of TF-pairs
 
@@ -424,4 +557,24 @@ class DistObj():
                 plt.savefig(f'{save}dens_{pair[0]}_{pair[1]}.png', dpi=600)
                 plt.clf()
 
+    def plot_decision_boundary(self,targets,n_bins = None, save = None):
+        if n_bins is None:
+            n_bins = self.max_dist - self.min_dist+1
+        #check self.corrected filled
+        for pair in targets:
+            tf1 = pair[0]
+            tf2 = pair[1]
+            corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
+                                           (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+            linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(corrected_data,dtype = float))
+            x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
+            thresh = self.get_median(tf1,tf2) * self.foldchange_thresh
+            plt.hist(range(self.min_dist,self.max_dist+1),weights=corrected_data, bins=n_bins, density=False, alpha=0.6)
+            plt.plot(x, [thresh]*len(x), 'r', label='upper boundary')
+            plt.plot(x, [-thresh]*len(x), 'r', label='lower boundary')
+            title = f"Decision boundary for {tf1}-{tf2}" 
+            plt.title(title)
+            if save is not None:
+                plt.savefig(f'{save}db_{tf1}_{tf2}.png', dpi=600)
+                plt.clf()
 
