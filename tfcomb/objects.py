@@ -170,7 +170,7 @@ class CombObj():
 		to_pickle
 		"""
 
-		filehandler = open(path, 'r') 
+		filehandler = open(path, 'rb') 
 		obj = pickle.load(filehandler)
 
 		#Check if object is CombObj
@@ -179,6 +179,8 @@ class CombObj():
 
 		#Overwrite self with CombObj
 		self = obj
+
+		return(self)
 
 	#-------------------------------------------------------------------------------#
 	#-------------------------- Setting up the .TFBS list --------------------------#
