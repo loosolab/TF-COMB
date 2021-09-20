@@ -6,6 +6,7 @@ import matplotlib.colors as colors
 import seaborn as sns
 import networkx as nx
 import graphviz
+from adjustText import adjust_text
 
 
 from tfcomb.utils import check_columns, check_type
@@ -137,7 +138,15 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 
 	return(h)
 
-def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None, save=None):
+def scatter(table, x, y, label, label_fontsize, save=None):
+	""" Plot scatter-plot of x/y values within table """
+
+	g = sns.jointplot(data=table, x=x, y=y, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	
+
+
+def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None, label=None, 
+			label_fontsize=9, save=None):
 	"""
 	Plot volcano-style plots combining a measure and a pvalue.
 
@@ -153,7 +162,10 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 		If 'off', no measure threshold is set
 	pvalue_threshold : float between 0-1
 		Default: 0.05.
+	label : list of points to label
 	"""
+
+	#todo: check that pvalue column is given
 
 	check_columns(table, [measure, pvalue])	
 	pseudo = 10**(-300) #smallest pvalue possible
@@ -194,11 +206,28 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", linewidth=0.2, 
 							label="Selection (n={0})".format(n_selected))
 
+	#Label given indices
+	if label is not None:
+		txts = []
+		for l in label:
+			coord = [table.loc[l,measure], table.loc[l,pval_col]]
+			
+			ax = g.ax_joint
+			ax.scatter(coord[0], coord[1], color="red")
+		
+			txts.append(ax.text(coord[0], coord[1], l, fontsize=label_fontsize))
+		
+		#Adjust overlapping labels
+		adjust_text(txts, ax=ax, add_objects=[], text_from_points=True, arrowprops=dict(arrowstyle='-', color='black', lw=0.5))  #, expand_text=(0.1,1.2), expand_objects=(0.1,0.1))
+
 	if save is not None:
 		plt.savefig(save, dpi=600)
 
 	return(g)
-	
+
+#labels
+
+
 def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	"""
 	Plot a bubble-style plot of GO-enrichment results.
@@ -214,7 +243,7 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	threshold : float between 0-1
 		The p-value-threshold to show in plot.
 	save : str, optional
-		""
+		Save the plot to the file given in 'save'. Default: None.
 	
 	Returns
 	----------
@@ -231,9 +260,9 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	aspect_table.loc[:,"n_genes"] = aspect_table["study_count"]
 
 	#Sort by pvalue and ngenes
-	aspect_table.sort_values("-log(p-value)", ascending=False, inplace=True)
+	aspect_table = aspect_table.sort_values("-log(p-value)", ascending=False)
 	aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
-	
+
 	#Plot enriched terms 
 	ax = sns.scatterplot(x="-log(p-value)", 
 								y="name",
@@ -250,6 +279,9 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	ax.set_ylabel(aspect)
 	ax.legend(bbox_to_anchor=(1.01, 1), borderaxespad=0)
 	ax.grid()
+
+	if save is not None:
+		plt.savefig(save, dpi=600)
 
 	return(ax)
 
