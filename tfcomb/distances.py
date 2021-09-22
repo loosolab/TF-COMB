@@ -1,12 +1,16 @@
 from tfcomb.logging import *
 from tfcomb.counting import count_distances
 from tobias.utils.regions import OneRegion, RegionList
+from tobias.utils.signals import fast_rolling_math
+from scipy.signal import find_peaks
+from tfcomb.logging import *
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 import csv 
+import copy 
 
 #TODO: Include logger
 
@@ -36,9 +40,14 @@ class DistObj():
         self._raw = None
         self.distances = None 	     # Numpy array of size n_pairs x maxDist
         self.corrected = None
-        self.peaks = None 	     # Numpy array of size n_pairs x n_preferredDistance 
+        self.peaks = None 	         # Numpy array of size n_pairs x n_preferredDistance 
         self.linres = None
+        self.normalized = None
         self.peaking_count = None
+        self.directional = None
+        self.smoothed = None
+        self.is_smoothed = None
+        self.smooth_window = 3
         self.n_bp = 0			     # Predicted number of baskets 
         self.TFBS = RegionList()     # None RegionList() of TFBS
         self.anchor_mode = 0         # Distance measure mode [0,1,2]
@@ -48,7 +57,7 @@ class DistObj():
         self.max_dist = 300          # Maximum distance. Default: 100
         self.max_overlap = 0         # Maximum overlap. Default: 0       
         self.foldchange_thresh = 1     
-        self._PEAK_HEADER = "TF1\tTF2\tDistance\tFoldchange\tThreshold\n"
+        self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\n"
 
     def __str__(self):
 	    pass
@@ -94,7 +103,7 @@ class DistObj():
         modes = ["inner","outer","center"]
         self.anchor_mode = modes.index(anchor)
 		
-    def count_distances(self):
+    def count_distances(self, normalize = True, directional = False):
         """ Count distances for co_occurring TFs, can be followed by analyze_distances
             to determine preferred binding distances
         
@@ -104,22 +113,34 @@ class DistObj():
         self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
         sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
                           for site in self.TFBS]) #numpy integer array
-	
+
         self.pairs_to_idx = {(self.name_to_idx[tf1],self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
+        
+        self.logger.info("Calculating distances")
         self._raw = count_distances(sites, 
                                     self.pairs_to_idx,
                                     self.min_dist,
                                     self.max_dist,
                                     self.anchor_mode)
-        self._raw_to_human_readable()
+        if not directional:
+            for i in range(0,self._raw.shape[0]-1):
+                if (self._raw[i,0] == self._raw[i+1,1]) and (self._raw[i,1] == self._raw[i+1,0]):
+                    s = self._raw[i,2:]+self._raw[i+1,2:]
+                    self._raw[i,2:] = s
+                    self._raw[i+1,2:] = s
+            self.directional = directional
+        self._raw_to_human_readable(normalize)
+
+        self.logger.info("Done finding distances! Run .linregress_pair() or .linregress_all() to fit linear regression")
     
-    def _raw_to_human_readable(self):
+    def _raw_to_human_readable(self, normalize = True):
         """ Get the raw distance in human readable format
             
             Returns:
 		    ----------
 			pd.Dataframe (TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
         """
+        self.logger.debug("Converting raw count data to pretty dataframe")
         idx_to_name = {}
         for k,v in self.name_to_idx.items():
             idx_to_name[v] = k 
@@ -129,12 +150,17 @@ class DistObj():
             tf1 = idx_to_name[row[0]]
             tf2 = idx_to_name[row[1]]
             entry = [tf1,tf2]
-            entry += row[2:].tolist()
+            self.normalized = normalize
+            if normalize:
+                entry += (row[2:]/(row[2:].sum())).tolist()
+            else:
+                entry += row[2:].tolist()
             results.append(entry)
                 
         self.distances = pd.DataFrame(results,columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)])
 
     def linregress_pair(self,pair,n_bins=None, save = None):
+        self.logger.debug(f"Fitting linear regression for pair: {pair}")
         if n_bins is None:
             n_bins = self.max_dist - self.min_dist +1
         x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
@@ -156,6 +182,7 @@ class DistObj():
     
     def linregress_all(self,n_bins = None, save = None):
         #TODO:check self.distances not None
+        self.logger.info("Fitting linear regression.")
         linres = {}
         for idx,row in self.distances.iterrows():
             tf1 = row["TF1"]
@@ -166,6 +193,7 @@ class DistObj():
         self.linres = pd.DataFrame.from_dict(linres,orient="index",columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
     
     def correct_pair(self,pair,linres,n_bins = None, save = None):
+        self.logger.debug(f"Correcting background for pair {pair}")
         if n_bins is None:
             n_bins = self.max_dist - self.min_dist +1
         #TODO: check pair is valid
@@ -192,6 +220,7 @@ class DistObj():
         return corrected
     
     def correct_all(self,n_bins = None, save = None):
+        self.logger.info(f"Correcting background")
         corrected = {}
         #TODO: check linres not none
         for idx,row in self.linres.iterrows():
@@ -206,57 +235,88 @@ class DistObj():
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
 
+        self.logger.debug(f" Median for pair {tf1} - {tf2}: {data.median}")
         return data.median()
 
-    def peaks_pair(self,pair,corrected,foldchange_thresh = 1,save = None, new_file = True):
-        """ Analyze preferred binding distances, requires count_distances() run.
-
-            Returns:
-		    ----------
-            pd.DataFrame 
-        """
-        #TODO: check pair is valid
-        tf1 = pair[0]
-        tf2 = pair[1]
+    def analyze_signal_pair(self, pair, corrected, smooth_window = 3, smooth = True, height = 0, prominence = None, save = None, new_file = True):
+        tf1, tf2 = pair
+        peaks = []
+        if(smooth):
+            #TODO:Check window size >=0
+            smoothed = fast_rolling_math(np.array(list(corrected)), smooth_window, "mean")
+            #x = smoothed[~np.isnan(smoothed)]
+            x = np.nan_to_num(smoothed)
+        else:
+            x = corrected
         
-        thresh = self.get_median(tf1,tf2)
-        self.foldchange_thresh = foldchange_thresh
-        if save is not None:
+        peaks_smooth, properties = find_peaks(x, height=height, prominence = prominence)
+        self.logger.debug(f"{len(peaks_smooth)} Peaks found")
+        if (save is not None):
             if new_file:
                 outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','w') 
                 outfile.write(self._PEAK_HEADER)
             else:
                 outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','a') 
 
-        peaks = []
-        dist = 0
-        for c in corrected:
-            if c > thresh:
-                fold_change = c/thresh
-                if fold_change > foldchange_thresh:
-                    peak = [tf1,tf2,dist,round(fold_change,2),round(thresh,2)]
-                    peaks.append(peak)
-                    if save is not None:
-                        outfile.write('\t'.join(str(x) for x in peak) + '\n')
-            dist += 1
-        if save is not None:
+        if (len(peaks_smooth) > 0):
+            for i in range(len(peaks_smooth)):
+                peak = [tf1,tf2,peaks_smooth[i],round(properties["peak_heights"][i],4),round(properties["prominences"][i],4),round(prominence,4)]
+                peaks.append(peak)
+                if (save is not None):
+                    outfile.write('\t'.join(str(x) for x in peak) + '\n')
+        
+        if (save is not None):
             outfile.close()
+
         return peaks
     
-    def peaks_all(self,foldchange_thresh = 1,save = None):
+    def smooth(self,window_size = 3):
+        all_smoothed = []
+        #TODO: Check corrected
+        self.smooth_window = window_size
+        self.logger.info(f"Smoothing signal with window size {window_size}")
+        for idx, row in self.corrected.iterrows():
+            tf1 = row[0]
+            tf2 = row[1]
+            smoothed = fast_rolling_math(np.array(list(row[2:])), window_size, "mean")
+            #x = smoothed[~np.isnan(smoothed)]
+            x = np.nan_to_num(smoothed)
+            x = np.insert(np.array(x,dtype=object), 0, tf2)
+            x = np.insert(x, 0, tf1)
+            all_smoothed.append(x)
+            
+        self.smoothed = pd.DataFrame(all_smoothed,columns=['TF1','TF2']+[str(x) for x in range (len(all_smoothed[0])-2)])
+
+    def analyze_signal_all(self, smooth_window = 3, smooth = True, height = 0, prominence = "mean",save = None):
+        self.logger.info(f"Analyzing Signal")
         all_peaks = []
+        if smooth:
+            self.smooth(smooth_window)
         #TODO check if corrected not none and check save
         if save is not None:
             outfile = open(f'{save}peaks.tsv','w')
             outfile.write(self._PEAK_HEADER)
+        calc_mean = False
+        if (prominence == "mean"):
+            calc_mean = True
+    
         peaking_count = 0
         for idx,row in self.corrected.iterrows():
             tf1 = row["TF1"]
             tf2 = row["TF2"]
             corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
-                                           (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+                                                 (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+            
+            if (calc_mean):
+                prominence = self.get_median(tf1,tf2)
 
-            peaks = self.peaks_pair((tf1,tf2),corrected_data,foldchange_thresh = foldchange_thresh,save = None)
+            peaks = self.analyze_signal_pair((tf1,tf2),
+                                              corrected_data, 
+                                              smooth_window = smooth_window, 
+                                              smooth = smooth, 
+                                              height = height, 
+                                              prominence = prominence, 
+                                              save = None)
                 
             if len(peaks)>0:
                 for peak in peaks:
@@ -264,20 +324,98 @@ class DistObj():
                     if save is not None:    
                         outfile.write('\t'.join(str(x) for x in peak) + '\n')
                 peaking_count += 1
-        self.peaks = pd.DataFrame(all_peaks,columns=["TF1","TF2","Distance","Fold_change","Threshold"])
+        self.peaks = pd.DataFrame(all_peaks,columns=self._PEAK_HEADER.strip().split("\t"))
+        self.is_smoothed = smooth
         self.peaking_count = peaking_count
         if save is not None:
             outfile.close()
+        
+
+    # def peaks_pair(self,pair,corrected,foldchange_thresh = 1,save = None, new_file = True):
+    #     """ Analyze preferred binding distances, requires count_distances() run.
+
+    #         Returns:
+	# 	    ----------
+    #         pd.DataFrame 
+    #     """
+    #     self.logger.debug(f"Calculating Peaks for pair {pair}")
+    #     #TODO: check pair is valid
+    #     tf1 = pair[0]
+    #     tf2 = pair[1]
+        
+    #     thresh = self.get_median(tf1,tf2)
+    #     self.foldchange_thresh = foldchange_thresh
+    #     if save is not None:
+    #         if new_file:
+    #             outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','w') 
+    #             outfile.write(self._PEAK_HEADER)
+    #         else:
+    #             outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','a') 
+
+    #     peaks = []
+    #     dist = 0
+    #     for c in corrected:
+    #         if c > thresh:
+    #             fold_change = c/thresh
+    #             if fold_change > foldchange_thresh:
+    #                 peak = [tf1,tf2,dist,round(fold_change,2),round(thresh,2)]
+    #                 peaks.append(peak)
+    #                 if save is not None:
+    #                     outfile.write('\t'.join(str(x) for x in peak) + '\n')
+    #         dist += 1
+    #     if save is not None:
+    #         outfile.close()
+    #     return peaks
+    
+    # def peaks_all(self,foldchange_thresh = 1,save = None):
+
+    #     self.logger.debug(f"Calculating Peaks")
+    #     all_peaks = []
+    #     #TODO check if corrected not none and check save
+    #     if save is not None:
+    #         outfile = open(f'{save}peaks.tsv','w')
+    #         outfile.write(self._PEAK_HEADER)
+    #     peaking_count = 0
+    #     for idx,row in self.corrected.iterrows():
+    #         tf1 = row["TF1"]
+    #         tf2 = row["TF2"]
+    #         corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
+    #                                        (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+
+    #         peaks = self.peaks_pair((tf1,tf2),corrected_data,foldchange_thresh = foldchange_thresh,save = None)
+                
+    #         if len(peaks)>0:
+    #             for peak in peaks:
+    #                 all_peaks.append(peak)
+    #                 if save is not None:    
+    #                     outfile.write('\t'.join(str(x) for x in peak) + '\n')
+    #             peaking_count += 1
+    #     self.peaks = pd.DataFrame(all_peaks,columns=["TF1","TF2","Distance","Fold_change","Threshold"])
+    #     self.peaking_count = peaking_count
+    #     if save is not None:
+    #         outfile.close()
             
     def check_periodicity(self):
         """ checks periodicity of distances (like 10 bp indicating dna full turn)
-
+            - placeholder for functionality upgrade -
             Returns:
 		    ----------
             pd.DataFrame 
         """
         pass
     
+    def select_motif(self,motif):
+        self.logger.debug(f"Selecting Rules for motif {motif}")
+        selected = self.rules.copy()
+        selected = selected[(selected["TF1"]==motif) | (selected["TF2"]==motif)]
+        new_obj = self.deepcopy()
+        new_obj.rules = selected
+
+        selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
+        new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+
+        return(new_obj)
+
     # TODO: remove code duplication  
     def get_pair_locations(self, TF1, TF2,TF1_strand = None, TF2_strand = None,min_distance = 0, max_distance = 100, max_overlap = 0,directional = False):
         """ Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
@@ -472,6 +610,13 @@ class DistObj():
                         csv_file.writerow(content) 
         return b
 
+    # TODO: duplicated
+    def copy(self):
+        """ Returns a copy of the DistObj """
+
+        copied = copy.deepcopy(self)
+        #copied.logger = TFcombLogger(self.verbosity) #receives its own logger
+        return(copied)
 
 	#-------------------------------------------------------------------------------------------------------------#
 	#---------------------------------------------- plotting -----------------------------------------------------#
@@ -560,7 +705,7 @@ class DistObj():
     def plot_decision_boundary(self,targets,n_bins = None, save = None):
         if n_bins is None:
             n_bins = self.max_dist - self.min_dist+1
-        #check self.corrected filled
+        #TODO: check self.corrected filled
         for pair in targets:
             tf1 = pair[0]
             tf2 = pair[1]
@@ -578,3 +723,30 @@ class DistObj():
                 plt.savefig(f'{save}db_{tf1}_{tf2}.png', dpi=600)
                 plt.clf()
 
+    def plot_analyzed_signal(self,pair, peaks = None, sourceData = None, save = None, only_peaking = False):
+        #TODO: check self.peaks filled and self.corrected
+        tf1, tf2 = pair
+        if peaks is None:
+            peaks = self.peaks.loc[((self.peaks["TF1"]==tf1) &
+                                    (self.peaks["TF2"]==tf2))].Distance.to_numpy()
+        else:
+            peaks = np.array(peaks)
+        if sourceData is None: 
+            if self.is_smoothed:
+                x = self.smoothed.loc[((self.smoothed["TF1"]==tf1) &
+                                       (self.smoothed["TF2"]==tf2))].iloc[0,2:].to_numpy()
+            else:    
+                x = self.corrected.loc[((self.corrected["TF1"]==tf1) &
+                                        (self.corrected["TF2"]==tf2))].iloc[0,2:].to_numpy()
+        else:
+            x = sourceData.loc[((sourceData["TF1"]==tf1) &
+                                (sourceData["TF2"]==tf2))].iloc[0,2:].to_numpy()
+        if (only_peaking) and (len(peaks) == 0):
+            return
+            
+        plt.plot (x)
+        plt.plot(peaks, x[peaks], "x")
+        plt.plot(np.zeros_like(x), "--", color="gray")
+        if save is not None:
+            plt.savefig(f'{save}/peaks_{tf1}_{tf2}.png', dpi=600)
+        plt.clf()
