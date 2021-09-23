@@ -12,7 +12,6 @@ from scipy import stats
 import csv 
 import copy 
 
-#TODO: raise Errors instead of return None 
 
 class DistObj():
     """
@@ -168,8 +167,8 @@ class DistObj():
         tf1 = pair[0]
         tf2 = pair[1]
         if self.distances is None:
-            self.logger.info("No distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
         linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(data,dtype = float))
@@ -184,8 +183,8 @@ class DistObj():
     
     def linregress_all(self,n_bins = None, save = None):
         if self.distances is None:
-            self.logger.info("No distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
         self.logger.info("Fitting linear regression.")
         linres = {}
         for idx,row in self.distances.iterrows():
@@ -204,18 +203,18 @@ class DistObj():
         tf1 = pair[0]
         tf2 = pair[1]
         if self.distances is None:
-            self.logger.info("No distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
         corrected = []
         x_val = 0
         if linres is None:
-            self.logger.info("Please fit a linear regression first. [.linregress_all() or .linregress_pair()]")
-            return None
+            self.logger.error("Please fit a linear regression first. [.linregress_all() or .linregress_pair()]")
+            sys.exit(0)
         if  not isinstance(linres, stats._stats_mstats_common.LinregressResult):
-            self.logger.info("linres need to be a valid scipy LinregressResult type. Use .linregress_all() or .linregress_pair() to create one.")
-            return None
+            self.logger.error("linres need to be a valid scipy LinregressResult type. Use .linregress_all() or .linregress_pair() to create one.")
+            sys.exit(0)
         
         for dist in data:
             corrected.append(dist-(linres.intercept + linres.slope*x_val))
@@ -235,8 +234,8 @@ class DistObj():
         self.logger.info(f"Correcting background")
         corrected = {}
         if self.linres is None:
-            self.logger.info("Please fit a linear regression first. [.linregress_all()]")
-            return None
+            self.logger.error("Please fit a linear regression first. [.linregress_all()]")
+            sys.exit(0)
         for idx,row in self.linres.iterrows():
             tf1,tf2,linres = row
             res=self.correct_pair((tf1,tf2),linres,n_bins,save)
@@ -246,23 +245,22 @@ class DistObj():
         
     def get_median(self,tf1,tf2):
         if self.distances is None:
-            self.logger.info("Can not calculate Median, no distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("Can not calculate Median, no distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
 
         self.logger.debug(f" Median for pair {tf1} - {tf2}: {data.median}")
         return data.median()
 
-    def analyze_signal_pair(self, pair, corrected, smooth_window = 3, smooth = True, height = 0, prominence = None, save = None, new_file = True):
+    def analyze_signal_pair(self, pair, corrected, smooth_window = 3, height = 0, prominence = None, save = None, new_file = True):
         tf1, tf2 = pair
         peaks = []
-        if(smooth):
+        if(smooth_window != 1):
             if smooth_window < 0 :
-                self.logger.info("Window size need to be positive or zero.")
-                return None
+                self.logger.error("Window size need to be positive or zero.")
+                sys.exit(0)
             smoothed = fast_rolling_math(np.array(list(corrected)), smooth_window, "mean")
-            #x = smoothed[~np.isnan(smoothed)]
             x = np.nan_to_num(smoothed)
         else:
             x = corrected
@@ -290,12 +288,12 @@ class DistObj():
     
     def smooth(self,window_size = 3):
         if window_size < 0 :
-                self.logger.info("Window size need to be positive or zero.")
-                return None
+                self.logger.error("Window size need to be positive or zero.")
+                sys.exit(0)
         
         if self.corrected is None:
-            self.logger.info("Background is not yet corrected. Please try .correct_all() first.")
-            return None
+            self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
+            sys.exit(0)
         all_smoothed = []
         
         self.smooth_window = window_size
@@ -311,7 +309,8 @@ class DistObj():
             
         self.smoothed = pd.DataFrame(all_smoothed,columns=['TF1','TF2']+[str(x) for x in range (len(all_smoothed[0])-2)])
 
-    def analyze_signal_all(self, smooth_window = 3, smooth = True, height = 0, prominence = "median",save = None):
+
+    def analyze_signal_all(self, smooth_window = 3, height = 0, prominence = "median",save = None):
         """ Wrapper for analyze_signal_pair(). Will run the analysis for all pairs and saves results in the object itself. 
             
             Parameters
@@ -326,11 +325,11 @@ class DistObj():
         """
         self.logger.info(f"Analyzing Signal")
         all_peaks = []
-        if smooth:
+        if smooth_window > 1:
             self.smooth(smooth_window)
         if self.corrected is None:
-            self.logger.info("Background is not corrected yet. Please try .correct_all() first.")
-            return None
+            self.logger.error("Background is not corrected yet. Please try .correct_all() first.")
+            sys.exit(0)
         #TODO check save
         if save is not None:
             outfile = open(f'{save}peaks.tsv','w')
@@ -352,7 +351,6 @@ class DistObj():
             peaks = self.analyze_signal_pair((tf1,tf2),
                                               corrected_data, 
                                               smooth_window = smooth_window, 
-                                              smooth = smooth, 
                                               height = height, 
                                               prominence = prominence, 
                                               save = None)
@@ -364,10 +362,15 @@ class DistObj():
                         outfile.write('\t'.join(str(x) for x in peak) + '\n')
                 peaking_count += 1
         self.peaks = pd.DataFrame(all_peaks,columns=self._PEAK_HEADER.strip().split("\t"))
-        self.is_smoothed = smooth
+        self.smooth_window = smooth_window
         self.peaking_count = peaking_count
         if save is not None:
             outfile.close()
+
+    def is_smoothed(self):
+        if self.smoothed is None or self.smooth_window <= 1: 
+            return False
+        return True
         
 
     def check_periodicity(self):
@@ -694,8 +697,8 @@ class DistObj():
             n_bins = self.max_dist - self.min_dist+1
 
         if self.corrected is None:
-            self.logger.info("Background is not yet corrected. Please try .correct_all() first.")
-            return None
+            self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
+            sys.exit(0)
 
         for pair in targets:
             tf1 = pair[0]
@@ -716,12 +719,12 @@ class DistObj():
 
     def plot_analyzed_signal(self,pair, peaks = None, sourceData = None, save = None, only_peaking = False):
         if (sourceData is None) and (self.corrected is None):
-            self.logger.info("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
-            return None
+            self.logger.error("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
+            sys.exit(0)
 
         if (peaks is None) and (self.peaks is None):
-            self.logger.info("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
-            return None
+            self.logger.error("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
+            sys.exit(0)
 
         tf1, tf2 = pair
         if peaks is None:
