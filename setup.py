@@ -68,7 +68,7 @@ setup(name='TF-COMB',
 			'matplotlib>=2',
 			'pandas',
 			'tobias',
-			'networkx',
+			'networkx>=2.4', #G.node -> G.nodes
 			'python-louvain',
 			'graphviz',
 			'statsmodels',

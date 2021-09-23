@@ -114,13 +114,18 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 						# check if they are overlapping more than the threshold
 						valid_pair = 1
 						if distance == 0:	#distance is 0 if the sites are overlapping or book-ended
-							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
-							
+
 							# Get the length of the shorter TF
 							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-							
+
+							#Calculate overlap between TF1/TF2
+							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+								overlap_bp = short_bp
+
 							#Invalid pair, overlap is higher than threshold
-							if overlap_bp / (short_bp*1.0) > max_overlap:  #if overlap_bp is negative; this will always be False
+							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+								print("{0} ({1}) > {2}".format(overlap_bp / (short_bp*1.0), overlap_bp, max_overlap))
 								valid_pair = 0
 
 						#Save counts of association
