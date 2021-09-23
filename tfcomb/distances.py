@@ -45,7 +45,6 @@ class DistObj():
         self.peaking_count = None
         self.directional = None
         self.smoothed = None
-        self.is_smoothed = None
         self.smooth_window = 3
         self.n_bp = 0			     # Predicted number of baskets 
         self.TFBS = RegionList()     # None RegionList() of TFBS
@@ -368,7 +367,7 @@ class DistObj():
             outfile.close()
 
     def is_smoothed(self):
-        if self.smoothed is None or self.smooth_window <= 1: 
+        if (self.smoothed is None) or (self.smooth_window <= 1): 
             return False
         return True
         
@@ -733,7 +732,7 @@ class DistObj():
         else:
             peaks = np.array(peaks)
         if sourceData is None: 
-            if self.is_smoothed:
+            if self.is_smoothed():
                 x = self.smoothed.loc[((self.smoothed["TF1"]==tf1) &
                                        (self.smoothed["TF2"]==tf2))].iloc[0,2:].to_numpy()
             else:    
