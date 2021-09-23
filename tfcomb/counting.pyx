@@ -203,3 +203,128 @@ def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
 	total_bp += previous_end - previous_start
 
 	return(total_bp)
+
+def count_distances(np.ndarray[np.int_t, ndim=2] sites,
+					dict rules,
+					int min_distance = 0,
+					int max_distance = 100, 
+					short anchor_mode = 0):
+
+	"""
+	Superfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction 
+	
+	Parameters:
+	------------
+	sites : np.ndarray
+		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
+	
+	rules :dict
+		dict of pairs (tf1 name, tf2 name):index with tf1 name, tf2 name encoded as int
+
+	min_distance : int
+		Minimum allowed distance between two TFs. Default: 0
+
+	max_distance : int
+		Maximum allowed distance between two TFs. Default: 100
+
+	anchor_mode : short
+		anchor mode to calculate distance with. One of [0,1,2]. 
+		0 = inner, 1 = outer, 2 = center. Default: 0
+
+	Returns:
+	-----------
+	dist_count_mat: np.ndarray
+		n x (distance range) matrix. 
+
+
+	"""
+
+	cdef int n_sites = len(sites)
+	
+	cdef list pairs = list()
+	cdef np.ndarray[np.int64_t, ndim=1] rule
+
+	#Create n x distance range matrix || +3 for 2 tf names + 1-off
+	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), 3+(max_distance-min_distance)), dtype=int)
+
+	cdef int i = 0
+	cdef int j = 0
+	cdef bint finding_assoc = True
+	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, TF1_anchor 
+	cdef int TF2_start, TF2_end, TF2_anchor, valid_pair
+	cdef int TF2_chr, TF2_name
+	cdef int distance
+	cdef int pair_ind = 0
+	cdef int ind = 0
+	
+	# initialize tfnames
+	for tf1,tf2 in rules:
+		dist_count_mat[ind, 0] = tf1
+		dist_count_mat[ind, 1] = tf2
+		ind += 1
+	#Loop over all sites
+	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
+		#Get current TF information
+		TF1_chr = sites[i,0]
+		TF1_start = sites[i,1]
+		TF1_end = sites[i,2]
+		TF1_name = sites[i,3]
+
+		#Find possible associations with TF1 within window 
+		finding_assoc = True
+		j = 0
+		while finding_assoc == True:
+			#Next site relative to TF1
+			j += 1
+			if j+i >= n_sites: #j+i index site is beyond end of list, increment i
+				i += 1
+				finding_assoc = False #break out of finding_assoc
+
+			else:	#There are still sites available
+
+				#Fetch information on TF2-site
+				TF2_chr = sites[i+j,0]
+				TF2_start = sites[i+j,1]
+				TF2_end = sites[i+j,2]
+				TF2_name = sites[i+j,3]
+				
+				# Check anchor mode 	
+    			# 1 = outer
+				if (anchor_mode == 1): 
+					TF1_anchor = TF1_start
+					TF2_anchor = TF2_end
+				# 2 = center
+				elif (anchor_mode == 2):
+					TF1_anchor = int(np.ceil((TF1_end - TF1_start) / 2))
+					TF2_anchor = int(np.ceil((TF2_end - TF2_start) / 2))
+				# 0 = inner (default)
+				else:
+					TF1_anchor = TF1_end
+					TF2_anchor = TF2_start
+
+				#Calculate distance between the two sites
+				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
+					if distance >= min_distance: #Check that sites are more than min distance away
+						valid_pair = 0
+						pair_ind = -1
+
+						if (TF1_name,TF2_name) in rules:
+							valid_pair = 1
+							pair_ind = rules[(TF1_name,TF2_name)]
+
+
+						#Save counts of association
+						if valid_pair == 1:
+							# min_distance is offset (negative min distance adds up, positive decrease the index) || +2 for TF names
+							dist_count_mat[pair_ind, (distance - min_distance)+2] += 1
+			
+				else:
+					#The next site is out of window range; increment to next i
+					i += 1
+					finding_assoc = False   #break out of finding_assoc-loop
+
+		## Done finding TF2's for current TF1
+		
+
+	return (dist_count_mat)
