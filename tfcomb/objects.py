@@ -116,6 +116,10 @@ class CombObj():
 		combined.TFBS.loc_sort() 				#sort TFBS by coordinates
 		combined.TFBS = tfcomb.utils.remove_duplicates(combined.TFBS) #remove duplicated sites 
 
+		#Set .TF_names
+		counts = {r.name: "" for r in combined.TFBS}
+		combined.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets		
+
 		return(combined)
 	
 	def copy(self):
@@ -329,8 +333,7 @@ class CombObj():
 		self.logger.info("Identified {0} TFBS within given regions".format(len(self.TFBS)))
 		e = datetime.datetime.now()
 
-
-	def TFBS_from_bed(self, bed_f):
+	def TFBS_from_bed(self, bed_f, overwrite=False):
 		"""
 		Fill the .TFBS attribute using a precalculated set of binding sites.
 
@@ -338,14 +341,25 @@ class CombObj():
 		-------------
 		bed_f : str 
 			A path to a .bed-file with precalculated binding sites.
-
+		overwrite : boolean
+			Whether to overwrite existing sites within .TFBS. Default: False (sites are appended to .TFBS).
 		"""
 
+		#If previous TFBS should be overwritten or TFBS should be initialized
+		if overwrite == True or self.TFBS is None:
+			self.TFBS = RegionList()
+
+		#Read sites from file
 		self.logger.info("Reading sites from '{0}'...".format(bed_f))
-		self.TFBS = RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(bed_f)])
+		read_TFBS = RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(bed_f)])
+		n_read_TFBS = len(read_TFBS)
+		self.logger.info("Read {0} sites".format(n_read_TFBS))
+
+		#Add TFBS to internal .TFBS list
+		self.TFBS += read_TFBS
 		n_sites = len(self.TFBS)
 
-		#Stats on the regions which were read
+		#Stats on the .TFBS regions
 		counts = {r.name: "" for r in self.TFBS}
 		n_names = len(counts)
 		self.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets
@@ -353,7 +367,8 @@ class CombObj():
 		#Process TFBS
 		self.TFBS.loc_sort()
 
-		self.logger.info("Read {0} sites (comprising {1} unique TFs)".format(n_sites, n_names))
+		#TODO: handle logging if .TFBS is initialized; no need to write again
+		self.logger.info(".TFBS contains {0} sites (comprising {1} unique names)".format(n_sites, n_names))
 
 
 	def TFBS_from_TOBIAS(self, bindetect_path, condition):
@@ -691,10 +706,14 @@ class CombObj():
 									# check if they are overlapping more than the threshold
 									valid_pair = 1
 									if distance == 0:
-										overlap_bp = TF1_end - TF2_start
-										
+
 										# Get the length of the shorter TF
 										short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+
+										#Calculate overlap between TF1/TF2
+										overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+										if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+											overlap_bp = short_bp
 										
 										#Invalid pair, overlap is higher than threshold
 										if overlap_bp / (short_bp*1.0) > max_overlap: 
@@ -870,8 +889,10 @@ class CombObj():
 				self.logger.warning("")
 			else:
 				selected = selected[selected_bool]
+		self.logger.info("Selected {0} rules".format(len(selected)))
 
 		#Create new object with selected rules
+		self.logger.info("Creating subset of object")
 		new_obj = self.copy()
 		new_obj.rules = selected
 
@@ -1152,7 +1173,9 @@ class CombObj():
 		#Update network attribute for plotting
 		if method == "blockmodel":
 			self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
-	
+
+		#no return - networks were changed in place
+
 	def plot_network(self, color_node_by="TF1_count",
 						   color_edge_by="cosine", 
 						   size_edge_by="TF1_TF2_count",
