@@ -41,6 +41,7 @@ import tfcomb.analysis
 from tfcomb.counting import count_co_occurrence
 from tfcomb.logging import *
 from tfcomb.utils import *
+import tfcomb.distances
 
 from kneed import KneeLocator
 
@@ -77,6 +78,9 @@ class CombObj():
 		self.TFBS = None		 #None or filled with list of TFBS
 		self.rules = None  		 #filled in by .market_basket()
 		self.network = None
+
+		#Variable for storing DistObj for distance analysis
+		self.distObj = None
 
 		#Formatted data / open files for reading
 		self._genome_obj = None
@@ -246,9 +250,9 @@ class CombObj():
 
 		#TODO: Check input validity
 		check_type(regions, [str, tobias.utils.regions.RegionList], "regions")
-		check_type(motifs, [str, tobias.utils.regions.MotifList], "motifs")
+		check_type(motifs, [str, tobias.utils.motifs.MotifList], "motifs")
 		check_type(genome, [str], "genome")
-		check_type(motif_naming, "motif_naming")
+		check_type(motif_naming,[str], "motif_naming")
 
 		#Setup regions
 		if isinstance(regions, str):
@@ -308,7 +312,7 @@ class CombObj():
 			n_prev_done = 0
 			n_done = sum([job.ready() for job in jobs])
 			if n_done != n_prev_done:
-				logger.info("- Progress: {0:.2f}%".format(n_done / len(jobs) * 100))
+				self.logger.info("- Progress: {0:.2f}%".format(n_done / len(jobs) * 100))
 				n_prev_done = n_done
 				n_done = sum([job.ready() for job in jobs])
 
@@ -1084,8 +1088,24 @@ class CombObj():
 	#----------------------------------- In-depth analysis -------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def analyze_distances():
-		pass
+	def create_distObj(self):
+		""" Creates a distObject, useful for manual analysis. 
+		 	Fills self.distObj.
+        """
+
+		self.distObj = tfcomb.distances.DistObj()
+		self.distObj.fill_rules(self)
+
+	def analyze_distances(self, parent = None):
+		""" Standard distance analysis workflow.
+			Use create_distObj for own workflow steps and more options!
+        """
+		self.create_distObj()
+		self.distObj.count_distances()
+		# TODO: check parent and create nice subfolder structure !
+		self.distObj.linregress_all(save= parent)
+		self.distObj.correct_all(save= parent)
+		self.distObj.analyze_signal_all(save= parent)
 
 
 	#-------------------------------------------------------------------------------------------#
