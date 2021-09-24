@@ -50,7 +50,7 @@ class CombObj():
 	The main class for collecting and working with co-occurring TFs.
 
 	Examples
-    ----------
+	----------
 
 	>>> C = tfcomb.objects.CombObj()
 
@@ -840,9 +840,11 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 
 	def simplify_rules(self):
-		""" Simplify rules so that TF1-TF2 and TF2-TF1 pairs only occur once within .rules. 
+		""" 
+		Simplify rules so that TF1-TF2 and TF2-TF1 pairs only occur once within .rules. 
 		This is useful for association metrics such as 'cosine', where the association of TF1->TF2 equals TF2->TF1. 
-		This function keeps the first unique pair occurring within the rules table. """
+		This function keeps the first unique pair occurring within the rules table. 
+		"""
 
 		#TODO:check that rules are present
 
@@ -1112,7 +1114,7 @@ class CombObj():
 	def create_distObj(self):
 		""" Creates a distObject, useful for manual analysis. 
 		 	Fills self.distObj.
-        """
+		"""
 
 		self.distObj = tfcomb.distances.DistObj()
 		self.distObj.fill_rules(self)
@@ -1120,7 +1122,8 @@ class CombObj():
 	def analyze_distances(self, parent = None):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
-        """
+		"""
+
 		self.create_distObj()
 		self.distObj.count_distances()
 		# TODO: check parent and create nice subfolder structure !

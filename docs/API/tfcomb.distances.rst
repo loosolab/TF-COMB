@@ -1,5 +1,5 @@
 tfcomb.distances module
-======================
+=========================
 
 .. automodule:: tfcomb.distances
    :members:

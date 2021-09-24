@@ -1,5 +1,5 @@
 tfcomb.annotation module
-======================
+==========================
 
 .. automodule:: tfcomb.annotation
    :members:
