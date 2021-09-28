@@ -10,6 +10,7 @@ import pysam
 import random
 import string
 import multiprocessing as mp
+import os
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
