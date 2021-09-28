@@ -1033,23 +1033,12 @@ class CombObj():
 		self.distObj = tfcomb.distances.DistObj()
 		self.distObj.fill_rules(self)
 
-<<<<<<< HEAD
 	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None,**kwargs):
-=======
-	def analyze_distances(self,normalize = True, n_bins = None, parent_directory = None, plot_signal = True, **kwargs):
->>>>>>> origin/preffered_distance
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
 
 		self.create_distObj()
-<<<<<<< HEAD
-		self.distObj.count_distances(normalize=normalize, directional=self.directional)
-		# TODO: check parent and create nice subfolder structure !
-		self.distObj.linregress_all(n_bins = n_bins, save=parent_directory)
-		self.distObj.correct_all(n_bins = n_bins, save=parent_directory)
-		self.distObj.analyze_signal_all(**kwargs, save=parent_directory)
-=======
 		self.distObj.count_distances(normalize=normalize,directional = self.directional)
 		# TODO: check parent_directory and create nice subfolder structure !
 		self.distObj.linregress_all(n_bins = n_bins, save= parent_directory)
@@ -1124,7 +1113,6 @@ class CombObj():
                                    dist]
 						csv_file.writerow(content) 
 		return b
->>>>>>> origin/preffered_distance
 
 
 	#-------------------------------------------------------------------------------------------#
