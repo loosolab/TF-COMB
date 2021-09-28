@@ -1025,22 +1025,22 @@ class CombObj():
 	def create_distObj(self):
 		""" Creates a distObject, useful for manual analysis. 
 		 	Fills self.distObj.
-		"""
-
+        """
+		#TODO: check rules filled
 		self.distObj = tfcomb.distances.DistObj()
 		self.distObj.fill_rules(self)
 
-	def analyze_distances(self, parent = None):
+	def analyze_distances(self,normalize = True, n_bins = None, parent_directory = None,**kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
 
 		self.create_distObj()
-		self.distObj.count_distances()
+		self.distObj.count_distances(normalize=normalize,directional = self.directional)
 		# TODO: check parent and create nice subfolder structure !
-		self.distObj.linregress_all(save= parent)
-		self.distObj.correct_all(save= parent)
-		self.distObj.analyze_signal_all(save= parent)
+		self.distObj.linregress_all(n_bins = n_bins, save= parent_directory)
+		self.distObj.correct_all(n_bins = n_bins, save= parent_directory)
+		self.distObj.analyze_signal_all(**kwargs,save= parent_directory)
 
 
 	#-------------------------------------------------------------------------------------------#

@@ -1,9 +1,11 @@
+from sys import path, stderr
 from tfcomb.logging import *
 from tfcomb.counting import count_distances
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.signals import fast_rolling_math
 from scipy.signal import find_peaks
 from tfcomb.logging import *
+import tfcomb.utils
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +14,6 @@ from scipy import stats
 import csv 
 import copy 
 
-#TODO: raise Errors instead of return None 
 
 class DistObj():
     """
@@ -37,17 +38,19 @@ class DistObj():
         #Variables for storing data
         self.rules = None  		     # Filled in by .fill_rules()
         self.TF_names = []		     # List of TF names
-        self._raw = None
-        self.distances = None 	     # Numpy array of size n_pairs x maxDist
-        self.corrected = None
-        self.peaks = None 	         # Numpy array of size n_pairs x n_preferredDistance 
-        self.linres = None
-        self.normalized = None
-        self.peaking_count = None
-        self.directional = None
-        self.smoothed = None
-        self.is_smoothed = None
-        self.smooth_window = 3
+        self._raw = None             # Raw distance data [Numpy array of size n_pairs x maxDist]
+
+        self.distances = None 	     # Pandas DataFrame of size n_pairs x maxDist
+        self.corrected = None        # Pandas DataFrame of size n_pairs x maxDist
+        self.linres = None           # Pandas DataFrame of size n_pairs x maxDist
+        self.normalized = None       # Pandas DataFrame of size n_pairs x maxDist
+        self.smoothed = None         # Pandas DataFrame of size n_pairs x maxDist
+        self.peaks = None 	         # Pandas DataFrame of size n_pairs x n_preferredDistance 
+
+        self.peaking_count = None    # Number of pairs with at least one peak 
+        self.directional = None      # True if direction is taken into account, false otherwise 
+        
+        self.smooth_window = 3       # Smoothing window size, 1 = no smoothing
         self.n_bp = 0			     # Predicted number of baskets 
         self.TFBS = RegionList()     # None RegionList() of TFBS
         self.anchor_mode = 0         # Distance measure mode [0,1,2]
@@ -56,7 +59,7 @@ class DistObj():
         self.min_dist = 0            # Minimum distance. Default: 0 
         self.max_dist = 300          # Maximum distance. Default: 100
         self.max_overlap = 0         # Maximum overlap. Default: 0       
-        self.foldchange_thresh = 1     
+   
         self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\n"
 
     def __str__(self):
@@ -68,26 +71,51 @@ class DistObj():
 		Parameters
 		----------
 		level : int
-			A value between 0-3 where 0 (only errors), 1 (info), 2 (debug), 3 (spam debug). Default: 1.
+			A value between 0-3 where 0 (only errors), 1 (info), 2 (debug), 3 (spam debug). 
+        
+        Returns
+		----------
+		None 
+			Sets the verbosity level for the Logger inplace
 		"""
 
 	    self.verbosity = level
 	    self.logger = TFcombLogger(self.verbosity) #restart logger with new verbosity	    
     
     def fill_rules(self,comb_obj):
-        """ Fill object according to reference object 
+        """ Fill DistanceObject according to reference object with all needed Values and parameters
+        to perform standard prefered distance analysis
 
         Parameters
 		----------
-		rules : tfcomb.objects
+		comb_obj: tfcomb.objects
+            Object from which the rules and parameters should be copied from
+
+        Returns
+		----------
+		None 
+			Copies values and parameters from a combObj or diffCombObj.
+        
+        try:
+            tfcomb.utils.check_type(comb_obj,[CombObj,DiffCombObj],"CombObject")
+        except ValueError as e :
+            self.logger.error(str(e))
+            sys.exit(0)
         """
-        # TODO: Check instance of combObj (or difcomb)
+        
+        #copy rules
         self.rules = comb_obj.rules
         # reset pandas index
         self.rules = self.rules.reset_index(drop=True)
+
+        # copy parameters
         self.TF_names = comb_obj.TF_names
         self.TFBS = comb_obj.TFBS 
-        # TODO: min/max dist + overlap
+        self.min_dist = comb_obj.min_distance
+        self.max_dist = comb_obj.max_distance
+        self.directional = comb_obj.directional
+        self.max_overlap = comb_obj.max_overlap
+        self.anchor = comb_obj.anchor
 
     def set_anchor(self,anchor):
         """ set anchor for distance measure mode
@@ -97,18 +125,61 @@ class DistObj():
 
         Parameters
 		----------
-		anchor : one of ["inner","outer","center"]
+		anchor : str or int
+            one of ["inner","outer","center"] or [0,1,2]
+
+        Returns
+		----------
+		None 
+			Sets anchor mode inplace
         """
-        #TODO: error if anchor not in modes
-        modes = ["inner","outer","center"]
-        self.anchor_mode = modes.index(anchor)
+
+        try:
+            tfcomb.utils.check_type(anchor,[str,int],"anchor")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        if isinstance(anchor,str):
+            try:
+                tfcomb.utils.check_string(anchor,["inner","outer","center"])
+            except ValueError as e:
+                self.logger.error(str(e))
+                sys.exit(0)
+
+            modes = ["inner","outer","center"]
+            self.anchor_mode = modes.index(anchor)
+        # anchor is int
+        else:
+            try:
+                tfcomb.utils.check_value(anchor,0,2)
+            except ValueError as e:
+                self.logger.error(str(e))
+                sys.exit(0)
+            self.anchor_mode = anchor
 		
     def count_distances(self, normalize = True, directional = False):
         """ Count distances for co_occurring TFs, can be followed by analyze_distances
             to determine preferred binding distances
+
+        Parameters
+		----------
+		normalize : bool
+            True if data should be normalized, False otherwise. Normalization is done as followed:
+            (number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
+            Default: True
+        directional : bool
+			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
+			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
         
+        Returns
+		----------
+		None 
+			Fills the object variable .distances.
+
         """
         chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
+        # encode chromosome,pairs and name to int representation
         chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
         self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
         sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
@@ -122,13 +193,17 @@ class DistObj():
                                     self.min_dist,
                                     self.max_dist,
                                     self.anchor_mode)
+        
+        # Unify (directional) counts 
         if not directional:
             for i in range(0,self._raw.shape[0]-1):
                 if (self._raw[i,0] == self._raw[i+1,1]) and (self._raw[i,1] == self._raw[i+1,0]):
                     s = self._raw[i,2:]+self._raw[i+1,2:]
                     self._raw[i,2:] = s
                     self._raw[i+1,2:] = s
-            self.directional = directional
+        self.directional = directional
+
+        # convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
         self._raw_to_human_readable(normalize)
 
         self.logger.info("Done finding distances! Run .linregress_pair() or .linregress_all() to fit linear regression")
@@ -136,12 +211,20 @@ class DistObj():
     def _raw_to_human_readable(self, normalize = True):
         """ Get the raw distance in human readable format
             
+            Parameters
+		    ----------
+            normalize : bool
+            True if data should be normalized, False otherwise. Normalization is done as followed:
+            (number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
+            Default: True
+
             Returns:
 		    ----------
 			pd.Dataframe (TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
         """
         self.logger.debug("Converting raw count data to pretty dataframe")
         idx_to_name = {}
+        # get names from int encoding
         for k,v in self.name_to_idx.items():
             idx_to_name[v] = k 
         
@@ -150,26 +233,65 @@ class DistObj():
             tf1 = idx_to_name[row[0]]
             tf2 = idx_to_name[row[1]]
             entry = [tf1,tf2]
-            self.normalized = normalize
+            
             if normalize:
                 entry += (row[2:]/(row[2:].sum())).tolist()
             else:
                 entry += row[2:].tolist()
             results.append(entry)
-                
+
+        self.normalized = normalize    
         self.distances = pd.DataFrame(results,columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)])
 
     def linregress_pair(self,pair,n_bins=None, save = None):
+        """ Fits a linear Regression to distance count data for a given pair. The linear regression is used to 
+            estimate the background. Proceed with .correct_pair()
+            
+            Parameters
+		    ----------
+            pair : tuple(str,str)
+                TF names for which the linear regression should be performed. e.g. ("NFYA","NFYB")
+            n_bins: int 
+                Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
+                Default: None
+            save: str
+                Path to save the plots to. If save is None plots won't be plotted. 
+                Default: None
+
+            Returns:
+		    ----------
+			scipy.stats._stats_mstats_common.LinregressResult Object
+        """
+        try:
+            tfcomb.utils.check_type(pair,[tuple],"pair")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+        
+        try:
+            tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+        
+        try:
+            tfcomb.utils.check_writeability(save)
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        if self.distances is None:
+            self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
+        #TODO: check pair is valid
+        tf1 = pair[0]
+        tf2 = pair[1]
+
         self.logger.debug(f"Fitting linear regression for pair: {pair}")
         if n_bins is None:
             n_bins = self.max_dist - self.min_dist +1
         x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
-        #TODO: check pair is valid
-        tf1 = pair[0]
-        tf2 = pair[1]
-        if self.distances is None:
-            self.logger.info("No distances evaluated yet. Please run .count_distances() first.")
-            return None
+        
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
         linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(data,dtype = float))
@@ -183,9 +305,39 @@ class DistObj():
         return linres
     
     def linregress_all(self,n_bins = None, save = None):
+        """ Fits a linear Regression to distance count data for all rules. The linear regression is used to 
+            estimate the background. Proceed with .correct_all()
+            
+            Parameters
+		    ----------
+            n_bins: int 
+                Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
+                Default: None
+            save: str 
+                Path to save the plots to. If save is None plots won't be plotted. 
+                Default: None
+
+            Returns:
+		    ----------
+			None
+                Fills the object variable .linres
+        """
+
+        try:
+            tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_writeability(save)
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
         if self.distances is None:
-            self.logger.info("No distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
         self.logger.info("Fitting linear regression.")
         linres = {}
         for idx,row in self.distances.iterrows():
@@ -197,27 +349,66 @@ class DistObj():
         self.linres = pd.DataFrame.from_dict(linres,orient="index",columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
     
     def correct_pair(self,pair,linres,n_bins = None, save = None):
+        """ Subtracts the estimated background from the Signal for a given pair. 
+            
+            Parameters
+		    ----------
+            pair : tuple(str,str)
+                TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
+            linres: scipy.stats._stats_mstats_common.LinregressResult 
+                Fitted linear regression for the given pair
+            n_bins: int 
+                Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
+                Default: None
+            save: str
+                Path to save the plots to. If save is None plots won't be plotted. 
+                Default: None
+
+            Returns:
+		    ----------
+			list 
+                Corrected values for the given pair
+        """
+        try:
+            tfcomb.utils.check_type(pair,[tuple],"pair")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_writeability(save)
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        #TODO: check pair is valid & check linres: import in utils needed ?
+        tf1 = pair[0]
+        tf2 = pair[1]
+
+        if linres is None:
+            self.logger.error("Please fit a linear regression first. [see .linregress_pair()]")
+            sys.exit(0)
+
         self.logger.debug(f"Correcting background for pair {pair}")
         if n_bins is None:
             n_bins = self.max_dist - self.min_dist +1
-        #TODO: check pair is valid
-        tf1 = pair[0]
-        tf2 = pair[1]
+       
         if self.distances is None:
-            self.logger.info("No distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
         corrected = []
         x_val = 0
-        if linres is None:
-            self.logger.info("Please fit a linear regression first. [.linregress_all() or .linregress_pair()]")
-            return None
-        if  not isinstance(linres, stats._stats_mstats_common.LinregressResult):
-            self.logger.info("linres need to be a valid scipy LinregressResult type. Use .linregress_all() or .linregress_pair() to create one.")
-            return None
         
         for dist in data:
+            # subtract background from signal
             corrected.append(dist-(linres.intercept + linres.slope*x_val))
             x_val += 1
 
@@ -232,11 +423,37 @@ class DistObj():
         return corrected
     
     def correct_all(self,n_bins = None, save = None):
+        """ Subtracts the estimated background from the Signal for all rules. 
+            
+            Parameters
+		    ----------
+            pair : tuple(str,str)
+                TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
+
+            Returns:
+		    ----------
+			None 
+                Fills the object variable .corrected
+        """
+        try:
+            tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_writeability(save)
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+        
+        if self.linres is None:
+            self.logger.error("Please fit a linear regression first. [see .linregress_all()]")
+            sys.exit(0)
+
         self.logger.info(f"Correcting background")
         corrected = {}
-        if self.linres is None:
-            self.logger.info("Please fit a linear regression first. [.linregress_all()]")
-            return None
+        
         for idx,row in self.linres.iterrows():
             tf1,tf2,linres = row
             res=self.correct_pair((tf1,tf2),linres,n_bins,save)
@@ -244,25 +461,106 @@ class DistObj():
         
         self.corrected = pd.DataFrame.from_dict(corrected,orient="index",columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)]).reset_index(drop=True) 
         
-    def get_median(self,tf1,tf2):
+    def get_median(self,pair):
+        """ Estimates the median from the distinct counts per distance for a given pair.
+            
+            Parameters
+		    ----------
+            pair: tuple(str,str)
+                TF names for which median should be calculated. e.g. ("NFYA","NFYB")
+  
+            Returns:
+		    ----------
+			Float 
+                Median for the given pair 
+        """
+        try:
+            tfcomb.utils.check_type(pair,[tuple],"pair")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
         if self.distances is None:
-            self.logger.info("Can not calculate Median, no distances evaluated yet. Please run .count_distances() first.")
-            return None
+            self.logger.error("Can not calculate Median, no distances evaluated yet. Please run .count_distances() first.")
+            sys.exit(0)
+        
+        # TODO: check pair is valid
+        tf1 = pair[0]
+        tf2 = pair[1]
+
         data = self.distances.loc[((self.distances["TF1"]==tf1) &
                (self.distances["TF2"]==tf2))].iloc[0, 2:]
 
         self.logger.debug(f" Median for pair {tf1} - {tf2}: {data.median}")
         return data.median()
 
-    def analyze_signal_pair(self, pair, corrected, smooth_window = 3, smooth = True, height = 0, prominence = None, save = None, new_file = True):
+    # TODO: Check if kwargs is better suited tham height & prominence
+    def analyze_signal_pair(self, pair, corrected, smooth_window = 3, height = 0, prominence = 0, save = None, new_file = True):
+        """ After background correction is done (see .correct_pair() or .correct_all()), the signal is analyzed for peaks, 
+            indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
+            Signal. Peaks are called with scipy.signal.find_peaks().
+            
+            Parameters
+		    ----------
+            pair : tuple(str,str)
+                TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
+            corrected: list 
+                corrected value for the given pair
+            smooth_window: int 
+                window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
+                (see tobias.utils.signals.fast_rolling_math) 
+                Default: 3
+            height: number or ndarray or sequence
+                height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
+                Zero means only positive peaks are called.
+                Default: 0
+            prominence: number or ndarray or sequence
+                prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
+                Default: 0
+            save: str
+                Path to save the plots to. If save is None plots won't be plotted. 
+                Default: None
+            new_file: boolean
+                True means results are written to a new file (overwrites already existing results), False means results are appended if 
+                file already exists.
+                Default: True
+
+            Returns:
+		    ----------
+			list 
+                list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
+        """
+        try:
+            tfcomb.utils.check_type(pair,[tuple],"pair")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+        
+        try:
+            tfcomb.utils.check_type(corrected,[list],"corrected")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_writeability(save)
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
         tf1, tf2 = pair
         peaks = []
-        if(smooth):
+        if(smooth_window != 1):
             if smooth_window < 0 :
-                self.logger.info("Window size need to be positive or zero.")
-                return None
+                self.logger.error("Window size need to be positive or zero.")
+                sys.exit(0)
             smoothed = fast_rolling_math(np.array(list(corrected)), smooth_window, "mean")
-            #x = smoothed[~np.isnan(smoothed)]
             x = np.nan_to_num(smoothed)
         else:
             x = corrected
@@ -289,13 +587,33 @@ class DistObj():
         return peaks
     
     def smooth(self,window_size = 3):
+        """ Helper function for smoothing all rules with a given window size. The function .correct_all() is required to be run beforehand.
+            
+            Parameters
+		    ----------
+            window_size: int 
+                window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
+                (see tobias.utils.signals.fast_rolling_math) 
+                Default: 3
+
+            Returns:
+		    ----------
+			None 
+                Fills the object variable .smoothed
+        """
+        try:
+            tfcomb.utils.check_type(window_size,[int],"window size")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
         if window_size < 0 :
-                self.logger.info("Window size need to be positive or zero.")
-                return None
+                self.logger.error("Window size need to be positive or zero.")
+                sys.exit(0)
         
         if self.corrected is None:
-            self.logger.info("Background is not yet corrected. Please try .correct_all() first.")
-            return None
+            self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
+            sys.exit(0)
         all_smoothed = []
         
         self.smooth_window = window_size
@@ -311,27 +629,67 @@ class DistObj():
             
         self.smoothed = pd.DataFrame(all_smoothed,columns=['TF1','TF2']+[str(x) for x in range (len(all_smoothed[0])-2)])
 
-    def analyze_signal_all(self, smooth_window = 3, smooth = True, height = 0, prominence = "median",save = None):
-        """ Wrapper for analyze_signal_pair(). Will run the analysis for all pairs and saves results in the object itself. 
+
+    def analyze_signal_all(self, smooth_window = 3, height = 0, prominence = "median",save = None):
+        """ After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
+            indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
+            Signal. Peaks are called with scipy.signal.find_peaks().
             
             Parameters
-            ----------
-            motif : str 
-                Name of motif to select
-                
-            Returns
-            -------
-            new object with reduced rules and TFBS sets
+		    ----------
+            smooth_window: int 
+                window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
+                (see tobias.utils.signals.fast_rolling_math) 
+                Default: 3
+            height: number or ndarray or sequence
+                height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
+                Zero means only positive peaks are called.
+                Default: 0
+            prominence: number or ndarray or sequence or "median"
+                prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
+                If "median", the median for the pairs is used (see .get_median())
+                Default: "median"
+            save: str
+                Path to save the plots to. If save is None plots won't be plotted. 
+                Default: None
+            new_file: boolean
+                True means results are written to a new file (overwrites already existing results), False means results are appended if 
+                file already exists.
+                Default: True
 
+            Returns:
+		    ----------
+			None 
+                Fills the object variable self.peaks, self.smooth_window, self.peaking_count
         """
-        self.logger.info(f"Analyzing Signal")
-        all_peaks = []
-        if smooth:
+        try:
+            tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+
+        try:
+            tfcomb.utils.check_writeability(save)
+        except ValueError as e:
+            self.logger.error(str(e))
+            sys.exit(0)
+        
+        if smooth_window > 1:
             self.smooth(smooth_window)
         if self.corrected is None:
-            self.logger.info("Background is not corrected yet. Please try .correct_all() first.")
-            return None
-        #TODO check save
+            self.logger.error("Background is not corrected yet. Please try .correct_all() first.")
+            sys.exit(0)
+
+        if isinstance(prominence,str):
+            try:
+                tfcomb.utils.check_string(prominence,["median"])
+            except ValueError as e:
+                self.logger.error(str(e))
+                sys.exit(0)
+
+        self.logger.info(f"Analyzing Signal")
+        all_peaks = []
+
         if save is not None:
             outfile = open(f'{save}peaks.tsv','w')
             outfile.write(self._PEAK_HEADER)
@@ -347,12 +705,11 @@ class DistObj():
                                                  (self.corrected["TF2"]==tf2))].iloc[0, 2:]
             
             if (calc_mean):
-                prominence = self.get_median(tf1,tf2)
+                prominence = self.get_median((tf1,tf2))
 
             peaks = self.analyze_signal_pair((tf1,tf2),
                                               corrected_data, 
                                               smooth_window = smooth_window, 
-                                              smooth = smooth, 
                                               height = height, 
                                               prominence = prominence, 
                                               save = None)
@@ -363,11 +720,29 @@ class DistObj():
                     if save is not None:    
                         outfile.write('\t'.join(str(x) for x in peak) + '\n')
                 peaking_count += 1
+
         self.peaks = pd.DataFrame(all_peaks,columns=self._PEAK_HEADER.strip().split("\t"))
-        self.is_smoothed = smooth
+        self.smooth_window = smooth_window
         self.peaking_count = peaking_count
+
         if save is not None:
             outfile.close()
+
+    def is_smoothed(self):
+        """ Return True if data was smoothed during analysis, False otherwise
+            
+            Parameters
+		    ----------
+           
+            Returns:
+		    ----------
+			bool 
+                True if smoothed, False otherwiese
+        """
+        
+        if (self.smoothed is None) or (self.smooth_window <= 1): 
+            return False
+        return True
         
 
     def check_periodicity(self):
@@ -378,31 +753,6 @@ class DistObj():
             pd.DataFrame 
         """
         pass
-    
-    # TODO: move to objects.py
-    def select_motif(self,motif):
-        """ Select all motif related rules and TFBS names as new object. 
-            
-            Parameters
-            ----------
-            motif : str 
-                Name of motif to select
-                
-            Returns
-            -------
-            new object with reduced rules and TFBS sets
-
-        """
-        self.logger.debug(f"Selecting Rules for motif {motif}. Don't forget to reestimate .count_distances()!")
-        selected = self.rules.copy()
-        selected = selected[(selected["TF1"]==motif) | (selected["TF2"]==motif)]
-        new_obj = self.copy()
-        new_obj.rules = selected
-
-        selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-        new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
-
-        return(new_obj)
 
     def bed_from_range(self, TF1, TF2, TF1_strand = None,
 									   TF2_strand = None,
@@ -564,39 +914,14 @@ class DistObj():
                 plt.savefig(f'{save}dens_{pair[0]}_{pair[1]}.png', dpi=600)
                 plt.clf()
 
-    def plot_decision_boundary(self,targets,n_bins = None, save = None):
-        if n_bins is None:
-            n_bins = self.max_dist - self.min_dist+1
-
-        if self.corrected is None:
-            self.logger.info("Background is not yet corrected. Please try .correct_all() first.")
-            return None
-
-        for pair in targets:
-            tf1 = pair[0]
-            tf2 = pair[1]
-            corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
-                                           (self.corrected["TF2"]==tf2))].iloc[0, 2:]
-            linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(corrected_data,dtype = float))
-            x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
-            thresh = self.get_median(tf1,tf2) * self.foldchange_thresh
-            plt.hist(range(self.min_dist,self.max_dist+1),weights=corrected_data, bins=n_bins, density=False, alpha=0.6)
-            plt.plot(x, [thresh]*len(x), 'r', label='upper boundary')
-            plt.plot(x, [-thresh]*len(x), 'r', label='lower boundary')
-            title = f"Decision boundary for {tf1}-{tf2}" 
-            plt.title(title)
-            if save is not None:
-                plt.savefig(f'{save}db_{tf1}_{tf2}.png', dpi=600)
-                plt.clf()
-
     def plot_analyzed_signal(self,pair, peaks = None, sourceData = None, save = None, only_peaking = False):
         if (sourceData is None) and (self.corrected is None):
-            self.logger.info("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
-            return None
+            self.logger.error("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
+            sys.exit(0)
 
         if (peaks is None) and (self.peaks is None):
-            self.logger.info("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
-            return None
+            self.logger.error("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
+            sys.exit(0)
 
         tf1, tf2 = pair
         if peaks is None:
@@ -605,7 +930,7 @@ class DistObj():
         else:
             peaks = np.array(peaks)
         if sourceData is None: 
-            if self.is_smoothed:
+            if self.is_smoothed():
                 x = self.smoothed.loc[((self.smoothed["TF1"]==tf1) &
                                        (self.smoothed["TF2"]==tf2))].iloc[0,2:].to_numpy()
             else:    
