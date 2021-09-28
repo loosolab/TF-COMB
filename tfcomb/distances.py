@@ -404,131 +404,6 @@ class DistObj():
 
         return(new_obj)
 
-    # TODO: remove code duplication  
-    def get_pair_locations(self, TF1, TF2,TF1_strand = None, TF2_strand = None,min_distance = 0, max_distance = 100, max_overlap = 0,directional = False):
-        """ Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
-
-        Parameters
-        ----------
-        TF1 : str 
-            Name of TF1 in pair.
-        TF2 : str 
-            Name of TF2 in pair.
-        TF1_strand : str
-            Strand of TF1 in pair. Default: None (strand is not taken into account).
-        TF2_strand : str
-            Strand of TF2 in pair. Default: None (strand is not taken into account).
-        min_distance : int
-            Default: 0
-        max_distance : int
-            Default: 100
-        max_overlap : float
-            Default: 0
-        directional : bool
-            Default: False
-
-        Returns
-        -------
-        List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-            Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
-
-        See also
-        ---------
-        count_within
-
-        """
-
-        ### (TODO: Check that .TFBS is filled) obsolete if duplication removed
-
-        locations = RegionList() #empty regionlist
-
-        TF1_tup = (TF1, TF1_strand)
-        TF2_tup = (TF2, TF2_strand)
-        sites = self.TFBS
-        n_sites = len(sites)
-
-		#Find out which TF is queried
-        if directional == True:
-            TF1_to_check = [TF1_tup]
-        else:
-            TF1_to_check = [TF1_tup, TF2_tup]
-
-		#Loop over all sites
-        i = 0
-        while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
-			
-			#Get current TF information
-            TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
-            this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
-
-			#Check whether TF is valid
-            if this_TF1_tup in TF1_to_check:
-	
-				#Find possible associations with TF1 within window 
-                finding_assoc = True
-                j = 0
-                while finding_assoc == True:
-					
-					#Next site relative to TF1
-                    j += 1
-                    if j+i >= n_sites - 1: #next site is beyond end of list, increment i
-                        i += 1
-                        finding_assoc = False #break out of finding_assoc
-
-                    else:	#There are still sites available
-
-						#Fetch information on TF2-site
-                        TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
-                        this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
-						
-						#Find out whether this TF2 is TF1/TF2
-                        if this_TF1_tup == TF1_tup:
-                            to_check = TF2_tup
-                        elif this_TF1_tup == TF2_tup:
-                            to_check = TF1_tup
-
-						#Check whether TF2 is either TF1/TF2
-                        if this_TF2_tup == to_check:
-						
-							#True if these TFBS co-occur within window
-                            distance = TF2_start - TF1_end
-                            distance = 0 if distance < 0 else distance
-
-                            if TF1_chr == TF2_chr and (distance <= max_distance):
-
-                                if distance >= min_distance:
-								
-									# check if they are overlapping more than the threshold
-                                    valid_pair = 1
-                                    if distance == 0:
-                                        overlap_bp = TF1_end - TF2_start
-										
-										# Get the length of the shorter TF
-                                        short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-										
-										#Invalid pair, overlap is higher than threshold
-                                        if overlap_bp / (short_bp*1.0) > max_overlap: 
-                                            valid_pair = 0
-
-									#Save association
-                                    if valid_pair == 1:
-
-										#Save location
-                                        reg1 = OneRegion([TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i])
-                                        reg2 = OneRegion([TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i])
-                                        location = (reg1, reg2, distance)
-                                        locations.append(location)
-
-                            else:
-								#The next site is out of window range; increment to next i
-                                i += 1
-                                finding_assoc = False   #break out of finding_assoc-loop
-			
-            else: #current TF1 is not TF1/TF2; go to next site
-                i += 1
-
-        return(locations)
-
     def bed_from_range(self, TF1, TF2, TF1_strand = None,
 									   TF2_strand = None,
 									   directional = False,
@@ -567,7 +442,7 @@ class DistObj():
         if self.min_dist < 0: 
             max_over = -self.min_dist
         
-        b = self.get_pair_locations(TF1, TF2, TF1_strand = TF1_strand,
+        b = tfcomb.utils.get_pair_locations(TF1, TF2, TF1_strand = TF1_strand,
 										   TF2_strand = TF2_strand,
 										   min_distance = self.min_dist, 
 										   max_distance = self.max_dist, 
