@@ -63,7 +63,7 @@ class CombObj():
 	#------------------------------- Getting started -------------------------------#
 	#-------------------------------------------------------------------------------#
 
-	def __init__(self, verbosity = 1): #set verbosity 
+	def __init__(self, verbosity=1): #set verbosity 
 
 		#Function and run parameters
 		self.verbosity = verbosity  #0: error, 1:info, 2:debug, 3:spam-debug
@@ -87,7 +87,8 @@ class CombObj():
 		self._motifs_obj = None
 
 	def __str__(self):
-		""" Returns a """
+		""" Returns a string representation of the CombObj """
+		
 		s = "<CombObj: "
 		s += "{0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
 
@@ -214,12 +215,14 @@ class CombObj():
 	#-------------------------- Setting up the .TFBS list --------------------------#
 	#-------------------------------------------------------------------------------#
 
-	def TFBS_from_motifs(self, regions, motifs, genome,
-								motif_pvalue = 0.0001,
-								motif_naming = "name",
-								gc = 0.5, 
-								keep_overlaps = False, 
-								threads = 1):
+	def TFBS_from_motifs(self, regions, 
+								motifs, 
+								genome,
+								motif_pvalue=0.0001,
+								motif_naming="name",
+								gc=0.5, 
+								keep_overlaps=False, 
+								threads=1):
 
 		"""
 		Function to calculate TFBS from motifs and genome fasta.
@@ -515,13 +518,13 @@ class CombObj():
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 
-	def count_within(self, min_distance = 0, 
-						   max_distance = 100, 
-						   max_overlap = 0, 
-						   stranded = False, 
-						   directional = False, 
-						   binarize = False,
-						   anchor = "inner"):
+	def count_within(self, min_distance=0, 
+						   max_distance=100, 
+						   max_overlap=0, 
+						   stranded=False, 
+						   directional=False, 
+						   binarize=False,
+						   anchor="inner"):
 		""" 
 		Count co-occurrences between TFBS. This function requires .TFBS to be filled by either `TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`. 
 		This function can be followed by .market_basket to calculate association rules.
@@ -609,12 +612,12 @@ class CombObj():
 		self.logger.info("Done finding co-occurrences! Run .market_basket() to estimate significant pairs")
 
 
-	def get_pair_locations(self, TF1, TF2, TF1_strand = None,
-										   TF2_strand = None,
-										   min_distance = 0, 
-										   max_distance = 100, 
-										   max_overlap = 0,
-										   directional = False):
+	def get_pair_locations(self, TF1, TF2, TF1_strand=None,
+										   TF2_strand=None,
+										   min_distance=0, 
+										   max_distance=100, 
+										   max_overlap=0,
+										   directional=False):
 		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
 		
 		Parameters
@@ -657,7 +660,7 @@ class CombObj():
 	#-------------------------------- Market basket analysis ---------------------------------#
 	#-----------------------------------------------------------------------------------------#
 
-	def market_basket(self, measure="cosine", threads = 1):
+	def market_basket(self, measure="cosine", threads=1):
 		"""
 		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within().
 	
@@ -911,10 +914,10 @@ class CombObj():
 		selected = selected[(selected[measure] >= measure_threshold) & (selected[pvalue] <= pvalue_threshold)]
 
 		if plot == True:
-			tfcomb.plotting.volcano(self.rules, measure = measure, 
-												pvalue = pvalue, 
-												measure_threshold = measure_threshold,
-												pvalue_threshold = pvalue_threshold,
+			tfcomb.plotting.volcano(self.rules, measure=measure, 
+												pvalue=pvalue, 
+												measure_threshold=measure_threshold,
+												pvalue_threshold=pvalue_threshold,
 												**kwargs)
 
 		#Create a CombObj with the subset of TFBS and rules
@@ -1030,17 +1033,17 @@ class CombObj():
 		self.distObj = tfcomb.distances.DistObj()
 		self.distObj.fill_rules(self)
 
-	def analyze_distances(self,normalize = True, n_bins = None, parent_directory = None,**kwargs):
+	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None,**kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
 
 		self.create_distObj()
-		self.distObj.count_distances(normalize=normalize,directional = self.directional)
+		self.distObj.count_distances(normalize=normalize, directional=self.directional)
 		# TODO: check parent and create nice subfolder structure !
-		self.distObj.linregress_all(n_bins = n_bins, save= parent_directory)
-		self.distObj.correct_all(n_bins = n_bins, save= parent_directory)
-		self.distObj.analyze_signal_all(**kwargs,save= parent_directory)
+		self.distObj.linregress_all(n_bins = n_bins, save=parent_directory)
+		self.distObj.correct_all(n_bins = n_bins, save=parent_directory)
+		self.distObj.analyze_signal_all(**kwargs, save=parent_directory)
 
 
 	#-------------------------------------------------------------------------------------------#
@@ -1198,7 +1201,7 @@ class CombObj():
 
 class DiffCombObj():
 
-	def __init__(self, objects = [], measure='cosine', verbosity=1):
+	def __init__(self, objects=[], measure='cosine', verbosity=1):
 		""" Initializes a DiffCombObj object for doing differential analysis between CombObj's.
 
 		Parameters
@@ -1291,7 +1294,7 @@ class DiffCombObj():
 		#TODO: Ensure that original 0 values are kept at 0
 
 
-	def calculate_foldchanges(self, pseudo = None):
+	def calculate_foldchanges(self, pseudo=None):
 		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
@@ -1600,7 +1603,7 @@ class DiffCombObj():
 		self.logger.debug("Plotting network using 'tfcomb.plotting.network'")
 		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, size_node_by=size_node_by, 
 										 color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
-										 verbosity = self.verbosity, **kwargs)
+										 verbosity=self.verbosity, **kwargs)
 
 		return(dot)
 
