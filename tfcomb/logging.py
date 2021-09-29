@@ -1,7 +1,7 @@
 import logging
 from logging import ERROR, INFO, DEBUG
 import sys
-
+from tfcomb.utils import InputError
 
 #Create additional level
 SPAM = DEBUG - 1
@@ -19,7 +19,7 @@ class TFcombLogger(logging.RootLogger):
 	def __init__(self, verbosity):
 
 		if verbosity not in verbosity_to_level.keys():
-			raise ValueError("Verbosity level {0} is not valid. Please choose one of: 0 (only errors), 1 (info - default), 2 (debug), 3 (spam debug).".format(verbosity))
+			raise InputError("Verbosity level {0} is not valid. Please choose one of: 0 (only errors), 1 (info - default), 2 (debug), 3 (spam debug).".format(verbosity))
 
 		self.level = verbosity_to_level[verbosity]
 		super().__init__(self.level)
@@ -46,9 +46,3 @@ class _LogFormatter(logging.Formatter):
 	def __init__(self, fmt='{levelname}: {message}', datefmt='%Y-%m-%d %H:%M', style='{'):
 		super().__init__(fmt, datefmt, style)
 
-#Functions imported
-#def warning(msg, *, time=None, deep=None, extra=None):
-#	return _TFcombLogger.warning(msg, time=time, deep=deep, extra=extra)
-
-#def info(msg, *, time=None, deep=None, extra=None):
-#	return _TFcombLogger.info(msg, time=time, deep=deep, extra=extra)

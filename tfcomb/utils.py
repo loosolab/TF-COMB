@@ -13,7 +13,6 @@ import statsmodels.stats.multitest
 import pysam
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
-import tfcomb
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -406,34 +405,39 @@ def resolve_overlapping(TFBS):
 	return(resolved)
 
 
-def get_pair_locations(TFBS, TF1, TF2, TF1_strand = None,
+def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 										   TF2_strand = None,
 										   min_distance = 0, 
 										   max_distance = 100, 
 										   max_overlap = 0,
-										   directional = False):
-		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
+										   directional = False,
+										   anchor = "inner"):
+		""" Get genomic locations of a particular TF pair.
 		
 		Parameters
 		----------
-		TFBS : RegionList()
+		sites : RegionList()
 			A list of TFBS regions.
 		TF1 : str 
 			Name of TF1 in pair.
 		TF2 : str 
 			Name of TF2 in pair.
-		TF1_strand : str
+		TF1_strand : str, optional
 			Strand of TF1 in pair. Default: None (strand is not taken into account).
-		TF2_strand : str
+		TF2_strand : str, optional
 			Strand of TF2 in pair. Default: None (strand is not taken into account).
-		min_distance : int
-			Default: 0
-		max_distance : int
-			Default: 100
-		max_overlap : float
-			Default: 0
-		directional : bool
-			Default: False
+		min_distance : int, optional
+			Minimum distance allowed between two TFBS. Default: 0
+		max_distance : int, optional
+			Maximum distance allowed between two TFBS. Default: 100
+		max_overlap : float between 0-1, optional
+			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
+			Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
+		directional : bool, optional
+			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
+			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
+		anchor : str, optional
+			The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
 
 		Returns
 		-------
@@ -446,11 +450,16 @@ def get_pair_locations(TFBS, TF1, TF2, TF1_strand = None,
 
 		"""
 
+		#Check input types
+		check_string(anchor, ["inner", "outer", "center"], "anchor")
+
+		#Subset sites to TF1/TF2 sites
+		sites = [site for site in sites if site.name in [TF1, TF2]]
+
 		locations = [] #empty list of regions
 
 		TF1_tup = (TF1, TF1_strand)
 		TF2_tup = (TF2, TF2_strand)
-		sites = TFBS
 		n_sites = len(sites)
 
 		#Find out which TF is queried
@@ -496,10 +505,19 @@ def get_pair_locations(TFBS, TF1, TF2, TF1_strand = None,
 						#Check whether TF2 is either TF1/TF2
 						if this_TF2_tup == to_check:
 						
-							#True if these TFBS co-occur within window
-							distance = TF2_start - TF1_end
-							distance = 0 if distance < 0 else distance
+							#Calculate distance between the two sites based on anchor
+							if anchor == "inner":
+								distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+								if distance < 0:
+									distance = 0
+							elif anchor == "outer":
+								distance = TF2_end - TF1_start
+							elif anchor == "center":
+								TF1_mid = (TF1_start + TF1_end) / 2
+								TF2_mid = (TF2_start + TF2_end) / 2
+								distance = TF2_mid - TF1_mid
 
+							#True if these TFBS co-occur within window
 							if TF1_chr == TF2_chr and (distance <= max_distance):
 
 								if distance >= min_distance:
@@ -528,11 +546,26 @@ def get_pair_locations(TFBS, TF1, TF2, TF1_strand = None,
 										reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
 										location = (reg1, reg2, distance)
 										locations.append(location)
-
-							else:
-								#The next site is out of window range; increment to next i
+							elif TF1_chr != TF2_chr: 
 								i += 1
 								finding_assoc = False   #break out of finding_assoc-loop
+
+							else: #This TF2 is on the same chromosome but more than max_distance away
+
+								#Establish if all valid sites were found for TF1
+								if anchor == "inner":
+
+									#The next site is out of inner window range; increment to next i
+									i += 1
+									finding_assoc = False   #break out of finding_assoc-loop
+								
+								else: #If anchor is outer or center, there might still be valid pairs for future TF2's
+
+									#Check if it will be possible to find valid pairs in next sites
+									if TF2_start > TF1_start + max_distance:
+										#no longer possible to find valid pairs for TF1; increment to next i
+										i += 1
+										finding_assoc = False   #break out of finding_assoc-loop
 			
 			else: #current TF1 is not TF1/TF2; go to next site
 				i += 1
