@@ -1,15 +1,19 @@
-from kneed import DataGenerator, KneeLocator
-from tobias.utils.regions import OneRegion, RegionList
-from tobias.utils.motifs import MotifList
-from copy import deepcopy
+import sys
+import os
 import pandas as pd
-import statsmodels.stats.multitest
 import numpy as np
+from copy import deepcopy
 import scipy.stats
-import pysam
 import random
 import string
 import multiprocessing as mp
+from kneed import DataGenerator, KneeLocator
+import statsmodels.stats.multitest
+
+import pysam
+from tobias.utils.regions import OneRegion, RegionList
+from tobias.utils.motifs import MotifList
+import tfcomb
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -45,6 +49,25 @@ class OneTFBS():
 
 		return(self)
 
+
+#------------------------------ Notebook / script exceptions -----------------------------#
+
+#NOTE: not applied at the moment, but kept here for future uses
+def is_notebook():
+	""" Utility to check if function is being run from a notebook or a script """
+	try:
+		ipython_shell = get_ipython()
+		return(True)
+	except NameError:
+		return(False)
+
+class InputError(Exception):
+	""" Raises an InputError exception without writing traceback """
+
+	def _render_traceback_(self):
+		etype, msg, tb = sys.exc_info()
+		sys.stderr.write("{0}: {1}".format(etype.__name__, msg))
+
 #--------------------------------- File/type checks ---------------------------------#
 
 def check_columns(df, columns):
@@ -52,27 +75,38 @@ def check_columns(df, columns):
 	
 	df_columns = df.columns
 
+	not_found = []
 	for column in columns:
 		if column is not None:
 			if column not in df_columns:
-				raise ValueError("Column '{0}' is not found in dataframe. Available columns are: {1}".format(column, df_columns))
+				not_found.append(column)
+	
+	if len(not_found) > 0:
+		error_str = "Columns '{0}' are not found in dataframe. Available columns are: {1}".format(not_found, df_columns)
+		raise InputError(error_str)
+		
 
 def check_writeability(file_path):
 	""" Check if a file is writeable """
 
 	#Check if file already exists
+	error_str = None
 	if os.path.exists(file_path):
 		if not os.path.isfile(file_path): # is it a file or a dir?
-			raise ValueError("Path '{0}' is not a file".format(file_path))
+			error_str = "Path '{0}' is not a file".format(file_path)
 
 	#check writeability of parent dir
 	else:
 		pdir = os.path.dirname(file_path)
 		if os.access(pdir, os.W_OK) == False:
-			raise ValueError("File '{0}' within dir {1} is not writeable".format(file_path, pdir))
+			error_str = "File '{0}' within dir {1} is not writeable".format(file_path, pdir)
+
+	#If any errors were found
+	if error_str is not None:
+		raise InputError(error_str)
 
 
-def check_type(obj, types, name=None):
+def check_type(obj, allowed, name=None):
 	"""
 	Check whether given object is within a list of allowed types.
 
@@ -80,27 +114,31 @@ def check_type(obj, types, name=None):
 	----------
 	obj : object
 		Object to check type on
-	types : list
-		A list of allowed object types
+	allowed : type or list of types
+		A type or a list of object types to be allowed
 	name : str, optional
 		Name of object to be written in error. Default: None (the input is referred to as 'object')
 
 	Raises
 	--------
-	ValueError
+	TypeError
 		If object type is not within types.
 	"""
-	
+
+	#Convert allowed to list
+	if not isinstance(allowed, list):
+		allowed = [allowed]
+
 	#Check if any of the types fit
 	flag = 0
-	for t in types:
+	for t in allowed:
 		if isinstance(obj, t):
 			flag = 1
 
-	#Raise valueError if none of the types fit
-	if flag == 0:	
+	#Raise error if none of the types fit
+	if flag == 0:
 		name = "object" if name is None else '\'{0}\''.format(name)
-		raise ValueError("The {0} given has type '{1}', but must be one of: {2}".format(name, type(obj), types))
+		raise InputError("The {0} given has type '{1}', but must be one of: {2}".format(name, type(obj), allowed))
 
 def check_string(astring, allowed):
 	""" 
@@ -114,6 +152,14 @@ def check_string(astring, allowed):
 		A string or list of allowed strings to check against 'astring'.
 	"""
 
+	#Convert allowed to list
+	if not isinstance(allowed, list):
+		allowed = [allowed]
+	
+	#Check if astring is within allowed
+	if astring not in allowed:
+		raise InputError("String '{0}' is not valid - it must be one of: {1}".format(astring, allowed))
+
 def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False):
 	"""
 	value : int or float
@@ -126,17 +172,28 @@ def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False):
 		Value must be an integer. Default: False.
 	"""
 
-	if integer == True:
-		#check if value is integer
-		pass
+	if vmin > vmax:
+		raise InputError("vmin must be smaller than vmax")
 
+	error_msg = None
+	if integer == True:		
+		if not isinstance(value, int):
+			error_msg = "The value '{0}' given is not an integer, but integer is set to True.".format(value)
 	else:
 		#check if value is any value
-		pass
+		try:
+			_ = int(value)
+		except:
+			error_msg = "The value '{0}' given is not a valid number".format(value)
 
-	if (value >= vmin) & (value <= vmax):
-		pass
-
+	#If value is a number, check if it is within bounds
+	if error_msg is None:
+		if not ((value >= vmin) & (value <= vmax)):
+			error_msg = "The value '{0}' given is not within the bounds of [{1};{2}]".format(value, vmin, vmax)
+	
+	#Finally, raise error if necessary:
+	if error_msg is not None:
+		raise InputError(error_msg)
 
 def random_string(l=8):
 	""" Get a random string of length l """
