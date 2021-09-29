@@ -1,5 +1,3 @@
-
-
 import os 
 import pandas as pd
 import itertools
@@ -17,7 +15,9 @@ import qnorm #quantile normalization
 import scipy
 from scipy.stats import rankdata
 from scipy.stats import norm
+from scipy.stats import linregress
 import statsmodels.stats.multitest
+from scipy.signal import find_peaks
 
 #Bioinfo-modules
 import pysam
@@ -33,13 +33,14 @@ import tobias
 from tobias.utils.motifs import MotifList
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.utilities import merge_dicts, run_parallel, check_required
+from tobias.utils.signals import fast_rolling_math
 
 #TF-comb modules
 import tfcomb
 import tfcomb.plotting
 import tfcomb.network
 import tfcomb.analysis
-from tfcomb.counting import count_co_occurrence
+from tfcomb.counting import count_co_occurrence, count_distances
 from tfcomb.logging import *
 from tfcomb.utils import *
 
@@ -1030,14 +1031,17 @@ class CombObj():
 			 Fills self.distObj.
 		"""
 		#TODO: check rules filled
-		self.distObj = tfcomb.distances.DistObj()
+		self.distObj = DistObj()
 		self.distObj.fill_rules(self)
 
 	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None,**kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
+<<<<<<< HEAD
 
+=======
+>>>>>>> merge-changes
 		self.create_distObj()
 		self.distObj.count_distances(normalize=normalize,directional = self.directional)
 		# TODO: check parent_directory and create nice subfolder structure !
@@ -1778,7 +1782,7 @@ class DistObj():
 		self.max_dist = comb_obj.max_distance
 		self.directional = comb_obj.directional
 		self.max_overlap = comb_obj.max_overlap
-		self.anchor = comb_obj.anchor
+		#self.anchor = comb_obj.anchor
 
 	def set_anchor(self,anchor):
 		""" set anchor for distance measure mode
@@ -1915,7 +1919,8 @@ class DistObj():
 
 		tfcomb.utils.check_type(pair,[tuple],"pair")
 		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 
 		if self.distances is None:
 			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
@@ -1931,7 +1936,7 @@ class DistObj():
 		
 		data = self.distances.loc[((self.distances["TF1"]==tf1) &
 			   (self.distances["TF2"]==tf2))].iloc[0, 2:]
-		linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(data,dtype = float))
+		linres = linregress(range(self.min_dist,self.max_dist+1),np.array(data,dtype = float))
 		if save is not None:
 			plt.hist(range(self.min_dist,self.max_dist+1),weights=data, bins=n_bins, density=False, alpha=0.6)
 			plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
@@ -1961,7 +1966,8 @@ class DistObj():
 		"""
 
 		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 
 		if self.distances is None:
 			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
@@ -2000,7 +2006,8 @@ class DistObj():
 
 		tfcomb.utils.check_type(pair,[tuple],"pair")
 		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 
 		#TODO: check pair is valid & check linres: import in utils needed ?
 		tf1 = pair[0]
@@ -2030,7 +2037,7 @@ class DistObj():
 		if save is not None:
 			x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
 			plt.hist(range(self.min_dist,self.max_dist+1),weights=corrected, bins=n_bins, density=False, alpha=0.6)
-			linres = stats.linregress(range(self.min_dist,self.max_dist+1),np.array(corrected,dtype = float))
+			linres = linregress(range(self.min_dist,self.max_dist+1),np.array(corrected,dtype = float))
 			plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
 			plt.savefig(f'{save}corrected_{tf1}_{tf2}.png', dpi=600)
 			plt.clf()
@@ -2052,7 +2059,8 @@ class DistObj():
 		"""
 		
 		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 		
 		if self.linres is None:
 			self.logger.error("Please fit a linear regression first. [see .linregress_all()]")
@@ -2139,7 +2147,8 @@ class DistObj():
 		tfcomb.utils.check_type(pair,[tuple],"pair")
 		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
 		tfcomb.utils.check_type(corrected,[list],"corrected")
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 
 		#Smooth the signal
 		tf1, tf2 = pair
@@ -2190,7 +2199,7 @@ class DistObj():
 				Fills the object variable .smoothed
 		"""
 		
-		tfcomb.utils.check_type(window_size,[int],"window size")
+		tfcomb.utils.check_type(window_size, [int], "window size")
 
 		if window_size < 0 :
 				self.logger.error("Window size need to be positive or zero.")
@@ -2249,7 +2258,8 @@ class DistObj():
 		"""
 
 		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 		
 		if smooth_window > 1:
 			self.smooth(smooth_window)
@@ -2376,8 +2386,8 @@ class DistObj():
 				Default: None (results will not be saved)
 
 		"""
-
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
 		source_table = dataSource
 			
@@ -2409,9 +2419,10 @@ class DistObj():
 		"""
 
 		tfcomb.utils.check_type(bwadjust,[tuple],"pair")
-		tfcomb.utils.check_writeability(save)
 		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
 		source_table = dataSource
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 		
 		for pair in targets:
 			weights = list(source_table.loc[((source_table["TF1"]==pair[0]) &
