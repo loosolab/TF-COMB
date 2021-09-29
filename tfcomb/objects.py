@@ -1038,10 +1038,6 @@ class CombObj():
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
-<<<<<<< HEAD
-
-=======
->>>>>>> merge-changes
 		self.create_distObj()
 		self.distObj.count_distances(normalize=normalize,directional = self.directional)
 		# TODO: check parent_directory and create nice subfolder structure !
@@ -2459,7 +2455,7 @@ class DistObj():
 		else:
 			x = sourceData.loc[((sourceData["TF1"]==tf1) &
 								(sourceData["TF2"]==tf2))].iloc[0,2:].to_numpy()
-								
+
 		if (only_peaking) and (len(peaks) == 0):
 			return
 			
