@@ -295,8 +295,8 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 					TF2_anchor = TF2_end
 				# 2 = center
 				elif (anchor_mode == 2):
-					TF1_anchor = int(np.ceil((TF1_end - TF1_start) / 2))
-					TF2_anchor = int(np.ceil((TF2_end - TF2_start) / 2))
+					TF1_anchor = int(np.ceil((TF1_end + TF1_start) / 2))
+					TF2_anchor = int(np.ceil((TF2_end + TF2_start) / 2))
 				# 0 = inner (default)
 				else:
 					TF1_anchor = TF1_end

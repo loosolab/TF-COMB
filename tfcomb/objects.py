@@ -45,6 +45,7 @@ from tfcomb.logging import *
 from tfcomb.utils import *
 
 from kneed import KneeLocator
+np.seterr(all='raise') # raise errors for runtimewarnings
 
 class CombObj(): 
 	"""
@@ -1780,7 +1781,7 @@ class DistObj():
 		self.max_overlap = comb_obj.max_overlap
 		#self.anchor = comb_obj.anchor
 
-	def set_anchor(self,anchor):
+	def set_anchor(self, anchor):
 		""" set anchor for distance measure mode
 		0 = inner
 		1 = outer
@@ -1797,7 +1798,7 @@ class DistObj():
 			Sets anchor mode inplace
 		"""
 
-		modes = ["inner","outer","center"]
+		modes = ["inner", "outer", "center"]
 
 		tfcomb.utils.check_type(anchor, [str, int], "anchor")
 		if isinstance(anchor, str):
@@ -1829,14 +1830,21 @@ class DistObj():
 
 		"""
 		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
+		
 		# encode chromosome,pairs and name to int representation
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
 		self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
-		sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
-						  for site in self.TFBS]) #numpy integer array
-
-		self.pairs_to_idx = {(self.name_to_idx[tf1],self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
+		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
+						  for site in self.TFBS] #numpy integer array
+		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
 		
+		#Sort sites by mid if anchor == 2 (center):
+		if self.anchor_mode == 2: 
+			sites = sorted(sites, key=lambda site: int((site[1] + site[2]) / 2))
+
+		#Convert to numpy integer arr for count_distances
+		sites = np.array(sites)
+
 		self.logger.info("Calculating distances")
 		self._raw = count_distances(sites, 
 									self.pairs_to_idx,
@@ -1848,7 +1856,7 @@ class DistObj():
 		if not directional:
 			for i in range(0,self._raw.shape[0]-1):
 				if (self._raw[i,0] == self._raw[i+1,1]) and (self._raw[i,1] == self._raw[i+1,0]):
-					s = self._raw[i,2:]+self._raw[i+1,2:]
+					s = self._raw[i,2:] + self._raw[i+1,2:]
 					self._raw[i,2:] = s
 					self._raw[i+1,2:] = s
 		self.directional = directional
@@ -1885,7 +1893,11 @@ class DistObj():
 			entry = [tf1,tf2]
 			
 			if normalize:
-				entry += (row[2:]/(row[2:].sum())).tolist()
+				row_sum = row[2:].sum()
+				if row_sum > 0:
+					entry += (row[2:]/row_sum).tolist()
+				else: 
+					entry += row[2:].tolist() #all values are 0
 			else:
 				entry += row[2:].tolist()
 			results.append(entry)
@@ -2142,7 +2154,7 @@ class DistObj():
 		#Check input parameters
 		tfcomb.utils.check_type(pair,[tuple],"pair")
 		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
-		tfcomb.utils.check_type(corrected,[list],"corrected")
+		tfcomb.utils.check_type(corrected, [list], "corrected")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
@@ -2286,6 +2298,7 @@ class DistObj():
 			tf2 = row["TF2"]
 			corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
 												 (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+			corrected_data = corrected_data.tolist() #series -> list
 			
 			if (calc_mean):
 				prominence = self.get_median((tf1,tf2))
