@@ -125,7 +125,6 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 
 							#Invalid pair, overlap is higher than threshold
 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
-								print("{0} ({1}) > {2}".format(overlap_bp / (short_bp*1.0), overlap_bp, max_overlap))
 								valid_pair = 0
 
 						#Save counts of association

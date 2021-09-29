@@ -169,6 +169,7 @@ def annotate_peaks(regions, gtf, config=None, threads=1, verbosity=1):
 	
 	best_annotations = [region for region in all_valid_annotations if region.get("best_hit", 0) == 1]
 	"""
+
 	#Add information to .annotation for each peak
 	for i, region in enumerate(regions):
 		region.annotation = best_annotations[i]
@@ -244,7 +245,8 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 
 	Reference
 	----------
-
+	https://www.nature.com/articles/s41598-018-28948-z
+	
 	"""
 	
 	#verbosity 0/1/2
@@ -291,7 +293,7 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	else:
 
 		#Find best-fitting column in gene_table
-		
+
 
 		pass
 		#check if background_gene_ids are in ns2assoc
@@ -307,6 +309,7 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 				prt=None, 
 				log=None) # defult multipletest correction method
 	
+
 	##### Run study #####
 	
 	#Check if gene_ids are in ns2assoc; else, try to convert

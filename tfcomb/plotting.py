@@ -75,22 +75,21 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	Parameters
 	----------
 	rules_table : pandas.DataFrame
-
+		The <CombObj>.rules table calculated by market basket analysis
 	columns : str, optional
-
+		The name of the column in rules_table to use as heatmap column names. Default: TF1.
 	rows : str, optional
-
+		The name of the column in rules_table to use as heatmap row names. Default: TF2.
 	color_by : str, optional
-
+		The name of the column in rules_table to use as heatmap colors. Default: "cosine".
 	figsize : tuple
-		. Default: (7,7)
-
+		The size of the output heatmap. Default: (7,7)
 	save : str
 		Save the plot to the file given in 'save'. Default: None.
 	"""
 
 	#Test input format
-	check_columns(rules_table, [columns, rows, color_by])	
+	check_columns(rules_table, [columns, rows, color_by])
 
 	# Create support table for the heatmap
 	pivot_table = rules_table.pivot(index=rows, columns=columns, values=color_by)
@@ -111,12 +110,17 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 		cmap = "PuBu"
 		center = None
 
+	row_cluster = True if pivot_table.shape[0] > 1 else False
+	col_cluster = True if pivot_table.shape[1] > 1 else False
+
 	#Plot heatmap
 	h = sns.clustermap(pivot_table, 
 								mask=mask,
 								cbar=True, 
 								cmap=cmap,
 								center=center,
+								row_cluster=row_cluster,
+								col_cluster=col_cluster,
 								cbar_kws={'label': color_by}, 
 								xticklabels=True,
 								yticklabels=True,

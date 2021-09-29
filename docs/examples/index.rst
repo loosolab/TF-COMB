@@ -16,5 +16,7 @@ The usage of TF-comb is split into three main parts:
 
     Predefined_TFBS
     TFBS_from_motifs
-    directionality_analysis
+    Select_rules
+    Network_analysis
+    Directionality_analysis
     *

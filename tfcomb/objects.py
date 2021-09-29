@@ -64,7 +64,7 @@ class CombObj():
 	#------------------------------- Getting started -------------------------------#
 	#-------------------------------------------------------------------------------#
 
-	def __init__(self, verbosity = 1): #set verbosity 
+	def __init__(self, verbosity=1): #set verbosity 
 
 		#Function and run parameters
 		self.verbosity = verbosity  #0: error, 1:info, 2:debug, 3:spam-debug
@@ -88,7 +88,8 @@ class CombObj():
 		self._motifs_obj = None
 
 	def __str__(self):
-		""" Returns a """
+		""" Returns a string representation of the CombObj """
+		
 		s = "<CombObj: "
 		s += "{0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
 
@@ -120,6 +121,10 @@ class CombObj():
 		combined.TFBS = RegionList(self.TFBS + obj.TFBS)
 		combined.TFBS.loc_sort() 				#sort TFBS by coordinates
 		combined.TFBS = tfcomb.utils.remove_duplicates(combined.TFBS) #remove duplicated sites 
+
+		#Set .TF_names
+		counts = {r.name: "" for r in combined.TFBS}
+		combined.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets		
 
 		return(combined)
 	
@@ -211,12 +216,14 @@ class CombObj():
 	#-------------------------- Setting up the .TFBS list --------------------------#
 	#-------------------------------------------------------------------------------#
 
-	def TFBS_from_motifs(self, regions, motifs, genome,
-								motif_pvalue = 0.0001,
-								motif_naming = "name",
-								gc = 0.5, 
-								keep_overlaps = False, 
-								threads = 1):
+	def TFBS_from_motifs(self, regions, 
+								motifs, 
+								genome,
+								motif_pvalue=0.0001,
+								motif_naming="name",
+								gc=0.5, 
+								keep_overlaps=False, 
+								threads=1):
 
 		"""
 		Function to calculate TFBS from motifs and genome fasta.
@@ -334,8 +341,7 @@ class CombObj():
 		self.logger.info("Identified {0} TFBS within given regions".format(len(self.TFBS)))
 		e = datetime.datetime.now()
 
-
-	def TFBS_from_bed(self, bed_f):
+	def TFBS_from_bed(self, bed_f, overwrite=False):
 		"""
 		Fill the .TFBS attribute using a precalculated set of binding sites.
 
@@ -343,14 +349,25 @@ class CombObj():
 		-------------
 		bed_f : str 
 			A path to a .bed-file with precalculated binding sites.
-
+		overwrite : boolean
+			Whether to overwrite existing sites within .TFBS. Default: False (sites are appended to .TFBS).
 		"""
 
+		#If previous TFBS should be overwritten or TFBS should be initialized
+		if overwrite == True or self.TFBS is None:
+			self.TFBS = RegionList()
+
+		#Read sites from file
 		self.logger.info("Reading sites from '{0}'...".format(bed_f))
-		self.TFBS = RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(bed_f)])
+		read_TFBS = RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(bed_f)])
+		n_read_TFBS = len(read_TFBS)
+		self.logger.info("Read {0} sites".format(n_read_TFBS))
+
+		#Add TFBS to internal .TFBS list
+		self.TFBS += read_TFBS
 		n_sites = len(self.TFBS)
 
-		#Stats on the regions which were read
+		#Stats on the .TFBS regions
 		counts = {r.name: "" for r in self.TFBS}
 		n_names = len(counts)
 		self.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets
@@ -358,7 +375,8 @@ class CombObj():
 		#Process TFBS
 		self.TFBS.loc_sort()
 
-		self.logger.info("Read {0} sites (comprising {1} unique TFs)".format(n_sites, n_names))
+		#TODO: handle logging if .TFBS is initialized; no need to write again
+		self.logger.info(".TFBS contains {0} sites (comprising {1} unique names)".format(n_sites, n_names))
 
 
 	def TFBS_from_TOBIAS(self, bindetect_path, condition):
@@ -501,13 +519,13 @@ class CombObj():
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 
-	def count_within(self, min_distance = 0, 
-						   max_distance = 100, 
-						   max_overlap = 0, 
-						   stranded = False, 
-						   directional = False, 
-						   binarize = False,
-						   anchor = "inner"):
+	def count_within(self, min_distance=0, 
+						   max_distance=100, 
+						   max_overlap=0, 
+						   stranded=False, 
+						   directional=False, 
+						   binarize=False,
+						   anchor="inner"):
 		""" 
 		Count co-occurrences between TFBS. This function requires .TFBS to be filled by either `TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`. 
 		This function can be followed by .market_basket to calculate association rules.
@@ -595,12 +613,12 @@ class CombObj():
 		self.logger.info("Done finding co-occurrences! Run .market_basket() to estimate significant pairs")
 
 
-	def get_pair_locations(self, TF1, TF2, TF1_strand = None,
-										   TF2_strand = None,
-										   min_distance = 0, 
-										   max_distance = 100, 
-										   max_overlap = 0,
-										   directional = False):
+	def get_pair_locations(self, TF1, TF2, TF1_strand=None,
+										   TF2_strand=None,
+										   min_distance=0, 
+										   max_distance=100, 
+										   max_overlap=0,
+										   directional=False):
 		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
 		
 		Parameters
@@ -635,92 +653,7 @@ class CombObj():
 
 		self._check_TFBS()
 
-		locations = [] #empty list of regions
-
-		TF1_tup = (TF1, TF1_strand)
-		TF2_tup = (TF2, TF2_strand)
-		sites = self.TFBS
-		n_sites = len(sites)
-
-		#Find out which TF is queried
-		if directional == True:
-			TF1_to_check = [TF1_tup]
-		else:
-			TF1_to_check = [TF1_tup, TF2_tup]
-
-		#Loop over all sites
-		i = 0
-		while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
-			
-			#Get current TF information
-			TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
-			this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
-
-			#Check whether TF is valid
-			if this_TF1_tup in TF1_to_check:
-	
-				#Find possible associations with TF1 within window 
-				finding_assoc = True
-				j = 0
-				while finding_assoc == True:
-					
-					#Next site relative to TF1
-					j += 1
-					if j+i >= n_sites - 1: #next site is beyond end of list, increment i
-						i += 1
-						finding_assoc = False #break out of finding_assoc
-
-					else:	#There are still sites available
-
-						#Fetch information on TF2-site
-						TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
-						this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
-						
-						#Find out whether this TF2 is TF1/TF2
-						if this_TF1_tup == TF1_tup:
-							to_check = TF2_tup
-						elif this_TF1_tup == TF2_tup:
-							to_check = TF1_tup
-
-						#Check whether TF2 is either TF1/TF2
-						if this_TF2_tup == to_check:
-						
-							#True if these TFBS co-occur within window
-							distance = TF2_start - TF1_end
-							distance = 0 if distance < 0 else distance
-
-							if TF1_chr == TF2_chr and (distance <= max_distance):
-
-								if distance >= min_distance:
-								
-									# check if they are overlapping more than the threshold
-									valid_pair = 1
-									if distance == 0:
-										overlap_bp = TF1_end - TF2_start
-										
-										# Get the length of the shorter TF
-										short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-										
-										#Invalid pair, overlap is higher than threshold
-										if overlap_bp / (short_bp*1.0) > max_overlap: 
-											valid_pair = 0
-
-									#Save association
-									if valid_pair == 1:
-
-										#Save location
-										reg1 = OneTFBS(chrom=TF1_chr, start=TF1_start, end=TF1_end, name=TF1_name, strand=TF1_strand_i)
-										reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
-										location = (reg1, reg2, distance)
-										locations.append(location)
-
-							else:
-								#The next site is out of window range; increment to next i
-								i += 1
-								finding_assoc = False   #break out of finding_assoc-loop
-			
-			else: #current TF1 is not TF1/TF2; go to next site
-				i += 1
+		locations = tfcomb.utils.get_pair_locations()
 
 		return(locations)
 
@@ -728,7 +661,7 @@ class CombObj():
 	#-------------------------------- Market basket analysis ---------------------------------#
 	#-----------------------------------------------------------------------------------------#
 
-	def market_basket(self, measure="cosine", threads = 1):
+	def market_basket(self, measure="cosine", threads=1):
 		"""
 		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within().
 	
@@ -822,9 +755,11 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 
 	def simplify_rules(self):
-		""" Simplify rules so that TF1-TF2 and TF2-TF1 pairs only occur once within .rules. 
+		""" 
+		Simplify rules so that TF1-TF2 and TF2-TF1 pairs only occur once within .rules. 
 		This is useful for association metrics such as 'cosine', where the association of TF1->TF2 equals TF2->TF1. 
-		This function keeps the first unique pair occurring within the rules table. """
+		This function keeps the first unique pair occurring within the rules table. 
+		"""
 
 		#TODO:check that rules are present
 
@@ -875,8 +810,10 @@ class CombObj():
 				self.logger.warning("")
 			else:
 				selected = selected[selected_bool]
+		self.logger.info("Selected {0} rules".format(len(selected)))
 
 		#Create new object with selected rules
+		self.logger.info("Creating subset of object")
 		new_obj = self.copy()
 		new_obj.rules = selected
 
@@ -978,10 +915,10 @@ class CombObj():
 		selected = selected[(selected[measure] >= measure_threshold) & (selected[pvalue] <= pvalue_threshold)]
 
 		if plot == True:
-			tfcomb.plotting.volcano(self.rules, measure = measure, 
-												pvalue = pvalue, 
-												measure_threshold = measure_threshold,
-												pvalue_threshold = pvalue_threshold,
+			tfcomb.plotting.volcano(self.rules, measure=measure, 
+												pvalue=pvalue, 
+												measure_threshold=measure_threshold,
+												pvalue_threshold=pvalue_threshold,
 												**kwargs)
 
 		#Create a CombObj with the subset of TFBS and rules
@@ -1098,7 +1035,7 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via combobj.distObj")
 
-	def analyze_distances(self,normalize = True, n_bins = None, parent_directory = None, plot_signal = True, **kwargs):
+	def analyze_distances(self,normalize=True, n_bins=None, parent_directory=None, plot_signal=True, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
@@ -1243,7 +1180,9 @@ class CombObj():
 		#Update network attribute for plotting
 		if method == "blockmodel":
 			self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
-	
+
+		#no return - networks were changed in place
+
 	def plot_network(self, color_node_by="TF1_count",
 						   color_edge_by="cosine", 
 						   size_edge_by="TF1_TF2_count",
@@ -1332,7 +1271,7 @@ class CombObj():
 
 class DiffCombObj():
 
-	def __init__(self, objects = [], measure='cosine', verbosity=1):
+	def __init__(self, objects=[], measure='cosine', verbosity=1):
 		""" Initializes a DiffCombObj object for doing differential analysis between CombObj's.
 
 		Parameters
@@ -1425,7 +1364,7 @@ class DiffCombObj():
 		#TODO: Ensure that original 0 values are kept at 0
 
 
-	def calculate_foldchanges(self, pseudo = None):
+	def calculate_foldchanges(self, pseudo=None):
 		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
@@ -1734,7 +1673,7 @@ class DiffCombObj():
 		self.logger.debug("Plotting network using 'tfcomb.plotting.network'")
 		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, size_node_by=size_node_by, 
 										 color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
-										 verbosity = self.verbosity, **kwargs)
+										 verbosity=self.verbosity, **kwargs)
 
 		return(dot)
 
@@ -1864,28 +1803,15 @@ class DistObj():
 			Sets anchor mode inplace
 		"""
 
-		try:
-			tfcomb.utils.check_type(anchor,[str,int],"anchor")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
+		modes = ["inner","outer","center"]
 
-		if isinstance(anchor,str):
-			try:
-				tfcomb.utils.check_string(anchor,["inner","outer","center"])
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
-
-			modes = ["inner","outer","center"]
+		tfcomb.utils.check_type(anchor, [str, int], "anchor")
+		if isinstance(anchor, str):
+			tfcomb.utils.check_string(anchor, modes)
 			self.anchor_mode = modes.index(anchor)
-		# anchor is int
-		else:
-			try:
-				tfcomb.utils.check_value(anchor,0,2)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+
+		else: # anchor is int
+			tfcomb.utils.check_value(anchor, vmin=0, vmax=2, integer=True)
 			self.anchor_mode = anchor
 		
 	def count_distances(self, normalize = True, directional = False):
@@ -1908,37 +1834,13 @@ class DistObj():
 			Fills the object variable .distances.
 
 		"""
-		try:
-			tfcomb.utils.check_type(normalize,[bool],"normalize")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
 
-		try:
-			tfcomb.utils.check_type(directional,[bool],"directional")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
+		tfcomb.utils.check_type(normalize,[bool],"normalize")
+		tfcomb.utils.check_type(directional,[bool],"directional")
+		tfcomb.utils.check_type(self.min_dist,[int],"min_dist")
+		tfcomb.utils.check_type(self.max_dist,[int],"max_dist")
+		tfcomb.utils.check_type(self.anchor_mode,[int],"anchor_mode")
 		
-		try:
-			tfcomb.utils.check_type(self.min_dist,[int],"min_dist")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
-		try:
-			tfcomb.utils.check_type(self.max_dist,[int],"max_dist")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-		
-		try:
-			tfcomb.utils.check_type(self.anchor_mode,[int],"anchor_mode")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
-
 		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
 		# encode chromosome,pairs and name to int representation
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
@@ -2023,24 +1925,11 @@ class DistObj():
 			----------
 			scipy.stats._stats_mstats_common.LinregressResult Object
 		"""
-		try:
-			tfcomb.utils.check_type(pair,[tuple],"pair")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-		
-		try:
-			tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
 
+		tfcomb.utils.check_type(pair,[tuple],"pair")
+		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 
 		if self.distances is None:
 			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
@@ -2085,18 +1974,9 @@ class DistObj():
 				Fills the object variable .linres
 		"""
 
-		try:
-			tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
+		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 
 		if self.distances is None:
 			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
@@ -2132,24 +2012,11 @@ class DistObj():
 			list 
 				Corrected values for the given pair
 		"""
-		try:
-			tfcomb.utils.check_type(pair,[tuple],"pair")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
 
-		try:
-			tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
+		tfcomb.utils.check_type(pair,[tuple],"pair")
+		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 
 		#TODO: check pair is valid & check linres: import in utils needed ?
 		tf1 = pair[0]
@@ -2199,18 +2066,10 @@ class DistObj():
 			None 
 				Fills the object variable .corrected
 		"""
-		try:
-			tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
+		
+		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 		
 		if self.linres is None:
 			self.logger.error("Please fit a linear regression first. [see .linregress_all()]")
@@ -2239,11 +2098,8 @@ class DistObj():
 			Float 
 				Median for the given pair 
 		"""
-		try:
-			tfcomb.utils.check_type(pair,[tuple],"pair")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
+		
+		tfcomb.utils.check_type(pair, [tuple], "pair")
 
 		if self.distances is None:
 			self.logger.error("Can not calculate Median, no distances evaluated yet. Please run .count_distances() first.")
@@ -2295,31 +2151,15 @@ class DistObj():
 			list 
 				list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
 		"""
-		try:
-			tfcomb.utils.check_type(pair,[tuple],"pair")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
-		try:
-			tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
 		
-		try:
-			tfcomb.utils.check_type(corrected,[list,pd.core.series.Series],"corrected")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
-
+		#Check input parameters
+		tfcomb.utils.check_type(pair,[tuple],"pair")
+		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
+		tfcomb.utils.check_type(corrected,[list],"corrected")
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 
+		#Smooth the signal
 		tf1, tf2 = pair
 		peaks = []
 		if(smooth_window != 1):
@@ -2367,11 +2207,8 @@ class DistObj():
 			None 
 				Fills the object variable .smoothed
 		"""
-		try:
-			tfcomb.utils.check_type(window_size,[int],"window size")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
+		
+		tfcomb.utils.check_type(window_size, [int], "window size")
 
 		if window_size < 0 :
 				self.logger.error("Window size need to be positive or zero.")
@@ -2428,18 +2265,10 @@ class DistObj():
 			None 
 				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
 		"""
-		try:
-			tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
 
+		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 		
 		if smooth_window > 1:
 			self.smooth(smooth_window)
@@ -2535,20 +2364,10 @@ class DistObj():
 				Default: None (results will not be saved)
 
 		"""
-		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
-		
-		if not isinstance(dataSource,pd.DataFrame):
-			try:
-				source_table = pd.DataFrame(dataSource)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
-			
+
+		tfcomb.utils.check_writeability(save)
+		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
+		source_table = dataSource
 		
 		for pair in targets:
 			#TODO: Check pair is valid
@@ -2577,18 +2396,9 @@ class DistObj():
 
 		"""
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
-		
-		if not isinstance(dataSource,pd.DataFrame):
-			try:
-				source_table = pd.DataFrame(dataSource)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
+		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
+		source_table = dataSource
 			
 		for pair in targets:
 			# TODO: Check pair is valid
@@ -2616,25 +2426,12 @@ class DistObj():
 				Default: None (results will not be saved)
 
 		"""
-		try:
-			tfcomb.utils.check_type(bwadjust,[tuple],"pair")
-		except ValueError as e:
-			self.logger.error(str(e))
-			sys.exit(0)
 
+		tfcomb.utils.check_type(bwadjust,[tuple],"pair")
+		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
+		source_table = dataSource
 		if save is not None:
-			try:
-				tfcomb.utils.check_writeability(save)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
-		
-		if not isinstance(dataSource,pd.DataFrame):
-			try:
-				source_table = pd.DataFrame(dataSource)
-			except ValueError as e:
-				self.logger.error(str(e))
-				sys.exit(0)
+			tfcomb.utils.check_writeability(save)
 		
 		for pair in targets:
 			weights = list(source_table.loc[((source_table["TF1"]==pair[0]) &

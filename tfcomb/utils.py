@@ -1,23 +1,26 @@
-from kneed import DataGenerator, KneeLocator
-from tobias.utils.regions import OneRegion, RegionList
-from tobias.utils.motifs import MotifList
-from copy import deepcopy
+import sys
+import os
 import pandas as pd
-import statsmodels.stats.multitest
 import numpy as np
+from copy import deepcopy
 import scipy.stats
-import pysam
 import random
 import string
 import multiprocessing as mp
-import os
+from kneed import DataGenerator, KneeLocator
+import statsmodels.stats.multitest
+
+import pysam
+from tobias.utils.regions import OneRegion, RegionList
+from tobias.utils.motifs import MotifList
+import tfcomb
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
 class OneTFBS():
 
 	def __init__(self, **kwargs):
-		
+
 		#Initialize attributes
 		for att in ["chrom", "start", "end", "name", "score", "strand"]:
 			setattr(self, att, None)
@@ -46,6 +49,25 @@ class OneTFBS():
 
 		return(self)
 
+
+#------------------------------ Notebook / script exceptions -----------------------------#
+
+#NOTE: not applied at the moment, but kept here for future uses
+def is_notebook():
+	""" Utility to check if function is being run from a notebook or a script """
+	try:
+		ipython_shell = get_ipython()
+		return(True)
+	except NameError:
+		return(False)
+
+class InputError(Exception):
+	""" Raises an InputError exception without writing traceback """
+
+	def _render_traceback_(self):
+		etype, msg, tb = sys.exc_info()
+		sys.stderr.write("{0}: {1}".format(etype.__name__, msg))
+
 #--------------------------------- File/type checks ---------------------------------#
 
 def check_columns(df, columns):
@@ -53,27 +75,38 @@ def check_columns(df, columns):
 	
 	df_columns = df.columns
 
+	not_found = []
 	for column in columns:
 		if column is not None:
 			if column not in df_columns:
-				raise ValueError("Column '{0}' is not found in dataframe. Available columns are: {1}".format(column, df_columns))
+				not_found.append(column)
+	
+	if len(not_found) > 0:
+		error_str = "Columns '{0}' are not found in dataframe. Available columns are: {1}".format(not_found, df_columns)
+		raise InputError(error_str)
+		
 
 def check_writeability(file_path):
 	""" Check if a file is writeable """
 
 	#Check if file already exists
+	error_str = None
 	if os.path.exists(file_path):
 		if not os.path.isfile(file_path): # is it a file or a dir?
-			raise ValueError("Path '{0}' is not a file".format(file_path))
+			error_str = "Path '{0}' is not a file".format(file_path)
 
 	#check writeability of parent dir
 	else:
 		pdir = os.path.dirname(file_path)
 		if os.access(pdir, os.W_OK) == False:
-			raise ValueError("File '{0}' within dir {1} is not writeable".format(file_path, pdir))
+			error_str = "File '{0}' within dir {1} is not writeable".format(file_path, pdir)
+
+	#If any errors were found
+	if error_str is not None:
+		raise InputError(error_str)
 
 
-def check_type(obj, types, name=None):
+def check_type(obj, allowed, name=None):
 	"""
 	Check whether given object is within a list of allowed types.
 
@@ -81,27 +114,31 @@ def check_type(obj, types, name=None):
 	----------
 	obj : object
 		Object to check type on
-	types : list
-		A list of allowed object types
+	allowed : type or list of types
+		A type or a list of object types to be allowed
 	name : str, optional
 		Name of object to be written in error. Default: None (the input is referred to as 'object')
 
 	Raises
 	--------
-	ValueError
+	TypeError
 		If object type is not within types.
 	"""
-	
+
+	#Convert allowed to list
+	if not isinstance(allowed, list):
+		allowed = [allowed]
+
 	#Check if any of the types fit
 	flag = 0
-	for t in types:
+	for t in allowed:
 		if isinstance(obj, t):
 			flag = 1
 
-	#Raise valueError if none of the types fit
-	if flag == 0:	
+	#Raise error if none of the types fit
+	if flag == 0:
 		name = "object" if name is None else '\'{0}\''.format(name)
-		raise ValueError("The {0} given has type '{1}', but must be one of: {2}".format(name, type(obj), types))
+		raise InputError("The {0} given has type '{1}', but must be one of: {2}".format(name, type(obj), allowed))
 
 def check_string(astring, allowed):
 	""" 
@@ -115,6 +152,14 @@ def check_string(astring, allowed):
 		A string or list of allowed strings to check against 'astring'.
 	"""
 
+	#Convert allowed to list
+	if not isinstance(allowed, list):
+		allowed = [allowed]
+	
+	#Check if astring is within allowed
+	if astring not in allowed:
+		raise InputError("String '{0}' is not valid - it must be one of: {1}".format(astring, allowed))
+
 def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False):
 	"""
 	value : int or float
@@ -127,17 +172,28 @@ def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False):
 		Value must be an integer. Default: False.
 	"""
 
-	if integer == True:
-		#check if value is integer
-		pass
+	if vmin > vmax:
+		raise InputError("vmin must be smaller than vmax")
 
+	error_msg = None
+	if integer == True:		
+		if not isinstance(value, int):
+			error_msg = "The value '{0}' given is not an integer, but integer is set to True.".format(value)
 	else:
 		#check if value is any value
-		pass
+		try:
+			_ = int(value)
+		except:
+			error_msg = "The value '{0}' given is not a valid number".format(value)
 
-	if (value >= vmin) & (value <= vmax):
-		pass
-
+	#If value is a number, check if it is within bounds
+	if error_msg is None:
+		if not ((value >= vmin) & (value <= vmax)):
+			error_msg = "The value '{0}' given is not within the bounds of [{1};{2}]".format(value, vmin, vmax)
+	
+	#Finally, raise error if necessary:
+	if error_msg is not None:
+		raise InputError(error_msg)
 
 def random_string(l=8):
 	""" Get a random string of length l """
@@ -304,6 +360,141 @@ def resolve_overlapping(TFBS):
 	resolved.loc_sort()
 	
 	return(resolved)
+
+
+def get_pair_locations(TFBS, TF1, TF2, TF1_strand = None,
+										   TF2_strand = None,
+										   min_distance = 0, 
+										   max_distance = 100, 
+										   max_overlap = 0,
+										   directional = False):
+		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
+		
+		Parameters
+		----------
+		TFBS : RegionList()
+			A list of TFBS regions.
+		TF1 : str 
+			Name of TF1 in pair.
+		TF2 : str 
+			Name of TF2 in pair.
+		TF1_strand : str
+			Strand of TF1 in pair. Default: None (strand is not taken into account).
+		TF2_strand : str
+			Strand of TF2 in pair. Default: None (strand is not taken into account).
+		min_distance : int
+			Default: 0
+		max_distance : int
+			Default: 100
+		max_overlap : float
+			Default: 0
+		directional : bool
+			Default: False
+
+		Returns
+		-------
+		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
+			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
+
+		See also
+		---------
+		count_within
+
+		"""
+
+		locations = [] #empty list of regions
+
+		TF1_tup = (TF1, TF1_strand)
+		TF2_tup = (TF2, TF2_strand)
+		sites = self.TFBS
+		n_sites = len(sites)
+
+		#Find out which TF is queried
+		if directional == True:
+			TF1_to_check = [TF1_tup]
+		else:
+			TF1_to_check = [TF1_tup, TF2_tup]
+
+		#Loop over all sites
+		i = 0
+		while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
+			
+			#Get current TF information
+			TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
+			this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
+
+			#Check whether TF is valid
+			if this_TF1_tup in TF1_to_check:
+	
+				#Find possible associations with TF1 within window 
+				finding_assoc = True
+				j = 0
+				while finding_assoc == True:
+					
+					#Next site relative to TF1
+					j += 1
+					if j+i >= n_sites - 1: #next site is beyond end of list, increment i
+						i += 1
+						finding_assoc = False #break out of finding_assoc
+
+					else:	#There are still sites available
+
+						#Fetch information on TF2-site
+						TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
+						this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
+						
+						#Find out whether this TF2 is TF1/TF2
+						if this_TF1_tup == TF1_tup:
+							to_check = TF2_tup
+						elif this_TF1_tup == TF2_tup:
+							to_check = TF1_tup
+
+						#Check whether TF2 is either TF1/TF2
+						if this_TF2_tup == to_check:
+						
+							#True if these TFBS co-occur within window
+							distance = TF2_start - TF1_end
+							distance = 0 if distance < 0 else distance
+
+							if TF1_chr == TF2_chr and (distance <= max_distance):
+
+								if distance >= min_distance:
+								
+									# check if they are overlapping more than the threshold
+									valid_pair = 1
+									if distance == 0:
+
+										# Get the length of the shorter TF
+										short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+
+										#Calculate overlap between TF1/TF2
+										overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+										if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+											overlap_bp = short_bp
+										
+										#Invalid pair, overlap is higher than threshold
+										if overlap_bp / (short_bp*1.0) > max_overlap: 
+											valid_pair = 0
+
+									#Save association
+									if valid_pair == 1:
+
+										#Save location
+										reg1 = OneTFBS(chrom=TF1_chr, start=TF1_start, end=TF1_end, name=TF1_name, strand=TF1_strand_i)
+										reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
+										location = (reg1, reg2, distance)
+										locations.append(location)
+
+							else:
+								#The next site is out of window range; increment to next i
+								i += 1
+								finding_assoc = False   #break out of finding_assoc-loop
+			
+			else: #current TF1 is not TF1/TF2; go to next site
+				i += 1
+
+		return(locations)
+
 
 #--------------------------------- P-value calculation ---------------------------------#
 
