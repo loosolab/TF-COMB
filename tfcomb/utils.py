@@ -71,7 +71,20 @@ class InputError(Exception):
 #--------------------------------- File/type checks ---------------------------------#
 
 def check_columns(df, columns):
-	""" Utility to check whether columns are found within a pandas dataframe """
+	""" Utility to check whether columns are found within a pandas dataframe.
+	
+	Parameters 
+	------------
+	df : pandas.DataFrame
+		A pandas dataframe to check.
+	columns : list
+		A list of column names to check for within 'df'.
+
+	Raises
+	--------
+	InputError
+		If any of the columns are not in 'df'.
+	"""
 	
 	df_columns = df.columns
 
@@ -87,7 +100,18 @@ def check_columns(df, columns):
 		
 
 def check_writeability(file_path):
-	""" Check if a file is writeable """
+	""" Check if a file is writeable.
+	
+	Parameters
+	------------
+	file_path : str
+		A path to a file.
+	
+	Raises
+	--------
+	InputError
+		If file_path is not writeable.
+	"""
 
 	#Check if file already exists
 	if file_path is not None: #don't check path given as None; assume that this is taken care of elsewhere
@@ -112,7 +136,7 @@ def check_type(obj, allowed, name=None):
 	Check whether given object is within a list of allowed types.
 
 	Parameters
-	----------
+	------------
 	obj : object
 		Object to check type on
 	allowed : type or list of types
@@ -122,7 +146,7 @@ def check_type(obj, allowed, name=None):
 
 	Raises
 	--------
-	TypeError
+	InputError
 		If object type is not within types.
 	"""
 
@@ -138,19 +162,26 @@ def check_type(obj, allowed, name=None):
 
 	#Raise error if none of the types fit
 	if flag == 0:
-		name = "object" if name is None else '\'{0}\''.format(name)
+		name = "object" if name is None else f'\'{name}\''
 		raise InputError("The {0} given has type '{1}', but must be one of: {2}".format(name, type(obj), allowed))
 
-def check_string(astring, allowed):
+def check_string(astring, allowed, name=None):
 	""" 
 	Check whether given string is within a list of allowed strings.
 	
 	Parameters
-	----------
+	------------
 	astring : str
 		A string to check.
 	allowed : str or list of strings
 		A string or list of allowed strings to check against 'astring'.
+	name : str, optional
+		The name of the string to be written in error. Default: None (the value is referred to as 'string').
+
+	Raises
+	--------
+	InputError
+		If 'astring' is not in 'allowed'.
 	"""
 
 	#Convert allowed to list
@@ -159,18 +190,30 @@ def check_string(astring, allowed):
 	
 	#Check if astring is within allowed
 	if astring not in allowed:
-		raise InputError("String '{0}' is not valid - it must be one of: {1}".format(astring, allowed))
+		name = "string" if name is None else f'\'{name}\''
+		raise InputError("The {0} given ({1}) is not valid - it must be one of: {2}".format(name, astring, allowed))
 
-def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False):
+def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False, name=None):
 	"""
+	Check whether given 'value' is a valid value (or integer) and if it is within the bounds of vmin/vmax.
+
+	Parameters
+	-------------
 	value : int or float
-		The value to check against vmin/max.
+		The value to check.
 	vmin : int or float, optional
-		Default: -infinity
+		Minimum the value is allowed to be. Default: -infinity (no bound)
 	vmax : int or float
-		Default: +infinity
+		Maxmum the value is allowed to be. Default: +infinity (no bound)
 	integer : bool, optional
-		Value must be an integer. Default: False.
+		Whether value must be an integer. Default: False (value can be float)
+	name : str, optional
+		The name of the value to be written in error. Default: None (the value is referred to as 'value').
+
+	Raises
+	--------
+	InputError
+		If 'value' is not a valid value as given by parameters.
 	"""
 
 	if vmin > vmax:
@@ -179,18 +222,18 @@ def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False):
 	error_msg = None
 	if integer == True:		
 		if not isinstance(value, int):
-			error_msg = "The value '{0}' given is not an integer, but integer is set to True.".format(value)
+			error_msg = "The {0} given ({1}) is not an integer, but integer is set to True.".format(name, value)
 	else:
 		#check if value is any value
 		try:
 			_ = int(value)
 		except:
-			error_msg = "The value '{0}' given is not a valid number".format(value)
+			error_msg = "The {0} given ({1}) is not a valid number".format(name, value)
 
 	#If value is a number, check if it is within bounds
 	if error_msg is None:
 		if not ((value >= vmin) & (value <= vmax)):
-			error_msg = "The value '{0}' given is not within the bounds of [{1};{2}]".format(value, vmin, vmax)
+			error_msg = "The {0} given ({1}) is not within the bounds of [{2};{3}]".format(name, value, vmin, vmax)
 	
 	#Finally, raise error if necessary:
 	if error_msg is not None:
@@ -407,7 +450,7 @@ def get_pair_locations(TFBS, TF1, TF2, TF1_strand = None,
 
 		TF1_tup = (TF1, TF1_strand)
 		TF2_tup = (TF2, TF2_strand)
-		sites = self.TFBS
+		sites = TFBS
 		n_sites = len(sites)
 
 		#Find out which TF is queried

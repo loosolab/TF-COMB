@@ -158,7 +158,7 @@ class CombObj():
 
 		#Check that TFBS exist and that it is RegionList
 		if self.TFBS is None or not isinstance(self.TFBS, RegionList):
-			raise ValueError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS")
+			raise InputError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS")
 
 
 	#-------------------------------------------------------------------------------#
@@ -1695,6 +1695,10 @@ class DistObj():
 
 	""" 
 
+	#-------------------------------------------------------------------------------------------#
+	#-------------------------------- Setup and sanity checks ----------------------------------#
+	#-------------------------------------------------------------------------------------------#
+
 	def __init__(self, verbosity = 1): #set verbosity 
 
 		#Function and run parameters
@@ -1808,7 +1812,21 @@ class DistObj():
 		else: # anchor is int
 			tfcomb.utils.check_value(anchor, vmin=0, vmax=2, integer=True)
 			self.anchor_mode = anchor
-		
+
+	def check_distances(self):
+			""" Utility function to check if distances were set. If not, InputError is raised. """
+
+			if self.distances is None:
+				raise InputError("No distances evaluated yet. Please run .count_distances() first.")
+			
+			#If self.distances is present, check if it is a Dataframe
+			tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
+
+
+	#-------------------------------------------------------------------------------------------#
+	#---------------------------------------- Counting -----------------------------------------#
+	#-------------------------------------------------------------------------------------------#
+
 	def count_distances(self, normalize = True, directional = False):
 		""" Count distances for co_occurring TFs, can be followed by analyze_distances
 			to determine preferred binding distances
@@ -1905,14 +1923,7 @@ class DistObj():
 		self.normalized = normalize    
 		self.distances = pd.DataFrame(results,columns=['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)])
 
-	def check_distances(self):
-		""" Utility function to check if distances were set. If not, InputError is raised. """
-
-		if self.distances is None:
-			raise InputError("No distances evaluated yet. Please run .count_distances() first.")
-		
-		#If self.distances is present, check if it is a Dataframe
-		tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
+	
 
 	def linregress_pair(self,pair,n_bins=None, save = None):
 		""" Fits a linear Regression to distance count data for a given pair. The linear regression is used to 
@@ -2193,7 +2204,7 @@ class DistObj():
 
 		return peaks
 	
-	def smooth(self,window_size = 3):
+	def smooth(self, window_size = 3):
 		""" Helper function for smoothing all rules with a given window size. The function .correct_all() is required to be run beforehand.
 			
 			Parameters
@@ -2209,12 +2220,8 @@ class DistObj():
 				Fills the object variable .smoothed
 		"""
 		
-		tfcomb.utils.check_type(window_size, [int], "window size")
+		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
 
-		if window_size < 0 :
-				self.logger.error("Window size need to be positive or zero.")
-				sys.exit(0)
-		
 		if self.corrected is None:
 			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
 			sys.exit(0)
@@ -2266,8 +2273,7 @@ class DistObj():
 			None 
 				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
 		"""
-
-		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
+		tfcomb.utils.check_value(smooth_window, vmin=0, integer=True, name="smooth_window")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		
@@ -2328,9 +2334,6 @@ class DistObj():
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
 			
-			Parameters
-			----------
-		   
 			Returns:
 			----------
 			bool 
@@ -2364,7 +2367,7 @@ class DistObj():
 				Default: None (results will not be saved)
 
 		"""
-		
+
 		tfcomb.utils.check_writeability(save)
 		self.check_distances()
 		source_table = self.distances
@@ -2407,7 +2410,7 @@ class DistObj():
 				plt.savefig(f'{save}hist_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_dens(self, targets, bwadjust = 1,save = None):
+	def plot_dens(self, targets, bwadjust = 1, save = None):
 		""" KDE Plots for a list of TF-pairs
 
 			Parameters
@@ -2423,7 +2426,9 @@ class DistObj():
 
 		"""
 
-		tfcomb.utils.check_type(bwadjust,[tuple],"pair")
+		tfcomb.utils.check_type(targets, list, "targets")
+		tfcomb.utils.check_value(bwadjust)
+
 		self.check_distances()
 		source_table = self.distances
 
@@ -2439,14 +2444,15 @@ class DistObj():
 				plt.savefig(f'{save}dens_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_analyzed_signal(self,pair, peaks = None, sourceData = None, save = None, only_peaking = False):
+	def plot_analyzed_signal(self, pair, peaks = None, sourceData = None, save = None, only_peaking = False):
+		""" """
+
+		#Check validity of input parameters
 		if (sourceData is None) and (self.corrected is None):
-			self.logger.error("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
-			sys.exit(0)
+			raise InputError("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
 
 		if (peaks is None) and (self.peaks is None):
-			self.logger.error("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
-			sys.exit(0)
+			raise InputError("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
 
 		tf1, tf2 = pair
 		if peaks is None:
@@ -2469,7 +2475,7 @@ class DistObj():
 		if (only_peaking) and (len(peaks) == 0):
 			return
 			
-		plt.plot (x)
+		plt.plot(x)
 		plt.plot(peaks, x[peaks], "x")
 		plt.plot(np.zeros_like(x), "--", color="gray")
 		plt.title(f"Analyzed signal for {tf1}-{tf2}")
