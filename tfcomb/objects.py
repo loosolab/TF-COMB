@@ -92,11 +92,14 @@ class CombObj():
 	def __str__(self):
 		""" Returns a string representation of the CombObj """
 		
-		s = "<CombObj: "
-		s += "{0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
+		s = "<CombObj"
 
-		if self.rules is not None:
-			s += " | Market basket analysis: {0} rules".format(self.rules.shape[0])
+		if self.TFBS is not None:
+			s += ": {0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
+
+			if self.rules is not None:
+				s += " | Market basket analysis: {0} rules".format(self.rules.shape[0])
+
 		s += ">"
 		return(s)
 
