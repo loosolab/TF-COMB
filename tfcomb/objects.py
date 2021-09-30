@@ -45,6 +45,7 @@ from tfcomb.logging import *
 from tfcomb.utils import *
 
 from kneed import KneeLocator
+np.seterr(all='raise') # raise errors for runtimewarnings
 
 class CombObj(): 
 	"""
@@ -157,7 +158,7 @@ class CombObj():
 
 		#Check that TFBS exist and that it is RegionList
 		if self.TFBS is None or not isinstance(self.TFBS, RegionList):
-			raise ValueError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS")
+			raise InputError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS")
 
 
 	#-------------------------------------------------------------------------------#
@@ -1695,6 +1696,10 @@ class DistObj():
 
 	""" 
 
+	#-------------------------------------------------------------------------------------------#
+	#-------------------------------- Setup and sanity checks ----------------------------------#
+	#-------------------------------------------------------------------------------------------#
+
 	def __init__(self, verbosity = 1): #set verbosity 
 
 		#Function and run parameters
@@ -1786,7 +1791,7 @@ class DistObj():
 		self.max_overlap = comb_obj.max_overlap
 		#self.anchor = comb_obj.anchor
 
-	def set_anchor(self,anchor):
+	def set_anchor(self, anchor):
 		""" set anchor for distance measure mode
 		0 = inner
 		1 = outer
@@ -1803,7 +1808,7 @@ class DistObj():
 			Sets anchor mode inplace
 		"""
 
-		modes = ["inner","outer","center"]
+		modes = ["inner", "outer", "center"]
 
 		tfcomb.utils.check_type(anchor, [str, int], "anchor")
 		if isinstance(anchor, str):
@@ -1813,8 +1818,22 @@ class DistObj():
 		else: # anchor is int
 			tfcomb.utils.check_value(anchor, vmin=0, vmax=2, integer=True)
 			self.anchor_mode = anchor
-		
-	def count_distances(self, normalize = True, directional = None):
+
+	def check_distances(self):
+			""" Utility function to check if distances were set. If not, InputError is raised. """
+
+			if self.distances is None:
+				raise InputError("No distances evaluated yet. Please run .count_distances() first.")
+			
+			#If self.distances is present, check if it is a Dataframe
+			tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
+
+
+	#-------------------------------------------------------------------------------------------#
+	#---------------------------------------- Counting -----------------------------------------#
+	#-------------------------------------------------------------------------------------------#
+
+	def count_distances(self, normalize = True, directional = False):
 		""" Count distances for co_occurring TFs, can be followed by analyze_distances
 			to determine preferred binding distances
 
@@ -1847,14 +1866,21 @@ class DistObj():
 		tfcomb.utils.check_type(self.anchor_mode,[int],"anchor_mode")
 		
 		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
+		
 		# encode chromosome,pairs and name to int representation
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
 		self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
-		sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
-						  for site in self.TFBS]) #numpy integer array
-
-		self.pairs_to_idx = {(self.name_to_idx[tf1],self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
+		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
+						  for site in self.TFBS] #numpy integer array
+		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
 		
+		#Sort sites by mid if anchor == 2 (center):
+		if self.anchor_mode == 2: 
+			sites = sorted(sites, key=lambda site: int((site[1] + site[2]) / 2))
+
+		#Convert to numpy integer arr for count_distances
+		sites = np.array(sites)
+
 		self.logger.info("Calculating distances")
 		self._raw = count_distances(sites, 
 									self.pairs_to_idx,
@@ -1867,7 +1893,7 @@ class DistObj():
 		if not directional:
 			for i in range(0,self._raw.shape[0]-1):
 				if (self._raw[i,0] == self._raw[i+1,1]) and (self._raw[i,1] == self._raw[i+1,0]):
-					s = self._raw[i,2:]+self._raw[i+1,2:]
+					s = self._raw[i,2:] + self._raw[i+1,2:]
 					self._raw[i,2:] = s
 					self._raw[i+1,2:] = s
 		self.directional = directional
@@ -1906,7 +1932,11 @@ class DistObj():
 			entry = [tf1,tf2]
 			
 			if normalize:
-				entry += (row[2:]/(row[2:].sum())).tolist()
+				row_sum = row[2:].sum()
+				if row_sum > 0:
+					entry += (row[2:]/row_sum).tolist()
+				else: 
+					entry += row[2:].tolist() #all values are 0
 			else:
 				entry += row[2:].tolist()
 			results.append(entry)
@@ -1918,6 +1948,8 @@ class DistObj():
 		else:
 			columns = ['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
 		self.distances = pd.DataFrame(results,columns=columns)
+
+	
 
 	def linregress_pair(self,pair,n_bins=None, save = None):
 		""" Fits a linear Regression to distance count data for a given pair. The linear regression is used to 
@@ -1944,9 +1976,8 @@ class DistObj():
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
-		if self.distances is None:
-			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
-			sys.exit(0)
+		self.check_distances()
+
 		#TODO: check pair is valid
 		tf1 = pair[0]
 		tf2 = pair[1]
@@ -1992,9 +2023,8 @@ class DistObj():
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
-		if self.distances is None:
-			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
-			sys.exit(0)
+		self.check_distances()
+
 		self.logger.info("Fitting linear regression.")
 		linres = {}
 		for idx,row in self.distances.iterrows():
@@ -2006,7 +2036,7 @@ class DistObj():
 		self.linres = pd.DataFrame.from_dict(linres,orient="index",columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
 		self.logger.info("Linear regression finished! Results can be found in .linres")
 	
-	def correct_pair(self,pair,linres,n_bins = None, save = None):
+	def correct_pair(self, pair, linres, n_bins = None, save = None):
 		""" Subtracts the estimated background from the Signal for a given pair. 
 			
 			Parameters
@@ -2032,6 +2062,7 @@ class DistObj():
 		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
+		self.check_distances()
 
 		#TODO: check pair is valid & check linres: import in utils needed ?
 		tf1 = pair[0]
@@ -2045,9 +2076,6 @@ class DistObj():
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist +1
 	   
-		if self.distances is None:
-			self.logger.error("No distances evaluated yet. Please run .count_distances() first.")
-			sys.exit(0)
 		data = self.distances.loc[((self.distances["TF1"]==tf1) &
 			   (self.distances["TF2"]==tf2))].iloc[0, 2:]
 		n_data = len(data)
@@ -2083,7 +2111,7 @@ class DistObj():
 				Fills the object variable .corrected
 		"""
 		
-		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+		tfcomb.utils.check_type(n_bins, [int,type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		
@@ -2122,10 +2150,7 @@ class DistObj():
 		"""
 		
 		tfcomb.utils.check_type(pair, [tuple], "pair")
-
-		if self.distances is None:
-			self.logger.error("Can not calculate Median, no distances evaluated yet. Please run .count_distances() first.")
-			sys.exit(0)
+		self.check_distances()
 		
 		# TODO: check pair is valid
 		tf1 = pair[0]
@@ -2226,7 +2251,7 @@ class DistObj():
 
 		return peaks
 	
-	def smooth(self,window_size = 3):
+	def smooth(self, window_size = 3):
 		""" Helper function for smoothing all rules with a given window size. The function .correct_all() is required to be run beforehand.
 			
 			Parameters
@@ -2242,12 +2267,8 @@ class DistObj():
 				Fills the object variable .smoothed
 		"""
 		
-		tfcomb.utils.check_type(window_size, [int], "window size")
+		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
 
-		if window_size < 0 :
-				self.logger.error("Window size need to be positive or zero.")
-				sys.exit(0)
-		
 		if self.corrected is None:
 			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
 			sys.exit(0)
@@ -2305,8 +2326,7 @@ class DistObj():
 			None 
 				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
 		"""
-
-		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
+		tfcomb.utils.check_value(smooth_window, vmin=0, integer=True, name="smooth_window")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		
@@ -2316,8 +2336,11 @@ class DistObj():
 			self.logger.error("Background is not corrected yet. Please try .correct_all() first.")
 			sys.exit(0)
 
-		if isinstance(prominence,str):
+
+		if isinstance(prominence, str):
 			tfcomb.utils.check_string(prominence,["median"])
+		else:
+			tfcomb.utils.check_value()
 
 		self.logger.info(f"Analyzing Signal")
 		all_peaks = []
@@ -2335,6 +2358,7 @@ class DistObj():
 			tf2 = row["TF2"]
 			corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
 												 (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+			corrected_data = corrected_data.tolist() #series -> list
 			
 			if (calc_mean):
 				prominence = self.get_median((tf1,tf2))
@@ -2365,9 +2389,6 @@ class DistObj():
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
 			
-			Parameters
-			----------
-		   
 			Returns:
 			----------
 			bool 
@@ -2388,15 +2409,14 @@ class DistObj():
 	#-------------------------------------------------------------------------------------------------------------#
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
-	def plot_bar(self,targets,dataSource,save = None):
+	
+	def plot_bar(self, targets, save = None):
 		""" Barplots for a list of TF-pairs
 
 		 Parameters
 			----------
 			targets : array[tuple(str,str)]
 				Pairs (tuples) to create plots for.
-			dataSource : pd.DataFrame 
-				Source Data (should be a result Table from .count_distances() e.g. .distances)
 			save:
 				Output path to write results to. (filename will be constructed automatically from TF1-/TF2-name)
 				Default: None (results will not be saved)
@@ -2404,8 +2424,8 @@ class DistObj():
 		"""
 
 		tfcomb.utils.check_writeability(save)
-		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
-		source_table = dataSource
+		self.check_distances()
+		source_table = self.distances
 		
 		for pair in targets:
 			#TODO: Check pair is valid
@@ -2418,15 +2438,13 @@ class DistObj():
 				plt.savefig(f'{save}bar_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_hist(self,targets,dataSource,nbins=None,save = None):
+	def plot_hist(self, targets, nbins=None, save = None):
 		""" Histograms for a list of TF-pairs
 
 		 Parameters
 			----------
 			targets : array[tuple(str,str)]
 				Pairs (tuples) to create plots for.
-			dataSource : pd.DataFrame 
-				Source Data (should be a result Table from .count_distances(), e.g. .distances)
 			nbins: int
 				Number of bins. Default: None (Binning is done automatically)
 			save:
@@ -2436,8 +2454,9 @@ class DistObj():
 		"""
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
-		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
-		source_table = dataSource
+		self.check_distances()
+		source_table = self.distances
+			
 		for pair in targets:
 			#TODO: Rename xticks
 			# TODO: Check pair is valid
@@ -2449,15 +2468,13 @@ class DistObj():
 				plt.savefig(f'{save}hist_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_dens(self,targets,dataSource,bwadjust = 0.1,save = None):
+	def plot_dens(self, targets, bwadjust = 1, save = None):
 		""" KDE Plots for a list of TF-pairs
 
 			Parameters
 			----------
 			targets : array[tuple(str,str)]
 				Pairs (tuples) to create plots for.
-			dataSource : pd.DataFrame 
-				Source Data (should be a result Table from .count_distances(), e.g. .distances)
 			bwadjust: float
 				Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. 
 				See kdeplot() from seaborn. Default: 0.1
@@ -2467,9 +2484,12 @@ class DistObj():
 
 		"""
 
-		tfcomb.utils.check_type(bwadjust,[float],"bwadjust")
-		tfcomb.utils.check_type(dataSource, pd.DataFrame, "dataSource")
-		source_table = dataSource
+		tfcomb.utils.check_type(targets, list, "targets")
+		tfcomb.utils.check_value(bwadjust)
+
+		self.check_distances()
+		source_table = self.distances
+
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		
@@ -2483,14 +2503,15 @@ class DistObj():
 				plt.savefig(f'{save}dens_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_analyzed_signal(self,pair, peaks = None, sourceData = None, save = None, only_peaking = False):
+	def plot_analyzed_signal(self, pair, peaks = None, sourceData = None, save = None, only_peaking = False):
+		""" """
+
+		#Check validity of input parameters
 		if (sourceData is None) and (self.corrected is None):
-			self.logger.error("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
-			sys.exit(0)
+			raise InputError("Background is not yet corrected. Please try .correct_all() first or provide sourceData Table.")
 
 		if (peaks is None) and (self.peaks is None):
-			self.logger.error("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
-			sys.exit(0)
+			raise InputError("Signal is not yet analyzed. Please try .analyze_signal_all() first or provide peak list.")
 
 		tf1, tf2 = pair
 		if peaks is None:
