@@ -322,7 +322,7 @@ def log_progress(jobs, logger, n=10):
 #--------------------------------------- Motif / TFBS scanning and processing ---------------------------------------#
 
 def prepare_motifs(motifs_file, motif_pvalue=0.0001, motif_naming="name"):
-	""" Read motifs from motifs_file """
+	""" Read motifs from motifs_file and set threshold/name. """
 
 	#Read and prepare motifs
 	motifs_obj = MotifList().from_file(motifs_file)
@@ -333,9 +333,68 @@ def prepare_motifs(motifs_file, motif_pvalue=0.0001, motif_naming="name"):
 	return(motifs_obj)
 
 def open_genome(genome_f):	
-	""" """
+	""" Opens an internal genome object for fetching sequences.
+
+	Parameters
+	------------
+	genome_f : str
+		The path to a fasta file.
+	
+	Returns
+	---------
+	pysam.FastaFile
+	"""
+
 	genome_obj = pysam.FastaFile(genome_f)
 	return(genome_obj)
+
+def check_boundaries(regions, genome):
+	""" Utility to check whether regions are within the boundaries of genome.
+	
+	Parameters
+	-----------
+	regions : tobias.utils.regions.RegionList 
+		A RegionList() object containing regions to check.
+	genome : pysam.FastaFile
+		An object (e.g. from open_genome()) to use as reference. 
+	
+	Raises
+	-------
+	InputError
+		If a region is not available within genome
+	"""
+
+	chromosomes = genome.references
+	lengths = genome.lengths
+	genome_bounds = dict(zip(chromosomes, lengths))
+
+	for region in regions:
+		if region.chrom not in chromosomes:
+			raise InputError("Region '{0} {1} {2} {3}' is not present in the given genome. Available chromosomes are: {4}.".format(region.chrom, chromosomes))
+		else:
+			if region.start < 0 or region.end > genome_bounds[region.chrom]:
+				raise InputError("Region '{0} {1} {2} {3}' is out of bounds in the given genome. The length of the chromosome is: {4}".format(region.chrom, region.start, region.end, genome_bounds[region.chrom]))
+
+
+def unique_region_names(regions):
+	""" 
+	Get a list of unique region names within regions. 
+
+	Parameters
+	-----------
+	regions : tobias.utils.regions.RegionList 
+		A RegionList() object containing regions with .name attributes.
+
+	Returns
+	--------
+	list
+		The list of sorted names from regions.
+	"""
+
+	names_dict = {r.name: True for r in regions}
+	names = sorted(list(names_dict.keys()))
+
+	return(names)
 
 def calculate_TFBS(regions, motifs, genome):
 	"""
@@ -385,7 +444,6 @@ def remove_duplicates(TFBS):
 
 	return(filtered)
 
-
 def resolve_overlapping(TFBS):
 	""" Remove self-overlapping regions """
 
@@ -403,6 +461,55 @@ def resolve_overlapping(TFBS):
 	resolved.loc_sort()
 	
 	return(resolved)
+
+def merge_self_overlaps(regions):
+	""" Merge overlapping regions with the same name.
+	
+	Parameters
+	-----------
+	regions : RegionList()
+		A RegionList() object of regions 
+
+	Return
+	--------
+	RegionList()
+		The given regions merged per name
+	"""
+
+	#regions.loc_sort() #assume that the regions are already sorted due to computational overhead
+	no_regions = len(regions)
+
+	i = 0
+	j = 1
+	while i + j < no_regions:
+
+		reg_a = regions[i]
+		reg_b = regions[i+j]
+
+		if reg_a == None:
+			i += 1
+			j = 1
+		elif reg_b == None:
+			j += 1
+		else:
+			if (reg_a.chrom == reg_b.chrom) and (reg_b.start < reg_a.end): #if overlapping
+				if reg_a.name == reg_b.name:
+					
+					#Update reg_a and set reg_b to None
+					reg_a.end = reg_b.end
+					regions[i+j] = None
+
+				else: #overlapping but not the same - increment b
+					j += 1
+
+			else: #non-overlapping, increment reg_a
+				i += 1
+				j = 1
+
+	#Remove all None
+	merged = RegionList([reg for reg in regions if reg is not None])
+
+	return(merged)
 
 
 def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
@@ -572,6 +679,38 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 
 		return(locations)
 
+def shuffle_array(arr):
+    length = arr.shape[0]
+    return(arr[np.random.permutation(length),:])
+
+def shuffle_sites(sites):
+    """ Shuffle TFBS names to existing positions and updates lengths of the new positions.
+	
+	Parameters
+	-----------
+	sites : np.array
+	
+
+	"""
+
+    
+    #Establish lengths of regions
+    lengths = sites[:,2] - sites[:,1]
+    sites_plus = np.c_[sites, lengths]
+    
+    #Shuffle names (and corresponding lengths)
+    sites_plus[:,-2:] = shuffle_array(sites_plus[:,-2:])
+    
+    #Adjust coordinates to new length
+    #new start = old start + old half length - new half length
+    #new end = new start + new length
+    sites_plus[:,1] = sites_plus[:,1] + ((sites_plus[:,2] - sites_plus[:,1])/2) - sites_plus[:,-1]/2 #new start
+    sites_plus[:,2] = sites_plus[:,1] + sites_plus[:,-1] #new end
+    
+    #Remove length again
+    sites_shuffled = sites_plus[:,:-1]
+    
+    return(sites_shuffled)
 
 #--------------------------------- P-value calculation ---------------------------------#
 
@@ -589,10 +728,8 @@ def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, l
 		One of: 'two-sided', 'greater', 'less'. Default: "greater".
 	threads : int, optional
 		Number of threads to use for multiprocessing. Default: 1.
-
-	Returns
-	--------
-	List of p-values in order of input table
+	logger : logger
+		A logger to use for logging progress.
 
 	"""
 	

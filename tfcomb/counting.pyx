@@ -232,7 +232,8 @@ def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
 def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 					dict rules,
 					int min_distance = 0,
-					int max_distance = 100, 
+					int max_distance = 100,
+					float max_overlap = 0, 
 					short anchor_mode = 0):
 
 	"""
@@ -251,6 +252,9 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 
 	max_distance : int
 		Maximum allowed distance between two TFs. Default: 100
+	
+	max_overlap (float): 
+		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.
 
 	anchor_mode : short
 		anchor mode to calculate distance with. One of [0,1,2]. 
@@ -268,15 +272,19 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 	
 	cdef list pairs = list()
 	cdef np.ndarray[np.int64_t, ndim=1] rule
+	cdef int offset = 3
 
+	# include negative counting 
+	if min_distance == 0:
+		offset += 1
 	#Create n x distance range matrix || +3 for 2 tf names + 1-off
-	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), 3+(max_distance-min_distance)), dtype=int)
+	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset+(max_distance-min_distance)), dtype=int)
 
 	cdef int i = 0
 	cdef int j = 0
 	cdef bint finding_assoc = True
 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, TF1_anchor 
-	cdef int TF2_start, TF2_end, TF2_anchor, valid_pair
+	cdef int TF2_start, TF2_end, TF2_anchor, valid_pair, overlap_bp, short_bp
 	cdef int TF2_chr, TF2_name
 	cdef int distance
 	cdef int pair_ind = 0
@@ -329,6 +337,9 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 
 				#Calculate distance between the two sites
 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+				if distance < 0:
+					distance = 0
+
 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
 					if distance >= min_distance: #Check that sites are more than min distance away
 						valid_pair = 0
@@ -337,12 +348,34 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 						if (TF1_name,TF2_name) in rules:
 							valid_pair = 1
 							pair_ind = rules[(TF1_name,TF2_name)]
+						
+							if distance == 0:	#distance is 0 if the sites are overlapping or book-ended
 
+								# Get the length of the shorter TF
+								short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+
+								#Calculate overlap between TF1/TF2
+								overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
+								if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+									overlap_bp = short_bp
+
+								#Invalid pair, overlap is higher than threshold
+								if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+
+									valid_pair = 0
+				
+								if TF2_anchor - TF1_anchor <= -1:
+									distance = -1
+								
 
 						#Save counts of association
 						if valid_pair == 1:
-							# min_distance is offset (negative min distance adds up, positive decrease the index) || +2 for TF names
-							dist_count_mat[pair_ind, (distance - min_distance)+2] += 1
+							offset = 2
+							# if min_distance is 0, overlapping is true, so we need to include distance -1
+							if min_distance == 0: 
+								offset += 1
+							# min_distance is offset ( positive decrease the index) || +2 for TF names [+1 if min_dist == 0, meaning overlapps are counted (-1 == overlapping)]
+							dist_count_mat[pair_ind, (distance - min_distance)+offset] += 1
 			
 				else:
 					#The next site is out of window range; increment to next i
