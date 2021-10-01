@@ -1183,24 +1183,24 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via combobj.distObj")
 
-	def analyze_distances(self,normalize=True, n_bins=None, parent_directory=None, plot_signal=True, **kwargs):
+	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None, plot_signal=True, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
 		self.create_distObj()
-		self.distObj.count_distances(normalize=normalize,directional = self.directional)
+		self.distObj.count_distances(normalize=normalize, directional=self.directional)
 		# TODO: check parent_directory and create nice subfolder structure !
-		self.distObj.linregress_all(n_bins = n_bins, save= parent_directory)
-		self.distObj.correct_all(n_bins = n_bins, save= parent_directory)
-		self.distObj.analyze_signal_all(**kwargs,save= parent_directory)
+		self.distObj.linregress_all(n_bins=n_bins, save=parent_directory)
+		self.distObj.correct_all(n_bins=n_bins, save=parent_directory)
+		self.distObj.analyze_signal_all(**kwargs, save=parent_directory)
 		
 
-	def bed_from_range(self, TF1, TF2, TF1_strand = None,
-									   TF2_strand = None,
-									   directional = False,
-									   dist_range = None,
-									   save = None,
-									   delim = "\t"):
+	def bed_from_range(self, TF1, TF2, TF1_strand=None,
+									   TF2_strand=None,
+									   directional=False,
+									   dist_range=None,
+									   save=None,
+									   delim="\t"):
 		""" Creates a bed file ("chr","pos start","pos end","name TF1", "strand","chr","pos start","pos end","name TF2", "strand","distance")
 			for a given TF-pair. Optional a range can be specified e.g. dist_range = (30,40) gives all hist with distances between 30 and 40
 
@@ -1242,24 +1242,25 @@ class CombObj():
 		
 		if save is not None:
 			# TODO: Check if save is a valid path
-			with open(f'{save}{TF1}_{TF2}.csv',"w") as outfile :
-				header_row = ["chr","pos start","pos end","name TF1", "strand","chr","pos start","pos end","name TF2", "strand","distance"]
-				csv_file = csv.writer(outfile,delimiter=delim) 
+			with open(f'{save}{TF1}_{TF2}.csv', "w") as outfile :
+				header_row = ["chr", "pos start", "pos end", "name TF1", "strand",
+				              "chr", "pos start", "pos end", "name TF2", "strand", "distance"]
+				csv_file = csv.writer(outfile, delimiter=delim) 
 				csv_file.writerow(header_row) 
 				for line in b:
 					tf1_region = line[0]
 					tf2_region = line[1]
 					dist = line[2]
 					if dist_range is not None:
-						if (dist in range(dist_range[0],dist_range[1])):
-							content = [tf1_region.chrom,tf1_region.start,tf1_region.end,tf1_region.name,tf1_region.strand,
-									   tf2_region.chrom,tf2_region.start,tf2_region.end,tf2_region.name,tf2_region.strand,
-									   dist]
+						if (dist in range(dist_range[0], dist_range[1])):
+							content = [tf1_region.chrom, tf1_region.start, tf1_region.end, tf1_region.name,
+									   tf1_region.strand, tf2_region.chrom, tf2_region.start, tf2_region.end,
+									   tf2_region.name, tf2_region.strand, dist]
 							csv_file.writerow(content)
 						else:
-							content = [tf1_region.chrom,tf1_region.start,tf1_region.end,tf1_region.name,tf1_region.strand,
-								   tf2_region.chrom,tf2_region.start,tf2_region.end,tf2_region.name,tf2_region.strand,
-								   dist]
+							content = [tf1_region.chrom, tf1_region.start, tf1_region.end, tf1_region.name,
+							           tf1_region.strand, tf2_region.chrom, tf2_region.start, tf2_region.end,
+									   tf2_region.name, tf2_region.strand, dist]
 						csv_file.writerow(content) 
 		return b
 
@@ -1855,7 +1856,7 @@ class DistObj():
 	#-------------------------------- Setup and sanity checks ----------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def __init__(self, verbosity = 1): #set verbosity 
+	def __init__(self, verbosity=1): #set verbosity 
 
 		#Function and run parameters
 		self.verbosity = verbosity  #0: error, 1:info, 2:debug, 3:spam-debug
@@ -1913,7 +1914,7 @@ class DistObj():
 		self.verbosity = level
 		self.logger = TFcombLogger(self.verbosity) #restart logger with new verbosity	    
 	
-	def fill_rules(self,comb_obj):
+	def fill_rules(self, comb_obj):
 		""" Fill DistanceObject according to reference object with all needed Values and parameters
 		to perform standard prefered distance analysis
 
@@ -1988,7 +1989,7 @@ class DistObj():
 	#---------------------------------------- Counting -----------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def count_distances(self, normalize = True, directional = False):
+	def count_distances(self, normalize=True, directional=False):
 		""" Count distances for co_occurring TFs, can be followed by analyze_distances
 			to determine preferred binding distances
 
@@ -2010,15 +2011,15 @@ class DistObj():
 
 		"""
 
-		tfcomb.utils.check_type(normalize,[bool],"normalize")
+		tfcomb.utils.check_type(normalize, [bool], "normalize")
 		if directional is None:
-			tfcomb.utils.check_type(self.directional,[bool],"self.directional")
+			tfcomb.utils.check_type(self.directional, [bool], "self.directional")
 			directional = self.directional
 		else:
-			tfcomb.utils.check_type(directional,[bool],"directional")
-		tfcomb.utils.check_type(self.min_dist,[int],"min_dist")
-		tfcomb.utils.check_type(self.max_dist,[int],"max_dist")
-		tfcomb.utils.check_type(self.anchor_mode,[int],"anchor_mode")
+			tfcomb.utils.check_type(directional, [bool], "directional")
+		tfcomb.utils.check_type(self.min_dist, [int], "min_dist")
+		tfcomb.utils.check_type(self.max_dist, [int], "max_dist")
+		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
 		
 		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
 		
@@ -2026,8 +2027,9 @@ class DistObj():
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
 		self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
 		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
-						  for site in self.TFBS] #numpy integer array
-		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, (tf1,tf2) in enumerate(self.rules[(["TF1","TF2"])].values.tolist())}
+				  for site in self.TFBS] #numpy integer array
+		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, 
+		                     (tf1,tf2) in enumerate(self.rules[(["TF1", "TF2"])].values.tolist())}
 		
 		#Sort sites by mid if anchor == 2 (center):
 		if self.anchor_mode == 2: 
@@ -2046,7 +2048,7 @@ class DistObj():
 		
 		# Unify (directional) counts 
 		if not directional:
-			for i in range(0,self._raw.shape[0]-1):
+			for i in range(0, self._raw.shape[0]-1):
 				if (self._raw[i,0] == self._raw[i+1,1]) and (self._raw[i,1] == self._raw[i+1,0]):
 					s = self._raw[i,2:] + self._raw[i+1,2:]
 					self._raw[i,2:] = s
@@ -2059,7 +2061,7 @@ class DistObj():
 		self.logger.info("Done finding distances! Results are found in .distances")
 		self.logger.info("Run .linregress_pair() or .linregress_all() to fit linear regression")
 	
-	def _raw_to_human_readable(self, normalize = True):
+	def _raw_to_human_readable(self, normalize=True):
 		""" Get the raw distance in human readable format
 			
 			Parameters
@@ -2084,7 +2086,7 @@ class DistObj():
 		for row in self._raw:
 			tf1 = idx_to_name[row[0]]
 			tf2 = idx_to_name[row[1]]
-			entry = [tf1,tf2]
+			entry = [tf1, tf2]
 			
 			if normalize:
 				row_sum = row[2:].sum()
@@ -2099,14 +2101,14 @@ class DistObj():
 		self.normalized = normalize
 	
 		if self.min_dist == 0:    
-			columns = ['TF1','TF2','neg']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
+			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
 		else:
-			columns = ['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
-		self.distances = pd.DataFrame(results,columns=columns)
+			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
+		self.distances = pd.DataFrame(results, columns=columns)
 
 	
 
-	def linregress_pair(self,pair,n_bins=None, save = None):
+	def linregress_pair(self, pair, n_bins=None, save=None):
 		""" Fits a linear Regression to distance count data for a given pair. The linear regression is used to 
 			estimate the background. Proceed with .correct_pair()
 			
@@ -2126,8 +2128,8 @@ class DistObj():
 			scipy.stats._stats_mstats_common.LinregressResult Object
 		"""
 
-		tfcomb.utils.check_type(pair,[tuple],"pair")
-		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+		tfcomb.utils.check_type(pair, [tuple], "pair")
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
@@ -2139,23 +2141,23 @@ class DistObj():
 
 		self.logger.debug(f"Fitting linear regression for pair: {pair}")
 		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist +1
-		x = np.linspace(self.min_dist,self.max_dist+1, n_bins)
+			n_bins = self.max_dist - self.min_dist + 1
+		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
 		
-		data = self.distances.loc[((self.distances["TF1"]==tf1) &
-			   (self.distances["TF2"]==tf2))].iloc[0, 2:]
+		data = self.distances.loc[((self.distances["TF1"] == tf1) &
+			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		n_data = len(data)
-		linres = linregress(range(0,n_data),np.array(data,dtype = float))
+		linres = linregress(range(0, n_data), np.array(data, dtype=float))
 		if save is not None:
-			plt.hist(range(0,n_data),weights=data, bins=n_bins, density=False, alpha=0.6)
-			plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
-			title = f"Fit results: pval = {linres.pvalue},  stderr = {linres.stderr}" 
+			plt.hist(range(0, n_data), weights=data, bins=n_bins, density=False, alpha=0.6)
+			plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
+			title = f"Fit results: pval={linres.pvalue},  stderr={linres.stderr}" 
 			plt.title(title)
 			plt.savefig(f'{save}linreg_{tf1}_{tf2}.png', dpi=600)
 			plt.clf()
 		return linres
 	
-	def linregress_all(self,n_bins = None, save = None):
+	def linregress_all(self, n_bins=None, save=None):
 		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
 			estimate the background. Proceed with .correct_all()
 			
@@ -2174,7 +2176,7 @@ class DistObj():
 				Fills the object variable .linres
 		"""
 
-		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
@@ -2185,13 +2187,14 @@ class DistObj():
 		for idx,row in self.distances.iterrows():
 			tf1 = row["TF1"]
 			tf2 = row["TF2"]
-			res = self.linregress_pair((tf1,tf2),n_bins,save)
-			linres[tf1,tf2]=[tf1,tf2,res]
+			res = self.linregress_pair((tf1, tf2), n_bins, save)
+			linres[tf1, tf2] = [tf1, tf2, res]
 		
-		self.linres = pd.DataFrame.from_dict(linres,orient="index",columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
+		self.linres = pd.DataFrame.from_dict(linres, orient="index",
+											 columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
 		self.logger.info("Linear regression finished! Results can be found in .linres")
 	
-	def correct_pair(self, pair, linres, n_bins = None, save = None):
+	def correct_pair(self, pair, linres, n_bins=None, save=None):
 		""" Subtracts the estimated background from the Signal for a given pair. 
 			
 			Parameters
@@ -2213,8 +2216,8 @@ class DistObj():
 				Corrected values for the given pair
 		"""
 
-		tfcomb.utils.check_type(pair,[tuple],"pair")
-		tfcomb.utils.check_type(n_bins,[int,type(None)],"n_bins")
+		tfcomb.utils.check_type(pair, [tuple], "pair")
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		self.check_distances()
@@ -2229,23 +2232,23 @@ class DistObj():
 
 		self.logger.debug(f"Correcting background for pair {pair}")
 		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist +1
+			n_bins = self.max_dist - self.min_dist + 1
 	   
-		data = self.distances.loc[((self.distances["TF1"]==tf1) &
-			   (self.distances["TF2"]==tf2))].iloc[0, 2:]
+		data = self.distances.loc[((self.distances["TF1"] == tf1) &
+			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		n_data = len(data)
 		corrected = []
 		x_val = 0
 		
 		for dist in data:
 			# subtract background from signal
-			corrected.append(dist-(linres.intercept + linres.slope*x_val))
+			corrected.append(dist - (linres.intercept + linres.slope * x_val))
 			x_val += 1
 
 		if save is not None:
-			x = np.linspace(0,n_data, n_bins)
-			plt.hist(range(0,n_data),weights=corrected, bins=n_bins, density=False, alpha=0.6)
-			linres = linregress(range(0,n_data),np.array(corrected,dtype = float))
+			x = np.linspace(0, n_data, n_bins)
+			plt.hist(range(0, n_data), weights=corrected, bins=n_bins, density=False, alpha=0.6)
+			linres = linregress(range(0, n_data), np.array(corrected, dtype=float))
 			plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
 			plt.savefig(f'{save}corrected_{tf1}_{tf2}.png', dpi=600)
 			plt.clf()
@@ -2311,14 +2314,14 @@ class DistObj():
 		tf1 = pair[0]
 		tf2 = pair[1]
 
-		data = self.distances.loc[((self.distances["TF1"]==tf1) &
-			   (self.distances["TF2"]==tf2))].iloc[0, 2:]
+		data = self.distances.loc[((self.distances["TF1"] == tf1) &
+			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
 
 		self.logger.debug(f" Median for pair {tf1} - {tf2}: {data.median}")
 		return data.median()
 
 	# TODO: Check if kwargs is better suited tham height & prominence
-	def analyze_signal_pair(self, pair, corrected, smooth_window = 3, height = 0, prominence = 0, save = None, new_file = True):
+	def analyze_signal_pair(self, pair, corrected, smooth_window=3, height=0, prominence=0, save=None, new_file=True):
 		""" After background correction is done (see .correct_pair() or .correct_all()), the signal is analyzed for peaks, 
 			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
 			Signal. Peaks are called with scipy.signal.find_peaks().
@@ -2355,9 +2358,9 @@ class DistObj():
 		"""
 		
 		#Check input parameters
-		tfcomb.utils.check_type(pair,[tuple],"pair")
-		tfcomb.utils.check_type(smooth_window,[int],"smooth_window")
-		tfcomb.utils.check_type(corrected,[list,pd.core.series.Series],"corrected")
+		tfcomb.utils.check_type(pair, [tuple], "pair")
+		tfcomb.utils.check_type(smooth_window, [int], "smooth_window")
+		tfcomb.utils.check_type(corrected, [list, pd.core.series.Series], "corrected")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
@@ -2377,7 +2380,7 @@ class DistObj():
 		# an other number left and right. 
 		x = [0] + list(x) + [0]
 
-		peaks_smooth, properties = find_peaks(x, height=height, prominence = prominence)
+		peaks_smooth, properties = find_peaks(x, height=height, prominence=prominence)
 		
 		# subtract the position added above (first zero) 
 		peaks_smooth = peaks_smooth - 1 
@@ -2396,7 +2399,8 @@ class DistObj():
 
 		if (len(peaks_smooth) > 0):
 			for i in range(len(peaks_smooth)):
-				peak = [tf1,tf2,peaks_smooth[i],round(properties["peak_heights"][i],4),round(properties["prominences"][i],4),round(prominence,4)]
+				peak = [tf1, tf2, peaks_smooth[i], round(properties["peak_heights"][i], 4),
+				        round(properties["prominences"][i], 4), round(prominence, 4)]
 				peaks.append(peak)
 				if (save is not None):
 					outfile.write('\t'.join(str(x) for x in peak) + '\n')
@@ -2406,7 +2410,7 @@ class DistObj():
 
 		return peaks
 	
-	def smooth(self, window_size = 3):
+	def smooth(self, window_size=3):
 		""" Helper function for smoothing all rules with a given window size. The function .correct_all() is required to be run beforehand.
 			
 			Parameters
@@ -2436,20 +2440,20 @@ class DistObj():
 			tf2 = row[1]
 			smoothed = fast_rolling_math(np.array(list(row[2:])), window_size, "mean")
 			x = np.nan_to_num(smoothed)
-			x = np.insert(np.array(x,dtype=object), 0, tf2)
+			x = np.insert(np.array(x, dtype=object), 0, tf2)
 			x = np.insert(x, 0, tf1)
 			all_smoothed.append(x)
 		
 		#TODO: check self.min_dist
 		if self.min_dist == 0:    
-			columns = ['TF1','TF2','neg']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
+			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
 		else:
-			columns = ['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
+			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
 		
-		self.smoothed = pd.DataFrame(all_smoothed,columns=columns)
+		self.smoothed = pd.DataFrame(all_smoothed, columns=columns)
 
 
-	def analyze_signal_all(self, smooth_window = 3, height = 0, prominence = "median",save = None):
+	def analyze_signal_all(self, smooth_window=3, height=0, prominence="median", save=None):
 		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
 			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
 			Signal. Peaks are called with scipy.signal.find_peaks().
@@ -2493,7 +2497,7 @@ class DistObj():
 
 
 		if isinstance(prominence, str):
-			tfcomb.utils.check_string(prominence,["median"])
+			tfcomb.utils.check_string(prominence, ["median"])
 		else:
 			tfcomb.utils.check_value()
 
@@ -2501,7 +2505,7 @@ class DistObj():
 		all_peaks = []
 
 		if save is not None:
-			outfile = open(f'{save}peaks.tsv','w')
+			outfile = open(f'{save}peaks.tsv', 'w')
 			outfile.write(self._PEAK_HEADER)
 		calc_mean = False
 		if (prominence == "median"):
@@ -2511,8 +2515,8 @@ class DistObj():
 		for idx,row in self.corrected.iterrows():
 			tf1 = row["TF1"]
 			tf2 = row["TF2"]
-			corrected_data = self.corrected.loc[((self.corrected["TF1"]==tf1) &
-												 (self.corrected["TF2"]==tf2))].iloc[0, 2:]
+			corrected_data = self.corrected.loc[((self.corrected["TF1"] == tf1) &
+												 (self.corrected["TF2"] == tf2))].iloc[0, 2:]
 			corrected_data = corrected_data.tolist() #series -> list
 			
 			if (calc_mean):
@@ -2520,10 +2524,10 @@ class DistObj():
 
 			peaks = self.analyze_signal_pair((tf1,tf2),
 											  corrected_data, 
-											  smooth_window = smooth_window, 
-											  height = height, 
-											  prominence = prominence, 
-											  save = None)
+											  smooth_window=smooth_window, 
+											  height=height, 
+											  prominence=prominence, 
+											  save=None)
 				
 			if len(peaks)>0:
 				for peak in peaks:
@@ -2532,7 +2536,7 @@ class DistObj():
 						outfile.write('\t'.join(str(x) for x in peak) + '\n')
 				peaking_count += 1
 
-		self.peaks = pd.DataFrame(all_peaks,columns=self._PEAK_HEADER.strip().split("\t"))
+		self.peaks = pd.DataFrame(all_peaks, columns=self._PEAK_HEADER.strip().split("\t"))
 		self.smooth_window = smooth_window
 		self.peaking_count = peaking_count
 
@@ -2565,7 +2569,7 @@ class DistObj():
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 	
-	def plot_bar(self, targets, save = None):
+	def plot_bar(self, targets, save=None):
 		""" Barplots for a list of TF-pairs
 
 		 Parameters
@@ -2584,16 +2588,16 @@ class DistObj():
 		
 		for pair in targets:
 			#TODO: Check pair is valid
-			height = source_table.loc[((source_table["TF1"]==pair[0]) &
-									   (source_table["TF2"]==pair[1]))].iloc[0, 2:]
-			fig = plt.bar(x = range(0,len(height)), height=height)
+			height = source_table.loc[((source_table["TF1"] == pair[0]) &
+									   (source_table["TF2"] == pair[1]))].iloc[0, 2:]
+			fig = plt.bar(x = range(0, len(height)), height=height)
 			plt.title(pair)
 			
 			if save is not None:
 				plt.savefig(f'{save}bar_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_hist(self, targets, nbins=None, save = None):
+	def plot_hist(self, targets, nbins=None, save=None):
 		""" Histograms for a list of TF-pairs
 
 		 Parameters
@@ -2615,15 +2619,15 @@ class DistObj():
 		for pair in targets:
 			#TODO: Rename xticks
 			# TODO: Check pair is valid
-			weights = source_table.loc[((source_table["TF1"]==pair[0]) &
-									   (source_table["TF2"]==pair[1]))].iloc[0, 2:]
-			plt.hist(range(0,len(weights)), nbins, weights=weights)
+			weights = source_table.loc[((source_table["TF1"] == pair[0]) &
+									   (source_table["TF2"] == pair[1]))].iloc[0, 2:]
+			plt.hist(range(0, len(weights)), nbins, weights=weights)
 			plt.title(pair)
 			if save is not None:
 				plt.savefig(f'{save}hist_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_dens(self, targets, bwadjust = 1, save = None):
+	def plot_dens(self, targets, bwadjust=1, save=None):
 		""" KDE Plots for a list of TF-pairs
 
 			Parameters
@@ -2649,16 +2653,16 @@ class DistObj():
 			tfcomb.utils.check_writeability(save)
 		
 		for pair in targets:
-			weights = list(source_table.loc[((source_table["TF1"]==pair[0]) &
-									   (source_table["TF2"]==pair[1]))].iloc[0, 2:])
+			weights = list(source_table.loc[((source_table["TF1"] == pair[0]) &
+											 (source_table["TF2"] == pair[1]))].iloc[0, 2:])
 			#TODO: Rename xticks
-			sns.kdeplot(range(0,len(weights)),weights = weights,bw_adjust=bwadjust,x="distance").set_title(pair)
+			sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(pair)
 			# TODO: Check if save is a valid path
 			if save is not None:
 				plt.savefig(f'{save}dens_{pair[0]}_{pair[1]}.png', dpi=600)
 				plt.clf()
 
-	def plot_analyzed_signal(self, pair, peaks = None, sourceData = None, save = None, only_peaking = False):
+	def plot_analyzed_signal(self, pair, peaks=None, sourceData=None, save=None, only_peaking=False):
 		""" """
 
 		#Check validity of input parameters
@@ -2670,20 +2674,20 @@ class DistObj():
 
 		tf1, tf2 = pair
 		if peaks is None:
-			peaks = self.peaks.loc[((self.peaks["TF1"]==tf1) &
-									(self.peaks["TF2"]==tf2))].Distance.to_numpy()
+			peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) &
+									(self.peaks["TF2"] == tf2))].Distance.to_numpy()
 		else:
 			peaks = np.array(peaks)
 		if sourceData is None: 
 			if self.is_smoothed():
-				x = self.smoothed.loc[((self.smoothed["TF1"]==tf1) &
-									   (self.smoothed["TF2"]==tf2))].iloc[0,2:].to_numpy()
+				x = self.smoothed.loc[((self.smoothed["TF1"] == tf1) &
+									   (self.smoothed["TF2"] == tf2))].iloc[0, 2:].to_numpy()
 			else:    
-				x = self.corrected.loc[((self.corrected["TF1"]==tf1) &
-										(self.corrected["TF2"]==tf2))].iloc[0,2:].to_numpy()
+				x = self.corrected.loc[((self.corrected["TF1"] == tf1) &
+										(self.corrected["TF2"] == tf2))].iloc[0, 2:].to_numpy()
 		else:
-			x = sourceData.loc[((sourceData["TF1"]==tf1) &
-								(sourceData["TF2"]==tf2))].iloc[0,2:].to_numpy()
+			x = sourceData.loc[((sourceData["TF1"] == tf1) &
+								(sourceData["TF2"] == tf2))].iloc[0, 2:].to_numpy()
 		if (only_peaking) and (len(peaks) == 0):
 			return
 			
@@ -2692,7 +2696,7 @@ class DistObj():
 			crosses = peaks +1 
 		else:
 			crosses = peaks
-		plt.plot(crosses, x[(crosses)] , "x")
+		plt.plot(crosses, x[(crosses)], "x")
 		plt.plot(np.zeros_like(x), "--", color="gray")
 		plt.title(f"Analyzed signal for {tf1}-{tf2}")
 		if save is not None:
