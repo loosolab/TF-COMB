@@ -1834,12 +1834,10 @@ class DistObj():
 				Median for the given pair 
 		"""
 		
-		tfcomb.utils.check_type(pair, [tuple], "pair")
 		self.check_distances()
-		
-		# TODO: check pair is valid
-		tf1 = pair[0]
-		tf2 = pair[1]
+		self.check_pair(pair)
+
+		tf1, tf2 = pair
 
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
 			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
@@ -1864,6 +1862,7 @@ class DistObj():
 		"""
 		
 		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
+		self.check_min_max_dist()
 
 		if self.corrected is None:
 			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
@@ -1881,7 +1880,6 @@ class DistObj():
 			x = np.insert(x, 0, tf1)
 			all_smoothed.append(x)
 		
-		#TODO: check self.min_dist
 		if self.min_dist == 0:    
 			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
 		else:
@@ -1909,41 +1907,82 @@ class DistObj():
 
 
 	def check_distances(self):
-			""" Utility function to check if distances were set. If not, InputError is raised. """
+		""" Utility function to check if distances were set. If not, InputError is raised. """
 
-			if self.distances is None:
-				raise InputError("No distances evaluated yet. Please run .count_distances() first.")
+		if self.distances is None:
+			raise InputError("No distances evaluated yet. Please run .count_distances() first.")
 			
-			#If self.distances is present, check if it is a Dataframe
-			tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
+		#If self.distances is present, check if it is a Dataframe
+		tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
 	
 	def check_linres(self):
-			""" Utility function to check if linear regressions were set. If not, InputError is raised. """
-			if self.linres is None:
-				raise InputError("Linear regression not fitted yet. Please run .linregress_all() first.")
+		""" Utility function to check if linear regressions were set. If not, InputError is raised. """
+		if self.linres is None:
+			raise InputError("Linear regression not fitted yet. Please run .linregress_all() first.")
 			
-			#If self.linres is present, check if it is a Dataframe
-			tfcomb.utils.check_type(self.linres, pd.DataFrame, ".linres")
+		#If self.linres is present, check if it is a Dataframe
+		tfcomb.utils.check_type(self.linres, pd.DataFrame, ".linres")
 	
 	def check_corrected(self):
-			""" Utility function to check if corrected were set. If not, InputError is raised. """
+		""" Utility function to check if corrected were set. If not, InputError is raised. """
 
-			if self.corrected is None:
-				raise InputError("Distances not corrected yet. Please run .correct_all() first.")
+		if self.corrected is None:
+			raise InputError("Distances not corrected yet. Please run .correct_all() first.")
 			
-			#If self.corrected is present, check if it is a Dataframe
-			tfcomb.utils.check_type(self.corrected, pd.DataFrame, ".corrected")
+		#If self.corrected is present, check if it is a Dataframe
+		tfcomb.utils.check_type(self.corrected, pd.DataFrame, ".corrected")
 	
 	def check_peaks(self):
-			""" Utility function to check if peaks were called. If not, InputError is raised. """
+		""" Utility function to check if peaks were called. If not, InputError is raised. """
 
-			if self.peaks is None:
-				raise InputError("Peaks not evaluated yet. Please run .analyze_signal_all() first.")
+		if self.peaks is None:
+			raise InputError("Peaks not evaluated yet. Please run .analyze_signal_all() first.")
 			
-			#If self.peaks is present, check if it is a Dataframe
-			tfcomb.utils.check_type(self.peaks, pd.DataFrame, ".corrected")
+		#If self.peaks is present, check if it is a Dataframe
+		tfcomb.utils.check_type(self.peaks, pd.DataFrame, ".corrected")
+	
+	def check_min_max_dist(self):
+		""" Utility function to check if min and max distance are valid. """
+		
+		if self.min_dist is None:
+			raise InputError(".min_dist is not set")
+		if self.max_dist is None:
+			raise InputError(".max_dist is not set")
+		tfcomb.utils.check_value(self.min_dist, integer=True, name=".min_dist")
+		tfcomb.utils.check_value(self.max_dist, integer=True, name=".max_dist")
+		
+		if self.min_dist > self.max_dist:
+			raise InputError(".min_dist must be lesser or equal .max_dist")
 
+	def check_pair(self, pair):
+		""" Utility function to check if a pair is valid. 
+		
+		Parameters
+		----------
+		pair : tuple(str,str)
+			TF names for which the test should be performed. e.g. ("NFYA","NFYB")
 
+		"""
+
+		#check member size
+		if len(pair) != 2:
+			raise InputError(f'{pair} is not valid. It should contain exactly two TF names per pair. e.g. ("NFYA","NFYB")')
+		# check tf names are string
+		tf1,tf2 = pair 
+		tfcomb.utils.check_type(tf1, str, "TF1 from pair")
+		tfcomb.utils.check_type(tf2, str, "TF2 from pair")
+		# check rules are filled
+		if self.rules is None:
+			raise InputError(".rules not filled. Please run .fill_rules() first.")
+
+		# check tf1 is present within rules
+		if tf1 not in set(self.rules.TF1):
+			raise InputError(f"{tf1} (TF1) is no valid key for a pair")
+
+		# check tf1 is present within rules
+		if tf2 not in set(self.rules.TF2):
+			raise InputError(f"{tf2} (TF2) is no valid key for a pair")
+		
 	#-------------------------------------------------------------------------------------------#
 	#---------------------------------------- Counting -----------------------------------------#
 	#-------------------------------------------------------------------------------------------#
@@ -1976,9 +2015,9 @@ class DistObj():
 			directional = self.directional
 		else:
 			tfcomb.utils.check_type(directional, [bool], "directional")
-		tfcomb.utils.check_type(self.min_dist, [int], "min_dist")
-		tfcomb.utils.check_type(self.max_dist, [int], "max_dist")
 		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
+
+		self.check_min_max_dist()
 		
 		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
 		
@@ -2091,33 +2130,26 @@ class DistObj():
 			scipy.stats._stats_mstats_common.LinregressResult Object
 		"""
 
-		tfcomb.utils.check_type(pair, [tuple], "pair")
 		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
 		self.check_distances()
+		self.check_min_max_dist()
+		self.check_pair(pair)
 
-		#TODO: check pair is valid
-		tf1 = pair[0]
-		tf2 = pair[1]
+		tf1, tf2 = pair
 
 		self.logger.debug(f"Fitting linear regression for pair: {pair}")
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist + 1
-		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
 		
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
 			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		n_data = len(data)
 		linres = linregress(range(0, n_data), np.array(data, dtype=float))
 		if save is not None:
-			plt.hist(range(0, n_data), weights=data, bins=n_bins, density=False, alpha=0.6)
-			plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
-			title = f"Fit results: pval={linres.pvalue},  stderr={linres.stderr}" 
-			plt.title(title)
-			plt.savefig(f'{save}linreg_{tf1}_{tf2}.png', dpi=600)
-			plt.clf()
+			self
 		return linres
 	
 	def linregress_all(self, n_bins=None, save=None):
@@ -2179,15 +2211,14 @@ class DistObj():
 				Corrected values for the given pair
 		"""
 
-		tfcomb.utils.check_type(pair, [tuple], "pair")
 		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		self.check_distances()
+		self.check_min_max_dist()
+		self.check_pair(pair)
 
-		#TODO: check pair is valid & check linres: import in utils needed ?
-		tf1 = pair[0]
-		tf2 = pair[1]
+		tf1, tf2 = pair
 
 		if linres is None:
 			self.logger.error("Please fit a linear regression first. [see ._linregress_pair()]")
@@ -2199,7 +2230,6 @@ class DistObj():
 	   
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
 			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
-		n_data = len(data)
 		corrected = []
 		x_val = 0
 		
@@ -2209,12 +2239,7 @@ class DistObj():
 			x_val += 1
 
 		if save is not None:
-			x = np.linspace(0, n_data, n_bins)
-			plt.hist(range(0, n_data), weights=corrected, bins=n_bins, density=False, alpha=0.6)
-			linres = linregress(range(0, n_data), np.array(corrected, dtype=float))
-			plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
-			plt.savefig(f'{save}corrected_{tf1}_{tf2}.png', dpi=600)
-			plt.clf()
+			self.plot_corrected()
 		
 		return corrected
 	
@@ -2223,8 +2248,12 @@ class DistObj():
 			
 			Parameters
 			----------
-			pair : tuple(str,str)
-				TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
+			n_bins: int 
+				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
+				Default: None
+			save: str
+				Path to save the plots to. If save is None plots won't be plotted. 
+				Default: None
 
 			Returns:
 			----------
@@ -2237,6 +2266,7 @@ class DistObj():
 			tfcomb.utils.check_writeability(save)
 		
 		self.check_linres()
+		self.check_min_max_dist()
 
 		self.logger.info(f"Correcting background")
 		corrected = {}
@@ -2245,8 +2275,7 @@ class DistObj():
 			tf1,tf2,linres = row
 			res=self._correct_pair((tf1,tf2),linres,n_bins,save)
 			corrected[tf1,tf2]=[tf1,tf2]+res
-
-		#TODO: check self.min_dist
+		
 		if self.min_dist == 0:    
 			columns = ['TF1','TF2','neg']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
 		else:
@@ -2293,11 +2322,13 @@ class DistObj():
 		"""
 		
 		#Check input parameters
-		tfcomb.utils.check_type(pair, [tuple], "pair")
 		tfcomb.utils.check_type(smooth_window, [int], "smooth_window")
 		tfcomb.utils.check_type(corrected, [list, pd.core.series.Series], "corrected")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
+		
+		self.check_min_max_dist()
+		self.check_pair(pair)
 
 		#Smooth the signal
 		tf1, tf2 = pair
@@ -2445,104 +2476,219 @@ class DistObj():
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 	
-	def plot_bar(self, targets, save=None):
+	def plot_bar(self, pair, save=None):
 		""" Barplots for a list of TF-pairs
 
 		 Parameters
 			----------
-			targets : array[tuple(str,str)]
-				Pairs (tuples) to create plots for.
+			pair : tuple(str,str)
+				Pair to create plot for.
 			save:
-				Output path to write results to. (filename will be constructed automatically from TF1-/TF2-name)
+				Output file to write results to. 
 				Default: None (results will not be saved)
 
 		"""
 
-		tfcomb.utils.check_writeability(save)
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
 		self.check_distances()
-		source_table = self.distances
-		
-		for pair in targets:
-			#TODO: Check pair is valid
-			height = source_table.loc[((source_table["TF1"] == pair[0]) &
-									   (source_table["TF2"] == pair[1]))].iloc[0, 2:]
-			fig = plt.bar(x = range(0, len(height)), height=height)
-			plt.title(pair)
-			
-			if save is not None:
-				plt.savefig(f'{save}bar_{pair[0]}_{pair[1]}.png', dpi=600)
-				plt.clf()
+		self.check_pair(pair)
 
-	def plot_hist(self, targets, nbins=None, save=None):
+		source_table = self.distances		
+		tf1, tf2 = pair
+
+		height = source_table.loc[((source_table["TF1"] == tf1) &
+								   (source_table["TF2"] == tf2))].iloc[0, 2:]
+		fig = plt.bar(x = range(0, len(height)), height=height)
+		plt.title(f"{tf1} - {tf2}")
+			
+		if save is not None:
+			plt.savefig(save, dpi=600)
+			plt.clf()
+
+	def plot_hist(self, pair, n_bins=None, save=None):
 		""" Histograms for a list of TF-pairs
 
 		 Parameters
 			----------
-			targets : array[tuple(str,str)]
-				Pairs (tuples) to create plots for.
-			nbins: int
+			pair : tuple(str,str)
+				Pair to create plot for.
+			n_bins: int
 				Number of bins. Default: None (Binning is done automatically)
 			save:
-				Output Path to write results to. (filename will be constructed automatically from TF1-/TF2-name)
+				Output file to write results to.
 				Default: None (results will not be saved)
 
 		"""
+
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		self.check_distances()
-		source_table = self.distances
-			
-		for pair in targets:
-			#TODO: Rename xticks
-			# TODO: Check pair is valid
-			weights = source_table.loc[((source_table["TF1"] == pair[0]) &
-									   (source_table["TF2"] == pair[1]))].iloc[0, 2:]
-			plt.hist(range(0, len(weights)), nbins, weights=weights)
-			plt.title(pair)
-			if save is not None:
-				plt.savefig(f'{save}hist_{pair[0]}_{pair[1]}.png', dpi=600)
-				plt.clf()
+		self.check_pair(pair)
 
-	def plot_dens(self, targets, bwadjust=1, save=None):
+		source_table = self.distances
+		tf1, tf2 = pair
+			
+		#TODO: Rename xticks
+		weights = source_table.loc[((source_table["TF1"] == tf1) &
+									(source_table["TF2"] == tf2))].iloc[0, 2:]
+		plt.hist(range(0, len(weights)), n_bins, weights=weights)
+		plt.title(pair)
+		if save is not None:
+			plt.savefig(save, dpi=600)
+			plt.clf()
+
+	def plot_dens(self, pair, bwadjust=0.1, save=None):
 		""" KDE Plots for a list of TF-pairs
 
 			Parameters
 			----------
-			targets : array[tuple(str,str)]
-				Pairs (tuples) to create plots for.
+			pair : tuple(str,str)
+				Pair to create plot for.
 			bwadjust: float
 				Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. 
 				See kdeplot() from seaborn. Default: 0.1
 			save:
-				Output Path to write results to. (filename will be constructed automatically from TF1-/TF2-name)
+				Output file to write results to.
 				Default: None (results will not be saved)
 
 		"""
 
-		tfcomb.utils.check_type(targets, list, "targets")
-		tfcomb.utils.check_value(bwadjust,vmin=0)
-
-		self.check_distances()
-		source_table = self.distances
-
+		tfcomb.utils.check_type(pair, tuple, "pair")
+		tfcomb.utils.check_value(bwadjust, vmin=0)
+		
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
-		
-		for pair in targets:
-			weights = list(source_table.loc[((source_table["TF1"] == pair[0]) &
-											 (source_table["TF2"] == pair[1]))].iloc[0, 2:])
-			#TODO: Rename xticks
-			sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(pair)
-			# TODO: Check if save is a valid path
-			if save is not None:
-				plt.savefig(f'{save}dens_{pair[0]}_{pair[1]}.png', dpi=600)
-				plt.clf()
 
-	def plot_analyzed_signal(self, pair, save=None, only_peaking=False):
-		""" """
+
+		self.check_distances()
+		self.check_pair(pair)
+
+		source_table = self.distances
+		tf1, tf2 = pair
+
+		weights = list(source_table.loc[((source_table["TF1"] == tf1) &
+										 (source_table["TF2"] == tf2))].iloc[0, 2:])
+		#TODO: Rename xticks
+		sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(f"{tf1} - {tf2}")
+
+		if save is not None:
+			plt.savefig(save, dpi=600)
+			plt.clf()
+	
+	def plot_corrected(self, pair, n_bins=None, save=None):
+		""" Plots corrected signal
+
+		 Parameters
+			----------
+			pair : tuple(str,str)
+				Pair to create plot for.
+			nbins: int
+				Number of bins. Default: None (Binning is done automatically)
+			save:
+				Output file to write results to.
+				Default: None (results will not be saved)
+
+		"""
+
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
+
+		self.check_distances()
+		self.check_corrected()
+		self.check_min_max_dist()
+		self.check_pair(pair)
+
+		tf1, tf2 = pair
+
+		data = self.distances.loc[((self.distances["TF1"] == tf1) &
+			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+		n_data = len(data)
+
+		weights = self.corrected.loc[((self.corrected["TF1"] == tf1) &
+			                          (self.corrected["TF2"] == tf2))].iloc[0, 2:]
+
+		if n_bins is None:
+			n_bins = self.max_dist - self.min_dist
+
+		x = np.linspace(0, n_data, n_bins)
+		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=False, alpha=0.6)
+		linres = linregress(range(0, n_data), np.array(weights, dtype=float))
+		plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
+		plt.title(f"{tf1} - {tf2}")
+		if save is not None:
+			plt.savefig(save, dpi=600)
+			plt.clf()
+	
+	def plot_linres(self, pair, n_bins=None, save=None):
+		""" Plots linear regression line into original signal
+
+		 Parameters
+			----------
+			pair : tuple(str,str)
+				Pair to create plot for.
+			nbins: int
+				Number of bins. Default: None (Binning is done automatically)
+			save:
+				Output file to write results to.
+				Default: None (results will not be saved)
+
+		"""
+
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
+
+		self.check_distances()
+		self.check_linres()
+		self.check_min_max_dist()
+		self.check_pair(pair)
+
+
+		tf1, tf2 = pair
+
+		data = self.distances.loc[((self.distances["TF1"] == tf1) &
+			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+		n_data = len(data)
+		linres = self.linres.loc[((self.linres["TF1"] == tf1) &
+			                      (self.linres["TF2"] == tf2))].iloc[0, 2]
+
+		if n_bins is None:
+			n_bins = self.max_dist - self.min_dist
+		
+		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
+
+		plt.hist(range(0, n_data), weights=data, bins=n_bins, density=True, alpha=0.6)
+		plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
+		title = f"{tf1} - {tf2}" 
+		plt.title(title)
+		if save is not None:
+			plt.savefig(save, dpi=600)
+			plt.clf()
+
+
+	def plot_analyzed_signal(self, pair, only_peaking=True, save=None):
+		""" Plots the analyzed signal
+
+		 Parameters
+			----------
+			pair : tuple(str,str)
+				Pair to create plot for.
+			only_peaking: bool
+				True if only those plots should be produced in which at least one peak was found, False otherwise.
+				Default: True (Binning is done automatically)
+			save:
+				Output file to write results to.
+				Default: None (results will not be saved)
+
+		"""
 
 		self.check_corrected()
-		self.check_peaks
+		self.check_peaks()
+		self.check_min_max_dist()
+		self.check_pair(pair)
 
 		tf1, tf2 = pair
 		
@@ -2569,5 +2715,7 @@ class DistObj():
 		plt.plot(np.zeros_like(x), "--", color="gray")
 		plt.title(f"Analyzed signal for {tf1}-{tf2}")
 		if save is not None:
-			plt.savefig(f'{save}/peaks_{tf1}_{tf2}.png', dpi=600)
+			plt.savefig(save, dpi=600)
 			plt.clf()
+	
+
