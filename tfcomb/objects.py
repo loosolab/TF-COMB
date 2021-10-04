@@ -2149,7 +2149,7 @@ class DistObj():
 		n_data = len(data)
 		linres = linregress(range(0, n_data), np.array(data, dtype=float))
 		if save is not None:
-			self
+			self.plot_linres(pair, n_bins=n_bins, save=save)
 		return linres
 	
 	def linregress_all(self, n_bins=None, save=None):
@@ -2239,7 +2239,7 @@ class DistObj():
 			x_val += 1
 
 		if save is not None:
-			self.plot_corrected()
+			self.plot_corrected(pair, n_bins=n_bins, save=save)
 		
 		return corrected
 	
