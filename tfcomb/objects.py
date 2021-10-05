@@ -1042,10 +1042,19 @@ class CombObj():
 		"""
 		self.create_distObj()
 		self.distObj.count_distances(normalize=normalize, directional=self.directional)
-		# TODO: check parent_directory and create nice subfolder structure !
-		self.distObj.linregress_all(n_bins=n_bins, save=parent_directory)
-		self.distObj.correct_all(n_bins=n_bins, save=parent_directory)
-		self.distObj.analyze_signal_all(**kwargs, save=parent_directory)
+		tfcomb.utils.check_dir(parent_directory)
+
+		subfolder_linres = os.path.join(parent_directory, "linres")
+		tfcomb.utils.check_dir(subfolder_linres) 
+		self.distObj.linregress_all(n_bins=n_bins, save=subfolder_linres)
+
+		subfolder_corrected = os.path.join(parent_directory, "corrected")
+		tfcomb.utils.check_dir(subfolder_corrected) 
+		self.distObj.correct_all(n_bins=n_bins, save=subfolder_corrected)
+
+		subfolder_peaks = os.path.join(parent_directory, "peaks")
+		tfcomb.utils.check_dir(subfolder_peaks) 
+		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
 		
 
 	def bed_from_range(self, TF1, TF2, TF1_strand=None,
@@ -1983,6 +1992,10 @@ class DistObj():
 		if tf2 not in set(self.rules.TF2):
 			raise InputError(f"{tf2} (TF2) is no valid key for a pair")
 		
+		if len(self.rules.loc[((self.rules["TF1"] == tf1) & (self.rules["TF2"] == tf2))]) == 0:
+			raise InputError(f"No rules for pair {tf1} - {tf2} found.")
+
+		
 	#-------------------------------------------------------------------------------------------#
 	#---------------------------------------- Counting -----------------------------------------#
 	#-------------------------------------------------------------------------------------------#
@@ -2182,7 +2195,11 @@ class DistObj():
 		for idx,row in self.distances.iterrows():
 			tf1 = row["TF1"]
 			tf2 = row["TF2"]
-			res = self._linregress_pair((tf1, tf2), n_bins, save)
+			if save is not None:
+				out_file = str(os.path.join(save, f"{tf1}_{tf2}.png"))
+			else:
+				out_file = None
+			res = self._linregress_pair((tf1, tf2), n_bins, out_file)
 			linres[tf1, tf2] = [tf1, tf2, res]
 		
 		self.linres = pd.DataFrame.from_dict(linres, orient="index",
@@ -2243,7 +2260,7 @@ class DistObj():
 		
 		return corrected
 	
-	def correct_all(self,n_bins = None, save = None):
+	def correct_all(self, n_bins=None, save=None):
 		""" Subtracts the estimated background from the Signal for all rules. 
 			
 			Parameters
@@ -2261,7 +2278,7 @@ class DistObj():
 				Fills the object variable .corrected
 		"""
 		
-		tfcomb.utils.check_type(n_bins, [int,type(None)], "n_bins")
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		
@@ -2272,15 +2289,19 @@ class DistObj():
 		corrected = {}
 		
 		for idx,row in self.linres.iterrows():
-			tf1,tf2,linres = row
-			res=self._correct_pair((tf1,tf2),linres,n_bins,save)
-			corrected[tf1,tf2]=[tf1,tf2]+res
+			tf1, tf2, linres = row
+			if save is not None:
+				out_file = str(os.path.join(save, f"{tf1}_{tf2}.png"))
+			else:
+				out_file = None
+			res = self._correct_pair((tf1, tf2), linres, n_bins, out_file)
+			corrected[tf1, tf2] = [tf1, tf2] + res
 		
 		if self.min_dist == 0:    
-			columns = ['TF1','TF2','neg']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
+			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
 		else:
-			columns = ['TF1','TF2']+[str(x) for x in range (self.min_dist, self.max_dist+1)]
-		self.corrected = pd.DataFrame.from_dict(corrected,orient="index",columns=columns).reset_index(drop=True) 
+			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
+		self.corrected = pd.DataFrame.from_dict(corrected, orient="index", columns=columns).reset_index(drop=True) 
 		self.logger.info("Background correction finished! Results can be found in .corrected")
 		
 
@@ -2358,10 +2379,10 @@ class DistObj():
 		self.logger.debug(f"{len(peaks_smooth)} Peaks found")
 		if (save is not None):
 			if new_file:
-				outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','w') 
+				outfile = open(save,'w') 
 				outfile.write(self._PEAK_HEADER)
 			else:
-				outfile = open(f'{save}peaks_{tf1}_{tf2}.tsv','a') 
+				outfile = open(save,'a') 
 
 		if (len(peaks_smooth) > 0):
 			for i in range(len(peaks_smooth)):
@@ -2426,7 +2447,7 @@ class DistObj():
 		all_peaks = []
 
 		if save is not None:
-			outfile = open(f'{save}peaks.tsv', 'w')
+			outfile = open(os.path.join(save, "peaks.tsv"), 'w')
 			outfile.write(self._PEAK_HEADER)
 		calc_mean = False
 		if (prominence == "median"):
@@ -2476,35 +2497,6 @@ class DistObj():
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 	
-	def plot_bar(self, pair, save=None):
-		""" Barplots for a list of TF-pairs
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			save:
-				Output file to write results to. 
-				Default: None (results will not be saved)
-
-		"""
-
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-		self.check_distances()
-		self.check_pair(pair)
-
-		source_table = self.distances		
-		tf1, tf2 = pair
-
-		height = source_table.loc[((source_table["TF1"] == tf1) &
-								   (source_table["TF2"] == tf2))].iloc[0, 2:]
-		fig = plt.bar(x = range(0, len(height)), height=height)
-		plt.title(f"{tf1} - {tf2}")
-			
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.clf()
 
 	def plot_hist(self, pair, n_bins=None, save=None):
 		""" Histograms for a list of TF-pairs
@@ -2526,10 +2518,14 @@ class DistObj():
 			tfcomb.utils.check_writeability(save)
 		self.check_distances()
 		self.check_pair(pair)
+		self.check_min_max_dist()
 
 		source_table = self.distances
 		tf1, tf2 = pair
-			
+		
+		if n_bins is None:
+			n_bins = self.max_dist - self.min_dist
+
 		#TODO: Rename xticks
 		weights = source_table.loc[((source_table["TF1"] == tf1) &
 									(source_table["TF2"] == tf2))].iloc[0, 2:]
