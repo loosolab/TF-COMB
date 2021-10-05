@@ -2530,6 +2530,8 @@ class DistObj():
 		weights = source_table.loc[((source_table["TF1"] == tf1) &
 									(source_table["TF2"] == tf2))].iloc[0, 2:]
 		plt.hist(range(0, len(weights)), n_bins, weights=weights)
+		plt.xlabel('Distance in bp')
+		plt.ylabel('Count per distance')
 		plt.title(pair)
 		if save is not None:
 			plt.savefig(save, dpi=600)
@@ -2568,6 +2570,7 @@ class DistObj():
 										 (source_table["TF2"] == tf2))].iloc[0, 2:])
 		#TODO: Rename xticks
 		sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(f"{tf1} - {tf2}")
+		plt.xlabel('Distance in bp')
 
 		if save is not None:
 			plt.savefig(save, dpi=600)
@@ -2613,6 +2616,8 @@ class DistObj():
 		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=False, alpha=0.6)
 		linres = linregress(range(0, n_data), np.array(weights, dtype=float))
 		plt.plot(x, linres.intercept + linres.slope*x, 'r', label='fitted line')
+		plt.xlabel('Distance in bp')
+		plt.ylabel('Corrected count per distance')
 		plt.title(f"{tf1} - {tf2}")
 		if save is not None:
 			plt.savefig(save, dpi=600)
@@ -2658,6 +2663,8 @@ class DistObj():
 
 		plt.hist(range(0, n_data), weights=data, bins=n_bins, density=True, alpha=0.6)
 		plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
+		plt.xlabel('Distance in bp')
+		plt.ylabel('Counts per distance')
 		title = f"{tf1} - {tf2}" 
 		plt.title(title)
 		if save is not None:
@@ -2702,13 +2709,15 @@ class DistObj():
 			self.logger.debug(f"Only plots for pairs with at least one peak should be plotted. {tf1}-{tf2} has no peak.")
 			return
 			
-		plt.plot (x)
+		plt.plot(x)
 		if self.min_dist == 0:
 			crosses = peaks + 1 
 		else:
 			crosses = peaks
 		plt.plot(crosses, x[(crosses)], "x")
 		plt.plot(np.zeros_like(x), "--", color="gray")
+		plt.xlabel('Distance in bp')
+		plt.ylabel('Corrected count per distance')
 		plt.title(f"Analyzed signal for {tf1}-{tf2}")
 		if save is not None:
 			plt.savefig(save, dpi=600)
