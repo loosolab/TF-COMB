@@ -16,7 +16,7 @@ import networkx as nx
 import community as community_louvain
 
 import tfcomb.utils
-from tfcomb.logging import TFcombLogger
+from tfcomb.logging import TFcombLogger, InputError
 from tfcomb.utils import check_columns
 
 #-------------------------------------------------------------------------------#
@@ -74,8 +74,9 @@ def build_gt_network(table,
 					node1="TF1", 
 					node2="TF2", 
 					node_table=None,
-					directed=False, verbosity=1):
-	""" Build graph-tool network from table 
+					directed=False, 
+					verbosity=1):
+	""" Build graph-tool network from table.
 	
 	Parameters
 	-----------
@@ -91,7 +92,16 @@ def build_gt_network(table,
 		Whether edges are directed or not. Default: False.
 	verbosity : int, optional
 		Verbosity of logging (0/1/2/3). Default: 1.
+
+	Returns
+	--------
+	graph_tool.Graph 
 	"""
+
+	#TODO: check given input
+	check_type(table, pd.DataFrame, "table")
+
+
 
 	#Setup logger
 	logger = TFcombLogger(verbosity)
@@ -305,6 +315,7 @@ def get_degree(G, weight=None):
 	"""
 
 	tfcomb.utils.check_type(G, [nx.Graph])
+	tfcomb.utils.check_type(G, [str, type(None)], "weight")
 	
 	
 	if weight is None:
@@ -326,9 +337,6 @@ def get_degree(G, weight=None):
 
 	return(df)
 
-#Center-piece subgraphs
-
-
 #Graph partitioning 
 def partition_louvain(G, weight=None, logger=None):
 	"""
@@ -340,6 +348,8 @@ def partition_louvain(G, weight=None, logger=None):
 		An instance of a network graph to partition
 	weight : str
 		Attribute in graph to use as weight. The higher the weight, the stronger the link. Default: None.
+	attribute_name : str
+		The attribute name to use for saving partition. Default: "partition".
 	logger : 
 
 	Returns
@@ -468,22 +478,24 @@ def get_edge_table(G):
 	return(table)
 
 def create_random_network(nodes, edges):
-    """ 
+	""" 
+	Create a random network with the given nodes and the number of edges.
+
 	nodes : list
 		List of nodes to use in network.
 	edges : int
 		Number of edges between nodes.
 	"""
 
-    G_rand = nx.Graph()
-    G_rand.add_nodes_from(nodes)
-    
-    #Setup edges
-    combis = list(itertools.combinations(nodes, 2))
-    edges = random.choices(combis, k=edges)
-    G_rand.add_edges_from(edges)
-    
-    return(G_rand)
+	G_rand = nx.Graph()
+	G_rand.add_nodes_from(nodes)
+	
+	#Setup edges
+	combis = list(itertools.combinations(nodes, 2))
+	edges_list = random.choices(combis, k=edges)
+	G_rand.add_edges_from(edges_list)
+	
+	return(G_rand)
 
 def powerlaw():
 	""" """
