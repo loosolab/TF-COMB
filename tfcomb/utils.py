@@ -11,6 +11,7 @@ from kneed import DataGenerator, KneeLocator
 import statsmodels.stats.multitest
 
 import pysam
+from tfcomb.logging import TFcombLogger, InputError
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
 
@@ -730,7 +731,6 @@ def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, l
 		Number of threads to use for multiprocessing. Default: 1.
 	logger : logger
 		A logger to use for logging progress.
-
 	"""
 	
 	if logger == None:

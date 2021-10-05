@@ -1,5 +1,10 @@
 import pandas as pd
 pd.options.mode.chained_assignment = None #suppress 'SettingWithCopyWarning' prints
+import copy
+import os
+import numpy as np
+
+import tobias
 
 #UROPA annotation
 import logging
@@ -15,7 +20,8 @@ from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.obo_parser import GODag
 
 #Import tfcomb
-import tfcomb.utils
+import tfcomb
+from tfcomb.utils import check_type, check_value
 from tfcomb.logging import TFcombLogger
 
 #Load internal data
@@ -31,7 +37,7 @@ name_to_taxid = {"human": 9606,
 #----------------------------- Annotation of sites -----------------------------#
 #-------------------------------------------------------------------------------#
 
-def annotate_peaks(regions, gtf, config=None, threads=1, verbosity=1):
+def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 	"""
 	Annotate regions with genes from .gtf using UROPA _[1]. 
 
@@ -40,17 +46,18 @@ def annotate_peaks(regions, gtf, config=None, threads=1, verbosity=1):
 	regions : tobias.utils.regions.RegionList()
 		A RegionList object with positions of genomic elements e.g. TFBS.
 	gtf : str
-		Path to .gtf file
-	config : dict
+		Path to .gtf file containing genomic elements for annotation.
+	config : dict, optional
 		A dictionary indicating how regions should be annotated. Default is to annotate feature 'gene' within -10000;1000bp of the gene start. See 'Examples' of how to set up a custom configuration dictionary.
-	threads : int
+	threads : int, optional
 		Number of threads to use for multiprocessing. Default: 1.
-	verbosity : int
-		Level of verbosity of logger. One of 0,1,2
+	verbosity : int, optional
+		Level of verbosity of logger. One of 0,1, 2. Default: 1.
 
 	Returns
 	--------
 	None
+		The .annotation attribute is added to each region in input regions. See 'Examples' of how to access this information.
 
 	Reference
 	----------
@@ -65,19 +72,24 @@ def annotate_peaks(regions, gtf, config=None, threads=1, verbosity=1):
 					              "feature": "gene"}],
 					"priority": True, 
 					"show_attributes": "all"}
+
+	#TODO
 	"""
 	
-	#TODO: Check input types
-	check_type(regions, [tobias.utils.regions.RegionList()], "regions")
+	#Check input types
+	check_type(regions, tobias.utils.regions.RegionList(), "regions")
+	check_type(gtf, str, "gtf")
+	check_type(config, [type(None), dict], "config")
+	check_value(threads, vmin=1, name="threads")
 
-
-	#setup logger
-	logger = logging.getLogger("logger")
+	#Setup logger (also checks verbosity is valid)
+	logger = TFcombLogger(verbosity)
 	
+	#Establish configuration dict
 	if config is None:
 		cfg_dict = {"queries": [{"distance": [10000, 1000], 
-					"feature_anchor": "start", 
-					"feature": "gene"}],
+								"feature_anchor": "start", 
+								"feature": "gene"}],
 					"priority": True, 
 					"show_attributes": "all"}
 	else:
@@ -187,8 +199,6 @@ def _annotate_peaks_chunk(region_dicts, gtf, cfg_dict):
 
 	#For each peak in input peaks, collect all_valid_annotations
 	all_valid_annotations = []
-	n_regions = len(region_dicts)
-	n_progress = int(n_regions / 10)
 	for i, region in enumerate(region_dicts):
 	
 		#Annotate single peak

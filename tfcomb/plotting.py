@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ import graphviz
 from adjustText import adjust_text
 
 
-from tfcomb.utils import check_columns, check_type
+from tfcomb.utils import check_columns, check_type, check_string
 from tfcomb.logging import TFcombLogger
 
 
@@ -38,6 +39,7 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	"""
 
 	check_columns(rules_table, [yaxis, color_by, size_by])	
+	check_type(figsize, tuple, "figsize")
 
 	fig, ax = plt.subplots(figsize=figsize) 
 
@@ -56,9 +58,8 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 
 	ax.grid()
 
-	labels = list(rules_table.index)
-
 	# Tweak the figure to finalize
+	labels = list(rules_table.index)
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
 	ax.set_xticklabels(labels, rotation=45, ha="right")
 
@@ -142,15 +143,38 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 
 	return(h)
 
-def scatter(table, x, y, label, label_fontsize, save=None):
-	""" Plot scatter-plot of x/y values within table """
+def scatter(table, x, 
+				   y, 
+				   label=None, 
+				   label_fontsize=9, 
+				   save=None):
+	""" Plot scatter-plot of x/y values within table.
+	
+	Parameters
+	-----------
+	
+
+	"""
 
 	g = sns.jointplot(data=table, x=x, y=y, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 	
 
 
-def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None, label=None, 
-			label_fontsize=9, save=None):
+	
+
+
+
+	return(g)
+
+
+
+def volcano(table, measure_col=None, 
+				   pvalue_col=None, 
+				   measure_threshold=None, 
+				   pvalue_threshold=None, 
+				   label=None, 
+				   label_fontsize=9, 
+				   save=None):
 	"""
 	Plot volcano-style plots combining a measure and a pvalue.
 
@@ -158,28 +182,29 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 	-----------
 	table : pd.DataFrame
 		A table containing columns of 'measure' and 'pvalue'.
-	measure : str
+	measure_col : str
 		The measure to show on the x-axis.
-	pvalue : str
+	pvalue_col : str
 		The column containing p-values (without any log-transformation).
-	measure_threshold : float or list of floats or "off"
-		If 'off', no measure threshold is set
-	pvalue_threshold : float between 0-1
+	measure_threshold : float, tuple of floats or None
+		If 'off', no measure threshold is set.
+	pvalue_threshold : float between 0-1, optional
 		Default: 0.05.
 	label : list of points to label
+		"selection"
 	"""
 
 	#todo: check that pvalue column is given
 
-	check_columns(table, [measure, pvalue])	
+	check_columns(table, [measure_col, pvalue_col])	
 	pseudo = 10**(-300) #smallest pvalue possible
 
 	#Convert pvalue to -log10
 	table = table.copy() #ensures that we don't change the table in place
-	pval_col = "-log10({0})".format(pvalue)
-	table[pval_col] = -np.log10(table[pvalue] + pseudo)
+	log_col = "-log10({0})".format(pvalue_col)
+	table[log_col] = -np.log10(table[pvalue_col] + pseudo)
 
-	g = sns.jointplot(data=table, x=measure, y=pval_col, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	g = sns.jointplot(data=table, x=measure_col, y=log_col, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if pvalue_threshold is not None:
@@ -188,33 +213,42 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 
 	if measure_threshold is not None:
 		
-		#if measure_threshold
+		if isinstance(measure_threshold, tuple): #two thresholds
+			for threshold in measure_threshold:
+				g.ax_joint.axvline(threshold, linestyle="--", color="grey")
+				g.ax_marg_x.axvline(threshold, linestyle="--", color="grey")
+		else:
+			g.ax_joint.axvline(measure_threshold, linestyle="--", color="grey")
+			g.ax_marg_x.axvline(measure_threshold, linestyle="--", color="grey")
 
-		g.ax_joint.axvline(measure_threshold, linestyle="--", color="grey")
-		g.ax_marg_x.axvline(measure_threshold, linestyle="--", color="grey")	#x-axis (measure) threshold
-
-	## Create selection of pairs below above thresholds
+	## Mark selection of pairs below above thresholds in red
 	if measure_threshold is not None or pvalue_threshold is not None:
 
+		if measure_threshold is not None and not isinstance(measure_threshold, tuple): #measure threshold is value; assumed to be higher threshold
+			measure_threshold = (-np.inf, measure_threshold)
+		
 		#Set threshold to minimum if not set
-		pvalue_threshold = np.min(table[pval_col]) if pvalue_threshold is None else pvalue_threshold
-		measure_threshold = np.min(table[measure]) if measure_threshold is None else measure_threshold
+		pvalue_threshold = np.min(table[pvalue_col]) if pvalue_threshold is None else pvalue_threshold
+		measure_threshold = np.min(table[measure_col]) if measure_threshold is None else measure_threshold
 
-		selection = table[(table[measure] >= measure_threshold) & 
-						  (table[pvalue] <= pvalue_threshold)]
+		selection = table[((table[measure_col] <= measure_threshold[0]) | (table[measure_col] >= measure_threshold[1])) &
+						   (table[pvalue_col] <= pvalue_threshold)]
 		n_selected = len(selection)
 
 		#Mark chosen TF pairs in red
-		xvals = selection[measure]
-		yvals = selection[pval_col]
+		xvals = selection[measure_col]
+		yvals = selection[log_col]
 		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", linewidth=0.2, 
 							label="Selection (n={0})".format(n_selected))
 
 	#Label given indices
 	if label is not None:
+		
+		sub = table.loc[l]
+		# _add_labels(table, measure_col, log_col, )
 		txts = []
 		for l in label:
-			coord = [table.loc[l,measure], table.loc[l,pval_col]]
+			coord = [table.loc[l,measure_col], table.loc[l,log_col]]
 			
 			ax = g.ax_joint
 			ax.scatter(coord[0], coord[1], color="red")
@@ -230,6 +264,23 @@ def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_thr
 	return(g)
 
 #labels
+
+#Add labels to ax
+def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
+	""" Utility to add labels to coordinates 
+
+	Parameters
+	----------
+	label : str
+		Name of column or "index".
+
+	Returns 
+	--------
+	None 
+		The labels are added to ax in place
+	"""
+	pass
+
 
 
 def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
@@ -255,9 +306,9 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 
 	"""
 	
+	check_string(aspect, ["BP", "CC", "MF"], "aspect")
 	#aspect has to be one of {'BP', 'CC', 'MF'}
 	
-
 	#Choose aspect
 	aspect_table = table[table["NS"] == aspect]
 	aspect_table.loc[:,"-log(p-value)"] = -np.log(aspect_table["p_fdr_bh"])
