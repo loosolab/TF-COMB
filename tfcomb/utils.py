@@ -14,6 +14,7 @@ import pysam
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
 import tfcomb
+import pathlib
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -98,6 +99,30 @@ def check_columns(df, columns):
 		error_str = "Columns '{0}' are not found in dataframe. Available columns are: {1}".format(not_found, df_columns)
 		raise InputError(error_str)
 		
+def check_dir(dir_path, create=True):
+	""" Check if a dir is writeable.
+	
+	Parameters
+	------------
+	dir_path : str
+		A path to a directory.
+	
+	Raises
+	--------
+	InputError
+		If dir_path is not writeable.
+	"""
+	#Check if dir already exists
+	if dir_path is not None: #don't check path given as None; assume that this is taken care of elsewhere
+		if os.path.exists(dir_path):
+			if not os.path.isdir(dir_path): # is it a file or a dir?
+				raise InputError("Path '{0}' is not a directory".format(dir_path))
+
+		#check writeability of parent dir
+		else:
+			if create:
+				pathlib.Path(dir_path).mkdir(parents=True, exist_ok=True)
+			
 
 def check_writeability(file_path):
 	""" Check if a file is writeable.
