@@ -1904,10 +1904,10 @@ class DistObj():
 			return False
 		return True
 
-	def shift_signal(self,smoothed):
+	def shift_signal(self, smoothed):
 		
 		datasource = None
-		tfcomb.utils.check_type(smoothed,bool)
+		tfcomb.utils.check_type(smoothed, bool)
 		if smoothed:
 			self.check_smoothed()
 			datasource = self.smoothed
@@ -1925,7 +1925,7 @@ class DistObj():
 		datasource = datasource.add(min_values, axis=0)
 		datasource = datasource.reset_index()
 		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		self.shift = pd.concat([datasource.TF1,datasource.TF2,min_values], axis = 1)
+		self.shift = pd.concat([datasource.TF1, datasource.TF2, min_values], axis=1)
 		self.shift.index = self.shift["TF1"]  + "-" + self.shift["TF2"]
 
 
