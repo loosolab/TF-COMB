@@ -1905,7 +1905,19 @@ class DistObj():
 		return True
 
 	def shift_signal(self, smoothed):
-		
+		""" Shifts the signal above zero. 
+
+		Parameters
+		----------
+		smoothed: bool 
+			True if the signal was smoothed beforehand, false otherwise
+
+		Returns:
+		----------
+		None 
+			Fills the object variables .shift and  either .smoothed or .corrected
+
+		"""
 		datasource = None
 		tfcomb.utils.check_type(smoothed, bool)
 		if smoothed:
@@ -1920,14 +1932,14 @@ class DistObj():
 			return
 
 		self.logger.info("Shifting signals above zero")
+
 		datasource = datasource.set_index(["TF1", "TF2"])
 		min_values = datasource.min(axis=1).abs()
 		datasource = datasource.add(min_values, axis=0)
 		datasource = datasource.reset_index()
+		self.shift = min_values.reset_index()
 		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		self.shift = pd.concat([datasource.TF1, datasource.TF2, min_values], axis=1)
-		self.shift.index = self.shift["TF1"]  + "-" + self.shift["TF2"]
-
+		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
 
 		if smoothed:
 			self.check_smoothed()
@@ -1935,6 +1947,53 @@ class DistObj():
 		else:
 			self.check_corrected()
 			self.corrected = datasource		
+
+	def reset_signal(self, smoothed):
+		""" Resets the signals to their original state. 
+
+		Parameters
+		----------
+		smoothed: bool 
+			True if the signal was smoothed beforehand, false otherwise
+
+		Returns:
+		----------
+		None 
+			Resets the object variables .shift and fills either .smoothed or .corrected
+
+		"""
+		datasource = None
+		tfcomb.utils.check_type(smoothed, bool)
+		if smoothed:
+			self.check_smoothed()
+			datasource = self.smoothed
+		else:
+			self.check_corrected()
+			datasource = self.corrected
+		
+		if self.shift is None:
+			self.logger.info("Signals already in original state.")
+			return
+
+		self.logger.info("Resetting signals")
+
+		datasource = datasource.set_index(["TF1", "TF2"])
+		self.shift = self.shift.set_index(["TF1", "TF2"])
+		shift_values = self.shift[0]
+		datasource = datasource.subtract(shift_values, axis=0)
+		datasource = datasource.reset_index()
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+
+		#save the min values to reset the signals
+		self.shift = None
+
+
+		if smoothed:
+			self.check_smoothed()
+			self.smoothed = datasource
+		else:
+			self.check_corrected()
+			self.corrected = datasource
 
 	
 
