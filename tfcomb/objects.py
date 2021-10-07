@@ -1918,20 +1918,25 @@ class DistObj():
 		if self.shift is not None:
 			self.logger.info("Signals already above zero, skipping shift.")
 			return
-		self.logger.info("Shifting signals above zero")
-		shift = {}
-		for idx,row in datasource.iterrows():
-			tf1 = row[0]
-			tf2 = row[1]
-			ind = tf1 + "-" + tf2 
-			data_line =  datasource.loc[ind].iloc[2:]
-			min_val = data_line.min()
-			#TODO: make faster
-			datasource.loc[ind] = [tf1, tf2]+[x + abs(min_val) for x in datasource.loc[ind].iloc[2:]]
-			shift[tf1,tf2] = [tf1,tf2,min_val]
-		self.shift = pd.DataFrame.from_dict(shift, orient="index", columns=["TF1", "TF2", "Shift value"]).reset_index(drop=True)
-		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
 
+		self.logger.info("Shifting signals above zero")
+		datasource = datasource.set_index(["TF1", "TF2"])
+		min_values = datasource.min(axis=1).abs()
+		datasource = datasource.add(min_values, axis=0)
+		datasource = datasource.reset_index()
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+		self.shift = pd.concat([datasource.TF1,datasource.TF2,min_values], axis = 1)
+		self.shift.index = self.shift["TF1"]  + "-" + self.shift["TF2"]
+
+
+		if smoothed:
+			self.check_smoothed()
+			self.smoothed = datasource
+		else:
+			self.check_corrected()
+			self.corrected = datasource		
+
+	
 
 
 	#-------------------------------------------------------------------------------------------#
@@ -2477,7 +2482,6 @@ class DistObj():
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		
-
 		self.check_corrected()
 
 		if isinstance(prominence, str):
