@@ -39,7 +39,8 @@ import tfcomb.plotting
 import tfcomb.network
 import tfcomb.analysis
 from tfcomb.counting import count_co_occurrence, count_distances
-from tfcomb.logging import *
+from tfcomb.logging import TFcombLogger, InputError
+from tfcomb.utils import check_type, check_value, check_string, unique_region_names
 from tfcomb.utils import *
 
 
@@ -638,7 +639,8 @@ class CombObj():
 						   stranded=False, 
 						   directional=False, 
 						   binarize=False,
-						   anchor="inner"):
+						   anchor="inner",
+						   n_background=50):
 		""" 
 		Count co-occurrences between TFBS. This function requires .TFBS to be filled by either `TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`. 
 		This function can be followed by .market_basket to calculate association rules.
@@ -661,6 +663,10 @@ class CombObj():
 			Whether to count a TF1-TF2 more than once per window (e.g. in the case of "<TF1> <TF2> <TF2> (...)"). Default: False.
 		anchor : str, optional
 			The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
+		n_background : int, optional
+			Number of random co-occurrence backgrounds to obtain. This number effects the runtime of .count_within, but 'threads' can be used to speed up background calculation. Default: 50.
+		threads : int, optional
+			Number of threads to use. Default: 1.
 
 		Returns
 		----------
@@ -685,7 +691,7 @@ class CombObj():
 		tfcomb.utils.check_type(binarize, bool, "binarize")
 		tfcomb.utils.check_string(anchor, list(anchor_str_to_int.keys()), "anchor")
 
-		self.logger.info("Setting up binding sites")
+		self.logger.info("Setting up binding sites for counting")
 	
 		#Should strand be taken into account?
 		TFBS = copy.deepcopy(self.TFBS)
@@ -704,7 +710,7 @@ class CombObj():
 		sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, name_to_idx[site.name]) for site in TFBS]) #numpy integer array
 
 		#---------- Count co-occurrences within TFBS ---------#
-		self.logger.debug("Counting co-occurrences within sites")
+		self.logger.info("Counting co-occurrences within sites")
 		n_TFs = len(TF_names)
 		binary = 0 if binarize == False else 1
 		anchor_int = anchor_str_to_int[anchor]
@@ -719,6 +725,30 @@ class CombObj():
 		self.count_names = TF_names #this can be different from TF_names if stranded == True
 		self.TF_counts = TF_counts
 		self.pair_counts = pair_counts
+
+		#---------- Count co-occurrences within shuffled background ---------#
+		self.logger.info("Counting co-occurrence within background")
+		args = locals()
+		args["directional"] = directional
+		args["binary"] = binary
+		args["anchor"] = anchor_int
+		args["n_TFs"] = n_TFs
+		l = [] #list of background pair_counts
+		for i in range(n_background):
+			l.append(tfcomb.utils.calculate_background(sites, args, seed=i))
+
+		#Calculate z-score per pair
+		stacked = np.stack(l) #3-dimensional array of stacked pair_counts from background
+		stds = np.std(stacked, axis=0)
+		stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
+		means = np.mean(stacked, axis=0)
+		z = (pair_counts - means)/stds	#pair_counts are the true osberved co-occurrences
+
+		#Handle NaNs introduced in zscore calculation
+		z[np.isnan(z) & (pair_counts == means)] = 0
+		z[np.isnan(z) & (pair_counts > means)] = np.inf
+		z[np.isnan(z) & (pair_counts < means)] = -np.inf
+		self.zscore = z
 
 		#Update object variables
 		self.rules = None 	#Remove .rules if market_basket() was previously run
@@ -797,16 +827,13 @@ class CombObj():
 		measure : str or list of strings, optional
 			The measure(s) to use for market basket analysis. Can be any of: ["cosine", "confidence", "lift", "jaccard"]. Default: 'cosine'.
 		threads : int, optional
-			Threads to use for multiprocessing. Default: 1.
+			Threads to use for multiprocessing. This is passed to .count_within() in case the <CombObj> does not contain any counts yet. Default: 1.
 
 		Raises
 		-------
 		InputError 
-			If no TF counts are available or measure is not within available measures.
+			If the measure given is not within available measures.
 		"""
-
-		#Check that TF counts are available
-		self._check_counts()
 
 		#Check given input
 		check_value(threads, vmin=1, name="threads")
@@ -816,6 +843,13 @@ class CombObj():
 			measure = [measure]
 		for m in measure:
 			tfcomb.utils.check_string(m, available_measures)
+
+		#Check that TF counts are available; otherwise calculate counts
+		try:
+			self._check_counts()
+		except InputError:
+			self.logger.warning("No counts found in <CombObj>. Running <CombObj>.count_within() with standard parameters.")
+			self.count_within(threads=threads)
 
 		#Check show columns; these are the columns which will be shown in .rules output
 		available = ["TF1_TF2_count", "TF1_count", "TF2_count", "n_baskets", "TF1_TF2_support", "TF1_support", "TF2_support"]
@@ -867,14 +901,20 @@ class CombObj():
 		table.sort_values(measure, ascending=False, inplace=True)
 		table.reset_index(inplace=True, drop=True)
 
+		#Add z-score per pair
+		zscore_table = pd.DataFrame(self.zscore, index=self.TF_names, columns=self.TF_names) #size n x n TFs
+		zscore_table["TF1"] = zscore_table.index
+		ztable_table_long = pd.melt(zscore_table, id_vars=["TF1"], var_name=["TF2"], value_name="zscore")  #long format (TF1, TF2, value)
+		table = table.merge(ztable_table_long)
+
 		#Calculate p-values for the measure(s) given
-		self.logger.debug("Calculating p-value for {0} rules".format(len(table)))
-		if threads == 1:
-			self.logger.info("Parameter 'threads' is set to '1' - to speed up p-value calculation, please increase the number of threads used.")
+		#self.logger.debug("Calculating p-value for {0} rules".format(len(table)))
+		#if threads == 1:
+		#	self.logger.info("Parameter 'threads' is set to '1' - to speed up p-value calculation, please increase the number of threads used.")
 		
-		for metric in measure:
-			self.logger.debug("Calculating p-value for {0}".format(metric))
-			tfcomb.utils.tfcomb_pvalue(table, measure=metric, threads=threads, logger=self.logger) #adds pvalue column to table
+		#for metric in measure:
+		#	self.logger.debug("Calculating p-value for {0}".format(metric))
+		#	tfcomb.utils.tfcomb_pvalue(table, measure=metric, threads=threads, logger=self.logger) #adds pvalue column to table
 
 		#Create internal node table for future network analysis
 		TF1_table = table[["TF1", "TF1_count", "TF1_support"]].set_index("TF1", drop=False).drop_duplicates()
@@ -885,7 +925,7 @@ class CombObj():
 		table.index = table["TF1"] + "-" + table["TF2"]
 
 		#Subset to _show_columns
-		table = table[["TF1", "TF2"] + _show_columns + measure]
+		table = table[["TF1", "TF2"] + _show_columns + measure + ["zscore"]]
 
 		#Market basket is done; save to .rules
 		self.rules = table

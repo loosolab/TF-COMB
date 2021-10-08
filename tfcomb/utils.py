@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 from copy import deepcopy
+import time
 import scipy.stats
 import random
 import string
@@ -11,7 +12,9 @@ from kneed import DataGenerator, KneeLocator
 import statsmodels.stats.multitest
 
 import pysam
+import tfcomb
 from tfcomb.logging import TFcombLogger, InputError
+from tfcomb.counting import count_co_occurrence
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
 
@@ -446,7 +449,13 @@ def remove_duplicates(TFBS):
 	return(filtered)
 
 def resolve_overlapping(TFBS):
-	""" Remove self-overlapping regions """
+	""" Remove self-overlapping regions from TFBS 
+	
+	Parameters
+	-----------
+	TFBS : tobias.regions.RegionList
+		
+	"""
 
 	#Split TFBS into dict per name
 	sites_per_name = {}
@@ -680,38 +689,85 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 
 		return(locations)
 
-def shuffle_array(arr):
-    length = arr.shape[0]
-    return(arr[np.random.permutation(length),:])
+#--------------------------------- Background calculation ---------------------------------#
 
-def shuffle_sites(sites):
-    """ Shuffle TFBS names to existing positions and updates lengths of the new positions.
+def shuffle_array(arr, seed=1):
+	np.random.seed(seed)
+	length = arr.shape[0]
+	return(arr[np.random.permutation(length),:])
+
+def shuffle_sites(sites, seed=1):
+	""" Shuffle TFBS names to existing positions and updates lengths of the new positions.
 	
 	Parameters
 	-----------
 	sites : np.array
+		An array of sites in shape (n_sites,4), where each row is a site and columns correspond to chromosome, start, end, name.
 	
+	Returns
+	--------
+	An array containing shuffled names with site lengths corresponding to original length of sites.
+	"""
+	
+	#Establish lengths of regions
+	lengths = sites[:,2] - sites[:,1]
+	sites_plus = np.c_[sites, lengths]
+	
+	#Shuffle names (and corresponding lengths)
+	sites_plus[:,-2:] = shuffle_array(sites_plus[:,-2:], seed)
+	
+	#Adjust coordinates to new length
+	#new start = old start + old half length - new half length
+	#new end = new start + new length
+	sites_plus[:,1] = sites_plus[:,1] + ((sites_plus[:,2] - sites_plus[:,1])/2) - sites_plus[:,-1]/2 #new start
+	sites_plus[:,2] = sites_plus[:,1] + sites_plus[:,-1] #new end
+	
+	#Remove length again
+	sites_shuffled = sites_plus[:,:-1]
+	
+	return(sites_shuffled)
 
+def calculate_background(sites, args, seed=1):
+	""" 
+	Wrapper to shuffle sites and count co-occurrence of the shuffled sites.
+	
+	Parameters
+	------------
+	sites : np.array
+		An array of sites in shape (n_sites,4), where each row is a site and columns correspond to chromosome, start, end, name.
+	args : dict
+		A dictionary containing args for count_co_occurrence.
 	"""
 
-    
-    #Establish lengths of regions
-    lengths = sites[:,2] - sites[:,1]
-    sites_plus = np.c_[sites, lengths]
-    
-    #Shuffle names (and corresponding lengths)
-    sites_plus[:,-2:] = shuffle_array(sites_plus[:,-2:])
-    
-    #Adjust coordinates to new length
-    #new start = old start + old half length - new half length
-    #new end = new start + new length
-    sites_plus[:,1] = sites_plus[:,1] + ((sites_plus[:,2] - sites_plus[:,1])/2) - sites_plus[:,-1]/2 #new start
-    sites_plus[:,2] = sites_plus[:,1] + sites_plus[:,-1] #new end
-    
-    #Remove length again
-    sites_shuffled = sites_plus[:,:-1]
-    
-    return(sites_shuffled)
+	#Parameters from args
+	directional = args["directional"]
+	min_distance = args["min_distance"]
+	max_distance = args["max_distance"]
+	max_overlap = args["max_overlap"]
+	binary = args["binary"]
+	anchor = args["anchor"]
+	n_TFs = args["n_TFs"]
+	
+	#Shuffle sites
+	s = datetime.datetime.now()
+	shuffled = shuffle_sites(sites, seed=seed)
+	e = datetime.datetime.now()
+	print("Shuffling: {0}".format(e-s))
+	
+	s = datetime.datetime.now()
+	_, pair_counts = count_co_occurrence(shuffled, 
+													min_distance,
+													max_distance,
+													max_overlap, 
+													binary,
+													anchor,
+													n_TFs)
+	e = datetime.datetime.now()
+	print("counting: {0}".format(e-s))
+	pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
+	
+	return(pair_counts)
+
 
 #--------------------------------- P-value calculation ---------------------------------#
 
