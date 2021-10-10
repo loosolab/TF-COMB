@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from copy import deepcopy
 import time
+import datetime
 import scipy.stats
 import random
 import string
@@ -689,6 +690,13 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 
 		return(locations)
 
+def merge_pair_locations(locations):
+	""" """
+
+	l = RegionList()
+
+	return(l)
+
 #--------------------------------- Background calculation ---------------------------------#
 
 def shuffle_array(arr, seed=1):
@@ -727,32 +735,36 @@ def shuffle_sites(sites, seed=1):
 	
 	return(sites_shuffled)
 
-def calculate_background(sites, args, seed=1):
+def calculate_background(sites, min_distance, 
+								max_distance, 
+								max_overlap,
+								binary,
+								anchor,
+								n_TFs,
+								directional,
+								seed=1):
 	""" 
-	Wrapper to shuffle sites and count co-occurrence of the shuffled sites.
+	Wrapper to shuffle sites and count co-occurrence of the shuffled sites. 
 	
 	Parameters
 	------------
 	sites : np.array
 		An array of sites in shape (n_sites,4), where each row is a site and columns correspond to chromosome, start, end, name.
-	args : dict
-		A dictionary containing args for count_co_occurrence.
+	min_distance
+	max_distance
+	max_overlap
+	binary
+	anchor
+	n_TFs
+	directional
+	seed
 	"""
-
-	#Parameters from args
-	directional = args["directional"]
-	min_distance = args["min_distance"]
-	max_distance = args["max_distance"]
-	max_overlap = args["max_overlap"]
-	binary = args["binary"]
-	anchor = args["anchor"]
-	n_TFs = args["n_TFs"]
 	
 	#Shuffle sites
 	s = datetime.datetime.now()
 	shuffled = shuffle_sites(sites, seed=seed)
 	e = datetime.datetime.now()
-	print("Shuffling: {0}".format(e-s))
+	#print("Shuffling: {0}".format(e-s))
 	
 	s = datetime.datetime.now()
 	_, pair_counts = count_co_occurrence(shuffled, 
@@ -763,13 +775,75 @@ def calculate_background(sites, args, seed=1):
 													anchor,
 													n_TFs)
 	e = datetime.datetime.now()
-	print("counting: {0}".format(e-s))
+	#print("counting: {0}".format(e-s))
 	pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
 	
 	return(pair_counts)
 
 
 #--------------------------------- P-value calculation ---------------------------------#
+
+def get_threshold(data, which="upper", percent=0.05):
+    """
+    Function to get upper/lower threshold(s) based on the distribution of data. The threshold is calculated as the probability of "percent" (upper=1-percent).
+    
+    Parameters
+    ------------
+    which : str
+        Which threshold to calculate. Can be one of "upper", "lower", "both". Default: "upper".
+    percent : float between 0-1
+        Controls how strict the threshold should be set in comparison to the distribution. Default: 0.05.
+    
+    Returns
+    ---------
+    If which is one of "upper"/"lower", get_threshold returns a float. If "both", get_threshold returns a list of two float thresholds.
+    """
+    
+    distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace, 
+					 scipy.stats.expon, scipy.stats.truncnorm, scipy.stats.truncexpon, scipy.stats.wald, scipy.stats.weibull_min]
+        
+    #Check input parameters
+    check_string(which, ["upper", "lower", "both"], "which")
+    check_value(percent, vmin=0, vmax=1, name="percent")
+    
+    
+    #Fit data to each distribution
+    distribution_dict = {}
+    for distribution in distributions:
+        params = distribution.fit(data)
+
+        #Test fit using negative loglikelihood function
+        mle = distribution.nnlf(params, data)
+
+        #Save info on distribution fit    
+        distribution_dict[distribution.name] = {"distribution": distribution,
+                                                "params": params, 
+                                                "mle": mle}
+
+    #Get best distribution
+    best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
+    parameters = distribution_dict[best_fit_name]["params"]
+    best_distribution = distribution_dict[best_fit_name]["distribution"]
+
+    #Get threshold
+    thresholds = best_distribution(*parameters).ppf([percent, 1-percent])
+    
+    if which == "upper":
+        final = thresholds[-1]
+    elif which == "lower":
+        final = thresholds[0]
+    elif which == "both":
+        final = thresholds
+        
+    #Plot fit and threshold
+    #plt.hist(data, bins=20, density=True)
+    #xmin = np.min(data)
+    #xmax = np.max(data)
+    #x = np.linspace(xmin, xmax, 100)
+    #plt.plot(x, best_distribution(*params).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
+    #plt.legend()
+    
+    return(final)
 
 def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, logger=None):
 	"""
@@ -841,8 +915,7 @@ def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, l
 	tuples_chunks = [tuples[i:i+per_chunk] for i in range(0, n_tuples, per_chunk)]
 
 	### Calculate pvalues with/without multiprocessing
-	p = Progress(n_jobs, 10, logger)
-
+	
 	if threads == 1:
 		pvalues = []
 		p = Progress(n_jobs, 10, logger) #Setup progress object

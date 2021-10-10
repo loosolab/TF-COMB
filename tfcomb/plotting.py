@@ -10,11 +10,11 @@ import graphviz
 from adjustText import adjust_text
 
 
-from tfcomb.utils import check_columns, check_type, check_string
+from tfcomb.utils import check_columns, check_type, check_string, check_value
 from tfcomb.logging import TFcombLogger
 
 
-def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,7), save=None):
+def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,4), save=None):
 	""" 
 	Plot bubble plot with TF1-TF2 pairs on the x-axis and a choice of measure on the y-axis, as well as color and size of bubbles. 
 
@@ -143,127 +143,98 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 
 	return(h)
 
-def scatter(table, x, 
-				   y, 
-				   label=None, 
-				   label_fontsize=9, 
-				   save=None):
-	""" Plot scatter-plot of x/y values within table.
-	
-	Parameters
-	-----------
-	
-
-	"""
-
-	g = sns.jointplot(data=table, x=x, y=y, space=0, linewidth=0.2) #, joint_kws={"s": 100})
-	
-
-
-	
-
-
-
-	return(g)
-
-
-
-def volcano(table, measure_col=None, 
-				   pvalue_col=None, 
-				   measure_threshold=None, 
-				   pvalue_threshold=None, 
+def scatter(table, x, y, 
+				   x_threshold=None, 
+				   y_threshold=None, 
 				   label=None, 
 				   label_fontsize=9, 
 				   save=None):
 	"""
-	Plot volcano-style plots combining a measure and a pvalue.
+	Plot scatter-plot of x/y values within table. Can also set thresholds and label values within plot.
 
 	Parameters
 	-----------
 	table : pd.DataFrame
 		A table containing columns of 'measure' and 'pvalue'.
-	measure_col : str
+	x : str
 		The measure to show on the x-axis.
-	pvalue_col : str
+	y : str
 		The column containing p-values (without any log-transformation).
-	measure_threshold : float, tuple of floats or None
-		If 'off', no measure threshold is set.
-	pvalue_threshold : float between 0-1, optional
-		Default: 0.05.
+	x_threshold : float, tuple of floats or None
+		If None, no measure threshold is set. Default: None
+	y_threshold : float, tuple of floats or None
+		Default: None
 	label : list of points to label
-		"selection"
+		If None, no point labels are plotted. If "selection", the . Default: None.
 	"""
 
-	#todo: check that pvalue column is given
+	check_columns(table, [x, y])
 
-	check_columns(table, [measure_col, pvalue_col])	
-	pseudo = 10**(-300) #smallest pvalue possible
+	#todo: mask np inf data
+	
+	#Handle thresholds being either float or tuple
+	if x_threshold is not None:
+		x_threshold = (x_threshold,) if not isinstance(x_threshold, tuple) else x_threshold
+		for threshold in x_threshold:
+			check_value(threshold, name="x_threshold")
 
-	#Convert pvalue to -log10
-	table = table.copy() #ensures that we don't change the table in place
-	log_col = "-log10({0})".format(pvalue_col)
-	table[log_col] = -np.log10(table[pvalue_col] + pseudo)
+	if y_threshold is not None:
+		y_threshold = (y_threshold,) if not isinstance(y_threshold, tuple) else y_threshold
+		for threshold in y_threshold:
+			check_value(threshold, name="y_threshold")
 
-	g = sns.jointplot(data=table, x=measure_col, y=log_col, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	#Plot all data
+	g = sns.jointplot(data=table, x=x, y=y, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 
 	#Plot thresholds
-	if pvalue_threshold is not None:
-		g.ax_joint.axhline(-np.log10(pvalue_threshold + pseudo), linestyle="--", color="grey")
-		g.ax_marg_y.axhline(-np.log10(pvalue_threshold + pseudo), linestyle="--", color="grey") #y-axis (pvalue)
-
-	if measure_threshold is not None:
-		
-		if isinstance(measure_threshold, tuple): #two thresholds
-			for threshold in measure_threshold:
+	if x_threshold is not None:
+		for threshold in x_threshold:
 				g.ax_joint.axvline(threshold, linestyle="--", color="grey")
 				g.ax_marg_x.axvline(threshold, linestyle="--", color="grey")
-		else:
-			g.ax_joint.axvline(measure_threshold, linestyle="--", color="grey")
-			g.ax_marg_x.axvline(measure_threshold, linestyle="--", color="grey")
+
+	if y_threshold is not None:
+		for threshold in y_threshold:
+			g.ax_joint.axhline(threshold, linestyle="--", color="grey")
+			g.ax_marg_y.axhline(threshold, linestyle="--", color="grey")
 
 	## Mark selection of pairs below above thresholds in red
-	if measure_threshold is not None or pvalue_threshold is not None:
+	if x_threshold is not None or y_threshold is not None:
+		if x_threshold is not None:
+			if len(x_threshold) == 1: 
+				 x_threshold = (-np.inf, x_threshold[0])  #assume that value is lower bound
 
-		if measure_threshold is not None and not isinstance(measure_threshold, tuple): #measure threshold is value; assumed to be higher threshold
-			measure_threshold = (-np.inf, measure_threshold)
-		
+		if y_threshold is not None:
+			if len(y_threshold) == 1:
+				y_threshold = (-np.inf, y_threshold[0]) 
+
 		#Set threshold to minimum if not set
-		pvalue_threshold = np.min(table[pvalue_col]) if pvalue_threshold is None else pvalue_threshold
-		measure_threshold = np.min(table[measure_col]) if measure_threshold is None else measure_threshold
+		#pvalue_threshold = np.min(table[x]) if x_threshold is None else x_threshold
+		#measure_threshold = np.min(table[y]) if y_threshold is None else y_threshold
 
-		selection = table[((table[measure_col] <= measure_threshold[0]) | (table[measure_col] >= measure_threshold[1])) &
-						   (table[pvalue_col] <= pvalue_threshold)]
+		selection = table[((table[x] <= x_threshold[0]) | (table[x] >= x_threshold[1])) &
+						 ((table[y] <= y_threshold[0]) | (table[y] >= y_threshold[1]))]
 		n_selected = len(selection)
-
+		
 		#Mark chosen TF pairs in red
-		xvals = selection[measure_col]
-		yvals = selection[log_col]
+		xvals = selection[x]
+		yvals = selection[y]
 		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", linewidth=0.2, 
 							label="Selection (n={0})".format(n_selected))
 
 	#Label given indices
 	if label is not None:
-		
-		sub = table.loc[l]
-		# _add_labels(table, measure_col, log_col, )
-		txts = []
-		for l in label:
-			coord = [table.loc[l,measure_col], table.loc[l,log_col]]
-			
-			ax = g.ax_joint
-			ax.scatter(coord[0], coord[1], color="red")
-		
-			txts.append(ax.text(coord[0], coord[1], l, fontsize=label_fontsize))
-		
-		#Adjust overlapping labels
-		adjust_text(txts, ax=ax, add_objects=[], text_from_points=True, arrowprops=dict(arrowstyle='-', color='black', lw=0.5))  #, expand_text=(0.1,1.2), expand_objects=(0.1,0.1))
+		if isinstance(label, list):
+			pass
 
+
+		elif label == "selection":
+			_add_labels(selection, x, y, "index", g.ax_joint)
+
+	#Save plot to file
 	if save is not None:
 		plt.savefig(save, dpi=600)
 
 	return(g)
-
-#labels
 
 #Add labels to ax
 def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
@@ -271,15 +242,35 @@ def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
 
 	Parameters
 	----------
+	table : pandas.DataFrame
+		A dataframe containing coordinates and labels to plot.
+	x : str
+		The name of a column in table containing x coordinates.
+	y : str
+		The name of a column in table containing y cooordinates.
 	label : str
-		Name of column or "index".
+		Name of column or "index" containing labels to plot.
+	ax : plt axes
+
 
 	Returns 
 	--------
 	None 
 		The labels are added to ax in place
 	"""
-	pass
+
+	txts = []
+	for l in label:
+		coord = [table.loc[l,measure_col], table.loc[l,log_col]]
+		
+		ax = g.ax_joint
+		ax.scatter(coord[0], coord[1], color="red")
+	
+		txts.append(ax.text(coord[0], coord[1], l, fontsize=label_fontsize))
+	
+	#Adjust overlapping labels
+	adjust_text(txts, ax=ax, add_objects=[], text_from_points=True, arrowprops=dict(arrowstyle='-', color='black', lw=0.5))  #, expand_text=(0.1,1.2), expand_objects=(0.1,0.1))
+
 
 
 

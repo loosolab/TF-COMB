@@ -17,7 +17,7 @@ import community as community_louvain
 
 import tfcomb.utils
 from tfcomb.logging import TFcombLogger, InputError
-from tfcomb.utils import check_columns
+from tfcomb.utils import check_columns, check_type
 
 #-------------------------------------------------------------------------------#
 #------------------------ Build network from table -----------------------------#
@@ -405,7 +405,7 @@ def partition_louvain(G, weight=None, logger=None):
 	#No return - G is changed in place
 
 def partition_blockmodel(g):
-	""" Partitioning of a graph tool graph 
+	""" Partitioning of a graph tool graph using stochastic block model minimization.
 	
 	Parameters
 	-----------

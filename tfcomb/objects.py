@@ -177,15 +177,14 @@ class CombObj():
 	def _check_counts(self):
 		""" Internal check whether .count_within was already run. Raises InputError when counts are not available or if counts have the wrong dimensions."""
 
-		n_TFs = len(self.TF_names)
-
 		#Check if counts were set
-		attributes = ["TF_counts", "pair_counts"] #, "bg_counts_mean", "bg_counts_std"]
+		attributes = ["TF_counts", "pair_counts", "zscore"]
 		for att in attributes:
 			val = getattr(self, att)
 			if val is None:
 				raise InputError(f"Internal counts for '{att}' were not set. Please run .count_within() to obtain TF-TF co-occurrence counts.")
 			else:
+				n_TFs = len(self.count_names)	#can be different than self.TF_names if stranded == True
 				tfcomb.utils.check_type(val, np.ndarray, val) #raises inputerror if val is not None, but also not array
 				size = val.shape
 				
@@ -258,6 +257,7 @@ class CombObj():
 
 		#Overwrite self with CombObj
 		self = obj
+		self.set_verbosity(self.verbosity) #restart logger
 		
 		return(self)
 
@@ -385,6 +385,8 @@ class CombObj():
 
 			#Join all TFBS to one list
 			TFBS = RegionList(sum(results, []))
+
+		self.logger.info("Formatting scanned TFBS")
 
 		#Resolve overlaps
 		if keep_overlaps == False:
@@ -640,7 +642,8 @@ class CombObj():
 						   directional=False, 
 						   binarize=False,
 						   anchor="inner",
-						   n_background=50):
+						   n_background=50,
+						   threads=1):
 		""" 
 		Count co-occurrences between TFBS. This function requires .TFBS to be filled by either `TFBS_from_motifs`, `TFBS_from_bed` or `TFBS_from_tobias`. 
 		This function can be followed by .market_basket to calculate association rules.
@@ -701,7 +704,7 @@ class CombObj():
 			TF_names = unique_region_names(TFBS)
 		else:
 			TF_names = self.TF_names
-		self.logger.spam("TF_names: {0}".format(self.TF_names))
+		self.logger.spam("TF_names: {0}".format(TF_names))
 
 		#Convert TFBS to internal numpy integer format
 		chromosomes = {site.chrom:"" for site in TFBS}.keys()
@@ -728,14 +731,37 @@ class CombObj():
 
 		#---------- Count co-occurrences within shuffled background ---------#
 		self.logger.info("Counting co-occurrence within background")
-		args = locals()
-		args["directional"] = directional
-		args["binary"] = binary
-		args["anchor"] = anchor_int
-		args["n_TFs"] = n_TFs
-		l = [] #list of background pair_counts
-		for i in range(n_background):
-			l.append(tfcomb.utils.calculate_background(sites, args, seed=i))
+		args = (min_distance, max_distance,	max_overlap, binary, anchor_int, n_TFs, directional)
+
+		#setup multiprocessing
+		if threads == 1:
+			l = [] #list of background pair_counts
+
+			self.logger.info("Running with multiprocessing threads == 1. To change this, give 'threads' in the parameter of the function.")
+			p = Progress(n_background, 10, self.logger) #Setup progress object
+			for i in range(n_background):
+				all_args = (sites,) + args + (i,)
+				l.append(tfcomb.utils.calculate_background(*all_args))
+				p.write_progress(i)
+
+		else:
+			#Setup pool
+			pool = mp.Pool(threads)
+
+			#Add job per background iteration
+			jobs = []
+			for i in range(n_background):
+				self.logger.spam("Adding job for i = {0}".format(i))
+				all_args = (sites,) + args + (i,)
+				job = pool.apply_async(tfcomb.utils.calculate_background, all_args)
+				jobs.append(job)
+			pool.close()
+			
+			log_progress(jobs, self.logger) #only exits when the jobs are complete
+			
+			self.logger.debug("Fetching jobs from pool")
+			l = [job.get() for job in jobs]
+			pool.join()
 
 		#Calculate z-score per pair
 		stacked = np.stack(l) #3-dimensional array of stacked pair_counts from background
@@ -817,8 +843,8 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 
 	def market_basket(self, measure="cosine", 
-						    threads=1,
-						    _show_columns=["TF1_TF2_count", "TF1_count", "TF2_count"]):
+							threads=1,
+							_show_columns=["TF1_TF2_count", "TF1_count", "TF2_count"]):
 		"""
 		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within().
 	
@@ -861,12 +887,12 @@ class CombObj():
 		n_baskets = len(self.TFBS) #number of baskets is the number of TFBS
 
 		#Convert pair counts to table and convert to long format
-		pair_counts_table = pd.DataFrame(self.pair_counts, index=self.TF_names, columns=self.TF_names) #size n x n TFs
+		pair_counts_table = pd.DataFrame(self.pair_counts, index=self.count_names, columns=self.count_names) #size n x n TFs
 		pair_counts_table["TF1"] = pair_counts_table.index
 		table = pd.melt(pair_counts_table, id_vars=["TF1"], var_name=["TF2"], value_name="TF1_TF2_count")  #long format (TF1, TF2, value)
 
 		#Add TF single counts to table
-		vals = zip(self.TF_names, self.TF_counts)
+		vals = zip(self.count_names, self.TF_counts)
 		single_counts = pd.DataFrame(vals, columns=["TF", "count"])
 		tf1_counts = single_counts.rename(columns={"TF": "TF1", "count":"TF1_count"})
 		tf2_counts = single_counts.rename(columns={"TF": "TF2", "count":"TF2_count"})
@@ -902,7 +928,7 @@ class CombObj():
 		table.reset_index(inplace=True, drop=True)
 
 		#Add z-score per pair
-		zscore_table = pd.DataFrame(self.zscore, index=self.TF_names, columns=self.TF_names) #size n x n TFs
+		zscore_table = pd.DataFrame(self.zscore, index=self.count_names, columns=self.count_names) #size n x n TFs
 		zscore_table["TF1"] = zscore_table.index
 		ztable_table_long = pd.melt(zscore_table, id_vars=["TF1"], var_name=["TF2"], value_name="zscore")  #long format (TF1, TF2, value)
 		table = table.merge(ztable_table_long)
@@ -917,8 +943,8 @@ class CombObj():
 		#	tfcomb.utils.tfcomb_pvalue(table, measure=metric, threads=threads, logger=self.logger) #adds pvalue column to table
 
 		#Create internal node table for future network analysis
-		TF1_table = table[["TF1", "TF1_count", "TF1_support"]].set_index("TF1", drop=False).drop_duplicates()
-		TF2_table = table[["TF2", "TF2_count", "TF2_support"]].set_index("TF2", drop=False).drop_duplicates()
+		TF1_table = table[["TF1", "TF1_count"]].set_index("TF1", drop=False).drop_duplicates()
+		TF2_table = table[["TF2", "TF2_count"]].set_index("TF2", drop=False).drop_duplicates()
 		self.TF_table = TF1_table.merge(TF2_table, left_index=True, right_index=True)
 
 		#Set name of index for table
@@ -1047,29 +1073,29 @@ class CombObj():
 
 		return(new_obj)
 
-	def select_significant_rules(self, measure="cosine", 
-										pvalue="cosine_pvalue", 
-										measure_threshold=None,
-										pvalue_threshold=0.05,
+	def select_significant_rules(self, x="cosine", 
+										y="zscore", 
+										x_threshold=None,
+										y_threshold=None,
 										plot=True, 
 										**kwargs):
 		"""
-		Make selection of rules based on distribution of measure and pvalue.
+		Make selection of rules based on distribution of x/y-measures
 
 		Parameters
 		-----------
-		measure : str, optional
+		x: str, optional
 			The name of the column within .rules containing the measure to be selected on. Default: 'cosine'.
-		pvalue : str, optional
-			The name of the column within .rules containing the pvalue to be selected on. Default: 'cosine_pvalue'
-		measure_threshold : float, optional
-			A minimum threshold for the measure to be selected. If None, the threshold will be estimated through a knee-plot of the cumulative sum of values. Default: None.
-		pvalue_threshold : float, optional
-			A p-value threshold for selecting rules. Default: 0.05.
+		y : str, optional
+			The name of the column within .rules containing the pvalue to be selected on. Default: 'zscore'
+		x_threshold : float, optional
+			A minimum threshold for the measure to be selected. If None, the threshold will be estimated from the data. Default: None.
+		y_threshold : float, optional
+			A p-value threshold for selecting rules. If None, the threshold will be estimated from the data. Default: None.
 		plot : bool, optional
 			Whether to show the 'measure vs. pvalue'-plot or not. Default: True.
 		kwargs : arguments
-			Additional arguments are forwarded to tfcomb.plotting.volcano
+			Additional arguments are forwarded to tfcomb.plotting.scatter
 
 		Returns
 		--------
@@ -1078,46 +1104,46 @@ class CombObj():
 
 		See also
 		---------
-		tfcomb.plotting.volcano
+		tfcomb.plotting.scatter
 		"""
 
 		#Check given input
 		self._check_rules()
-		check_value(measure_threshold)
-
+		if x_threshold is not None:
+			check_value(x_threshold)
+		if y_threshold is not None:
+			check_value(y_threshold)
 
 		#Check if measure are in columns
-		if measure not in self.rules.columns:
-			raise KeyError("Measure column '{0}' is not in .rules".format(measure))
+		if x not in self.rules.columns:
+			raise KeyError("Column given for x ('{0}') is not in .rules".format(x))
 
 		#If pvalue not in columns; calculate pvalue for measure
-		if pvalue not in self.rules.columns:
-			self.logger.warning("pvalue column given ('{0}') is not in .rules".format(pvalue))
-			self.logger.warning("Calculating pvalues from measure '{0}'".format(measure))
+		#if pvalue not in self.rules.columns:
+		#	self.logger.warning("pvalue column given ('{0}') is not in .rules".format(pvalue))
+		#	self.logger.warning("Calculating pvalues from measure '{0}'".format(measure))
 
-			self.calculate_pvalues(measure=measure)
-			pvalue = measure + "_pvalue"
+		#	self.calculate_pvalues(measure=measure)
+		#	pvalue = measure + "_pvalue"
 
 		#If measure_threshold is None; try to calculate optimal threshold via knee-plot
-		if measure_threshold == None:
-			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
-			
-			#Compute distribution histogram of measure values
-			y, x = np.histogram(self.rules[measure], bins=100)
-			x = [np.mean([x[i], x[i+1]]) for i in range(len(x)-1)] #Get mid of start/end of each bin
-			y = np.cumsum(y)
-			kneedle = KneeLocator(x, y, curve="concave", direction="increasing", interp_method="polynomial")
-			measure_threshold = kneedle.knee
+		if x_threshold is None:
+			self.logger.info("x_threshold is None; trying to calculate optimal threshold")
+			x_threshold = tfcomb.utils.get_threshold(self.rules[x])
+
+		if y_threshold is None:
+			self.logger.info("y_threshold is None; trying to calculate optimal threshold")
+			y_threshold = tfcomb.utils.get_threshold(self.rules[y])
 
 		#Set threshold on table
 		selected = self.rules.copy()
-		selected = selected[(selected[measure] >= measure_threshold) & (selected[pvalue] <= pvalue_threshold)]
+		selected = selected[(selected[x] >= x_threshold) & (selected[y] >= y_threshold)]
 
 		if plot == True:
-			tfcomb.plotting.volcano(self.rules, measure=measure, 
-												pvalue=pvalue, 
-												measure_threshold=measure_threshold,
-												pvalue_threshold=pvalue_threshold,
+			tfcomb.plotting.scatter(self.rules, x=x, 
+												y=y, 
+												x_threshold=x_threshold,
+												y_threshold=y_threshold,
 												**kwargs)
 
 		#Create a CombObj with the subset of TFBS and rules
@@ -1295,7 +1321,7 @@ class CombObj():
 			# TODO: Check if save is a valid path
 			with open(f'{save}{TF1}_{TF2}.csv', "w") as outfile :
 				header_row = ["chr", "pos start", "pos end", "name TF1", "strand",
-				              "chr", "pos start", "pos end", "name TF2", "strand", "distance"]
+							  "chr", "pos start", "pos end", "name TF2", "strand", "distance"]
 				csv_file = csv.writer(outfile, delimiter=delim) 
 				csv_file.writerow(header_row) 
 				for line in b:
@@ -1310,7 +1336,7 @@ class CombObj():
 							csv_file.writerow(content)
 						else:
 							content = [tf1_region.chrom, tf1_region.start, tf1_region.end, tf1_region.name,
-							           tf1_region.strand, tf2_region.chrom, tf2_region.start, tf2_region.end,
+									   tf1_region.strand, tf2_region.chrom, tf2_region.start, tf2_region.end,
 									   tf2_region.name, tf2_region.strand, dist]
 						csv_file.writerow(content) 
 		return b
@@ -2108,7 +2134,7 @@ class DistObj():
 		tf1, tf2 = pair
 
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
-			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+								   (self.distances["TF2"] == tf2))].iloc[0, 2:]
 
 		self.logger.debug(f" Median for pair {tf1} - {tf2}: {data.median}")
 		return data.median()
@@ -2295,7 +2321,7 @@ class DistObj():
 		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
 				  for site in self.TFBS] #numpy integer array
 		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, 
-		                     (tf1,tf2) in enumerate(self.rules[(["TF1", "TF2"])].values.tolist())}
+							 (tf1,tf2) in enumerate(self.rules[(["TF1", "TF2"])].values.tolist())}
 		
 		#Sort sites by mid if anchor == 2 (center):
 		if self.anchor_mode == 2: 
@@ -2413,7 +2439,7 @@ class DistObj():
 			n_bins = self.max_dist - self.min_dist + 1
 		
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
-			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+								   (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		n_data = len(data)
 		linres = linregress(range(0, n_data), np.array(data, dtype=float))
 		if save is not None:
@@ -2497,7 +2523,7 @@ class DistObj():
 			n_bins = self.max_dist - self.min_dist + 1
 	   
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
-			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+								   (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		corrected = []
 		x_val = 0
 		
@@ -2634,7 +2660,7 @@ class DistObj():
 		if (len(peaks_smooth) > 0):
 			for i in range(len(peaks_smooth)):
 				peak = [tf1, tf2, peaks_smooth[i], round(properties["peak_heights"][i], 4),
-				        round(properties["prominences"][i], 4), round(prominence, 4)]
+						round(properties["prominences"][i], 4), round(prominence, 4)]
 				peaks.append(peak)
 				if (save is not None):
 					outfile.write('\t'.join(str(x) for x in peak) + '\n')
@@ -2872,11 +2898,11 @@ class DistObj():
 		tf1, tf2 = pair
 
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
-			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+								   (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		n_data = len(data)
 
 		weights = self.corrected.loc[((self.corrected["TF1"] == tf1) &
-			                          (self.corrected["TF2"] == tf2))].iloc[0, 2:]
+									  (self.corrected["TF2"] == tf2))].iloc[0, 2:]
 
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist
@@ -2918,10 +2944,10 @@ class DistObj():
 		tf1, tf2 = pair
 
 		data = self.distances.loc[((self.distances["TF1"] == tf1) &
-			                       (self.distances["TF2"] == tf2))].iloc[0, 2:]
+								   (self.distances["TF2"] == tf2))].iloc[0, 2:]
 		n_data = len(data)
 		linres = self.linres.loc[((self.linres["TF1"] == tf1) &
-			                      (self.linres["TF2"] == tf2))].iloc[0, 2]
+								  (self.linres["TF2"] == tf2))].iloc[0, 2]
 
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist
