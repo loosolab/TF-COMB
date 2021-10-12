@@ -14,7 +14,7 @@ The usage of TF-comb is split into three main parts:
     :maxdepth: 1
     :glob:
 
-    Predefined_TFBS
+    chipseq_analysis
     TFBS_from_motifs
     Select_rules
     Network_analysis
