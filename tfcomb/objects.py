@@ -2787,7 +2787,7 @@ class DistObj():
 
 		return peaks
 
-	def analyze_signal_all(self, smooth_window=3, prominence="median", stringency=2,  save=None):
+	def analyze_signal_all(self, smooth_window=3, prominence="zscore", stringency=2,  save=None):
 		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
 			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
 			Signal. Peaks are called with scipy.signal.find_peaks().
@@ -2802,14 +2802,13 @@ class DistObj():
 				height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
 				Zero means only positive peaks are called.
 				Default: 0
-			prominence: number or ndarray or sequence or ["median","std","zscore"]
+			prominence: number or ndarray or sequence or ["median","zscore"]
 				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
 				If "median", the median for the pairs is used
-				If "std", the standard deviation for the pairs is used
 				If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
 				Attention, this also changes the scale and output column names.
 				If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
-				Default: "median"
+				Default: "zscore"
 			stringency: number
 				stringency the prominence threshold should be multiplied with. Default: 2
 			save: str
@@ -2832,7 +2831,7 @@ class DistObj():
 		self.check_corrected()
 
 		if isinstance(prominence, str):
-			tfcomb.utils.check_string(prominence, ["median","std","zscore"])
+			tfcomb.utils.check_string(prominence, ["median","zscore"])
 		else:
 			tfcomb.utils.check_value()
 	
@@ -2852,12 +2851,9 @@ class DistObj():
 			outfile = open(save, 'w')
 			outfile.write(self._PEAK_HEADER)
 		calc_median = False
-		calc_std = False
 		calc_zscore = False
 		if (prominence == "median"):
 			calc_median = True
-		if (prominence == "std"):
-			calc_std = True
 		if (prominence == "zscore"):
 			calc_zscore = True
 			prominence = 1
@@ -2880,8 +2876,6 @@ class DistObj():
 				corrected_data = (corrected_data - corrected_data.mean())/corrected_data.std()
 			if (calc_median):
 				prominence = corrected_data.mean()
-			if (calc_std):
-				prominence = corrected_data.std()
 			
 			corrected_data = corrected_data.tolist() #series -> list
 
@@ -2945,7 +2939,7 @@ class DistObj():
 		tf1, tf2 = pair
 		
 		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist
+			n_bins = self.max_dist - self.min_dist + 1
 
 		ind = tf1 + "-" + tf2
 		weights = source_table.loc[ind].iloc[2:]
@@ -2956,7 +2950,7 @@ class DistObj():
 
 		x_data = range(0, len(weights))
 
-		plt.hist(x_data, n_bins, weights=weights)
+		plt.hist(x_data, bins=n_bins, weights=weights)
 		plt.xlabel('Distance in bp')
 		
 		xt = ax.get_xticks() 
@@ -3062,7 +3056,7 @@ class DistObj():
 		weights = self.corrected.loc[ind].iloc[2:]
 
 		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist
+			n_bins = self.max_dist - self.min_dist + 1
 
 		fig, ax = plt.subplots(1, 1)
 
@@ -3122,7 +3116,7 @@ class DistObj():
 		linres = self.linres.loc[ind].iloc[2]
 
 		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist
+			n_bins = self.max_dist - self.min_dist + 1
 		
 		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
 
