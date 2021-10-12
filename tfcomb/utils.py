@@ -858,7 +858,7 @@ def get_threshold(data, which="upper", percent=0.05):
     elif which == "lower":
         final = thresholds[0]
     elif which == "both":
-        final = thresholds
+        final = tuple(thresholds)
         
     #Plot fit and threshold
     #plt.hist(data, bins=20, density=True)

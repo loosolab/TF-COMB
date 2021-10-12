@@ -45,6 +45,8 @@ from tfcomb.utils import *
 
 
 np.seterr(all='raise') # raise errors for runtimewarnings
+#pd.options.mode.chained_assignment = 'raise' # for debugging
+pd.options.mode.chained_assignment = None
 
 class CombObj(): 
 	"""
@@ -1118,14 +1120,6 @@ class CombObj():
 		if x not in self.rules.columns:
 			raise KeyError("Column given for x ('{0}') is not in .rules".format(x))
 
-		#If pvalue not in columns; calculate pvalue for measure
-		#if pvalue not in self.rules.columns:
-		#	self.logger.warning("pvalue column given ('{0}') is not in .rules".format(pvalue))
-		#	self.logger.warning("Calculating pvalues from measure '{0}'".format(measure))
-
-		#	self.calculate_pvalues(measure=measure)
-		#	pvalue = measure + "_pvalue"
-
 		#If measure_threshold is None; try to calculate optimal threshold via knee-plot
 		if x_threshold is None:
 			self.logger.info("x_threshold is None; trying to calculate optimal threshold")
@@ -1606,7 +1600,7 @@ class DiffCombObj():
 		#Format table from obj to contain TF1/TF2 + measures with prefix
 		columns_to_keep = ["TF1", "TF2"] + [self.measure]
 		obj_table = obj.rules[columns_to_keep] #only keep necessary columns
-		obj_table.rename(columns={self.measure: str(prefix) + "_" + self.measure}, inplace=True)
+		obj_table.rename(columns={self.measure: str(prefix) + "_" + self.measure}, inplace=True) #rename column to <prefix>_<measure>
 
 		#Initialize table if this is the first object
 		if self.n_objects == 0: 
@@ -1614,24 +1608,27 @@ class DiffCombObj():
 
 		#Or add object to this DiffCombObj
 		else:
-
-			#Start by merging all rules with "outer"
-			self.rules = self.rules.merge(obj_table, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"], how="outer")
 			
 			#if join is inner, remove any TFs not present in both objects
 			if join == "inner":
 
 				left_TFs = set(list(set(self.rules["TF1"])) + list(set(self.rules["TF2"])))
-				right_TFs = set(obj.TF_names)	
+				right_TFs = set(list(set(obj_table["TF1"])) + list(set(obj_table["TF2"])))
+
 				common = left_TFs.intersection(right_TFs)
 				not_common = left_TFs.union(right_TFs) - common
-
-				self.rules = self.rules[self.rules["TF1"].isin(common) & self.rules["TF2"].isin(common)]
-
 				if len(not_common) > 0:
-					self.logger.info("{0} TFs were not common between objects and were excluded from .rules. Set 'join' to 'outer' in order to use all TFs across objects. The TFs excluded were: {1}".format(len(not_common), list(not_common)))
+					self.logger.warning("{0} TFs were not common between objects and were excluded from .rules. Set 'join' to 'outer' in order to use all TFs across objects. The TFs excluded were: {1}".format(len(not_common), list(not_common)))
 
-			self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
+				#Subset both tables to common TFs
+				A = self.rules.loc[self.rules["TF1"].isin(common) & self.rules["TF2"].isin(common)]
+				B = obj_table.loc[obj_table["TF1"].isin(common) & obj_table["TF2"].isin(common)]
+
+				self.rules = A.merge(B, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"])
+
+			else: #join is outer
+				self.rules = self.rules.merge(obj_table, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"], how="outer")
+				self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
 		
 		self.n_objects += 1 #current number of objects +1 for the one just added
 		
@@ -1763,27 +1760,24 @@ class DiffCombObj():
 		if pvalue_col not in self.rules.columns:
 			self.logger.warning("pvalue column given ('{0}') is not in .rules".format(pvalue_col))
 			self.logger.warning("Calculating pvalues from measure '{0}'".format(measure_col))
-			self.rules[measure + "_pvalue"] = tfcomb.utils._calculate_pvalue(self.rules, measure=measure_col)
+			tfcomb.utils.tfcomb_pvalue(self.rules, measure=measure_col, alternative="two-sided")
 	
 		#Find optimal measure threshold
 		if measure_threshold is None:
 			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
-
-			#Fit to normal distribution (Assume that the log2fc background is normal)
-			mu = np.mean(self.rules[measure_col])
-			std = np.std(self.rules[measure_col])
-
-			dist = scipy.stats.norm(loc=mu, scale=std)
-			lower = dist.ppf(0.05)
-			upper = dist.ppf(0.95)
-			measure_threshold = (lower, upper)
+			measure_threshold = tfcomb.utils.get_threshold(self.rules[measure_col], "both")
 
 		if plot == True:
-			tfcomb.plotting.volcano(self.rules, 
-									measure_col=measure_col, 
-									pvalue_col=pvalue_col, 
-									measure_threshold=measure_threshold,
-									pvalue_threshold=pvalue_threshold,
+			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
+			log_col = "-log10({0})".format(pvalue_col)
+			cp[log_col] = -np.log10(self.rules[pvalue_col])
+			log_threshold = -np.log10(pvalue_threshold)
+			
+			tfcomb.plotting.scatter(cp, 
+									x=measure_col, 
+									y=log_col, 
+									x_threshold=measure_threshold,
+									y_threshold=log_threshold,
 									**kwargs)
 		
 		#Set threshold on rules
