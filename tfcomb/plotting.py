@@ -184,7 +184,10 @@ def scatter(table, x, y,
 			check_value(threshold, name="y_threshold")
 
 	#Plot all data
-	g = sns.jointplot(data=table, x=x, y=y, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	x_finite = table[x][~np.isinf(table[x])]
+	y_finite = table[y][~np.isinf(table[y])]
+
+	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if x_threshold is not None:
@@ -208,17 +211,16 @@ def scatter(table, x, y,
 				y_threshold = (-np.inf, y_threshold[0]) 
 
 		#Set threshold to minimum if not set
-		#pvalue_threshold = np.min(table[x]) if x_threshold is None else x_threshold
-		#measure_threshold = np.min(table[y]) if y_threshold is None else y_threshold
-
 		selection = table[((table[x] <= x_threshold[0]) | (table[x] >= x_threshold[1])) &
 						 ((table[y] <= y_threshold[0]) | (table[y] >= y_threshold[1]))]
-		n_selected = len(selection)
+		n_selected = len(selection) #including any non-finite values
 		
 		#Mark chosen TF pairs in red
 		xvals = selection[x]
+		xvals_finite = xvals[~np.isinf(xvals)]
 		yvals = selection[y]
-		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", linewidth=0.2, 
+		yvals_finite = yvals[~np.isinf(yvals)]
+		_ = sns.scatterplot(x=xvals_finite, y=yvals_finite, ax=g.ax_joint, color="red", linewidth=0.2, 
 							label="Selection (n={0})".format(n_selected))
 
 	#Label given indices

@@ -371,12 +371,13 @@ class CombObj():
 			genome_obj.close()
 
 		else:
-			chunks = regions.chunks(threads * 2) #creates chunks of regions for multiprocessing
+			chunks = regions.chunks(100) #creates chunks of regions for multiprocessing
 
 			#Setup pool
 			pool = mp.Pool(threads)
 			jobs = []
 			for region_chunk in chunks:
+				self.logger.spam("Starting job for region_chunk of length: {0}".format(len(region_chunk)))
 				jobs.append(pool.apply_async(tfcomb.utils.calculate_TFBS, (region_chunk, motifs, genome, )))
 			pool.close()
 			

@@ -480,7 +480,6 @@ def resolve_overlapping(TFBS):
 	Parameters
 	-----------
 	TFBS : tobias.regions.RegionList
-		
 	"""
 
 	#Split TFBS into dict per name
@@ -808,67 +807,78 @@ def calculate_background(sites, min_distance,
 
 #--------------------------------- P-value calculation ---------------------------------#
 
-def get_threshold(data, which="upper", percent=0.05):
-    """
-    Function to get upper/lower threshold(s) based on the distribution of data. The threshold is calculated as the probability of "percent" (upper=1-percent).
-    
-    Parameters
-    ------------
-    which : str
-        Which threshold to calculate. Can be one of "upper", "lower", "both". Default: "upper".
-    percent : float between 0-1
-        Controls how strict the threshold should be set in comparison to the distribution. Default: 0.05.
-    
-    Returns
-    ---------
-    If which is one of "upper"/"lower", get_threshold returns a float. If "both", get_threshold returns a list of two float thresholds.
-    """
-    
-    distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace, 
+def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
+	"""
+	Function to get upper/lower threshold(s) based on the distribution of data. The threshold is calculated as the probability of "percent" (upper=1-percent).
+	
+	Parameters
+	------------
+	data : list or array
+		An array of data to find threshold on.
+	which : str
+		Which threshold to calculate. Can be one of "upper", "lower", "both". Default: "upper".
+	percent : float between 0-1
+		Controls how strict the threshold should be set in comparison to the distribution. Default: 0.05.
+	
+	Returns
+	---------
+	If which is one of "upper"/"lower", get_threshold returns a float. If "both", get_threshold returns a list of two float thresholds.
+	"""
+	
+	distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace, 
 					 scipy.stats.expon, scipy.stats.truncnorm, scipy.stats.truncexpon, scipy.stats.wald, scipy.stats.weibull_min]
-        
-    #Check input parameters
-    check_string(which, ["upper", "lower", "both"], "which")
-    check_value(percent, vmin=0, vmax=1, name="percent")
-    
-    
-    #Fit data to each distribution
-    distribution_dict = {}
-    for distribution in distributions:
-        params = distribution.fit(data)
+	
+	logger = tfcomb.logging.TFcombLogger(verbosity)
 
-        #Test fit using negative loglikelihood function
-        mle = distribution.nnlf(params, data)
+	#Check input parameters
+	check_string(which, ["upper", "lower", "both"], "which")
+	check_value(percent, vmin=0, vmax=1, name="percent")
 
-        #Save info on distribution fit    
-        distribution_dict[distribution.name] = {"distribution": distribution,
-                                                "params": params, 
-                                                "mle": mle}
+	#Subset data to _n_max:
+	if len(data) > _n_max:
+		np.random.seed(0)
+		data = np.random.choice(data, size=_n_max, replace=False)
+	
+	data_finite = np.array(data)[~np.isinf(data)]
 
-    #Get best distribution
-    best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
-    parameters = distribution_dict[best_fit_name]["params"]
-    best_distribution = distribution_dict[best_fit_name]["distribution"]
+	#Fit data to each distribution
+	distribution_dict = {}
+	for distribution in distributions:
+		logger.debug("Fitting data to '{0}'".format(distribution))
+		params = distribution.fit(data_finite)
 
-    #Get threshold
-    thresholds = best_distribution(*parameters).ppf([percent, 1-percent])
-    
-    if which == "upper":
-        final = thresholds[-1]
-    elif which == "lower":
-        final = thresholds[0]
-    elif which == "both":
-        final = tuple(thresholds)
-        
-    #Plot fit and threshold
-    #plt.hist(data, bins=20, density=True)
-    #xmin = np.min(data)
-    #xmax = np.max(data)
-    #x = np.linspace(xmin, xmax, 100)
-    #plt.plot(x, best_distribution(*params).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
-    #plt.legend()
-    
-    return(final)
+		#Test fit using negative loglikelihood function
+		mle = distribution.nnlf(params, data_finite)
+
+		#Save info on distribution fit    
+		distribution_dict[distribution.name] = {"distribution": distribution,
+												"params": params, 
+												"mle": mle}
+
+	#Get best distribution
+	best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
+	parameters = distribution_dict[best_fit_name]["params"]
+	best_distribution = distribution_dict[best_fit_name]["distribution"]
+
+	#Get threshold
+	thresholds = best_distribution(*parameters).ppf([percent, 1-percent])
+	
+	if which == "upper":
+		final = thresholds[-1]
+	elif which == "lower":
+		final = thresholds[0]
+	elif which == "both":
+		final = tuple(thresholds)
+		
+	#Plot fit and threshold
+	#plt.hist(data, bins=20, density=True)
+	#xmin = np.min(data)
+	#xmax = np.max(data)
+	#x = np.linspace(xmin, xmax, 100)
+	#plt.plot(x, best_distribution(*params).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
+	#plt.legend()
+	
+	return(final)
 
 def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, logger=None):
 	"""
