@@ -2450,7 +2450,7 @@ class DistObj():
 					self._raw[i,2:] = s
 					self._raw[i+1,2:] = s
 		else:
-			self.logger.info("Directionality is not taken into account")
+			self.logger.info("Directionality is taken into account; counts for TF1-TF2 and TF2-TF1 are kept separate")
 		self.directional = directional
 
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
@@ -2460,55 +2460,48 @@ class DistObj():
 		self.logger.info("Run .linregress_all() to fit linear regression")
 	
 	def _raw_to_human_readable(self, normalize=True):
-		""" Get the raw distance in human readable format
+		""" Get the raw distance in human readable format. Sets the variable '.distances' which is a pd.Dataframe with the columns:
+			TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
 			
 			Parameters
-			----------
+			-------------
 			normalize : bool
 			True if data should be normalized, False otherwise. Normalization is done as followed:
 			(number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
 			Default: True
 
-			Returns:
-			----------
-			pd.Dataframe (TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
 		"""
-		tfcomb.utils.check_type(normalize,bool)
+
+		tfcomb.utils.check_type(normalize, bool)
 		# check min_max distance
 		self.logger.debug("Converting raw count data to pretty dataframe")
-		idx_to_name = {}
+		
 		# get names from int encoding
+		idx_to_name = {}
 		for k,v in self.name_to_idx.items():
 			idx_to_name[v] = k 
 		
+		#Converting to pandas format 
+		if self.min_dist == 0:    
+			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range(self.min_dist, self.max_dist + 1)]
+		else:
+			columns = ['TF1', 'TF2'] + [str(x) for x in range(self.min_dist, self.max_dist + 1)]
+
+		self.distances = pd.DataFrame(self._raw, columns=columns)
+		self.distances["TF1"] = [idx_to_name[idx] for idx in self.distances["TF1"]]
+		self.distances["TF2"] = [idx_to_name[idx] for idx in self.distances["TF2"]]
+
+		#Normalize
 		if normalize:
 			self.logger.info("Normalizing data.")
 
-		results = []
-		for row in self._raw:
-			tf1 = idx_to_name[row[0]]
-			tf2 = idx_to_name[row[1]]
-			entry = [tf1, tf2]
-			
-			if normalize:
-				row_sum = row[2:].sum()
-				if row_sum > 0:
-					entry += (row[2:]/row_sum).tolist()
-				else: 
-					entry += row[2:].tolist() #all values are 0
-			else:
-				entry += row[2:].tolist()
-			results.append(entry)
+			data_columns = [col for col in columns if col not in ["TF1", "TF2"]] #with or without 'neg' column
+			rowsums = self.distances[data_columns].sum(axis=1)
+			self.distances[data_columns] = self.distances[data_columns].div(rowsums, axis=0) #divide by zero returns NaN
+			self.distances.fillna(0, inplace=True)
 
-		self.normalized = normalize
-	
-		if self.min_dist == 0:    
-			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		else:
-			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		self.distances = pd.DataFrame(results, columns=columns)
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
-
+		self.normalized = normalize
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------------------ Analysis steps ---------------------------------------#
