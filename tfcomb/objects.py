@@ -16,6 +16,7 @@ import glob
 import fnmatch
 import pickle
 import csv 
+import collections
 
 #Statistics
 import qnorm #quantile normalization
@@ -2050,7 +2051,7 @@ class DistObj():
 		# private constants
 		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\n"
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
-		self._XLBL_FONTSIZE = 8    # label fontsize adjustment for plotting x labels
+		self._XLBL_FONTSIZE = 10    # label fontsize adjustment for plotting x labels
 
 	def __str__(self):
 		pass
@@ -2193,13 +2194,8 @@ class DistObj():
 			return False
 		return True
 
-	def shift_signal(self, smoothed):
+	def shift_signal(self):
 		""" Shifts the signal above zero. 
-
-		Parameters
-		----------
-		smoothed: bool 
-			True if the signal was smoothed beforehand, false otherwise
 
 		Returns:
 		----------
@@ -2207,6 +2203,8 @@ class DistObj():
 			Fills the object variables .shift and  either .smoothed or .corrected
 
 		"""
+		smoothed = self.is_smoothed()
+
 		datasource = None
 		tfcomb.utils.check_type(smoothed, bool)
 		if smoothed:
@@ -2757,8 +2755,8 @@ class DistObj():
 		# an other number left and right. 
 		x = [0] + list(x) + [0]
 		threshold = prominence * stringency
-		# height = 0 or we will not get peak_heights back!
-		peaks_idx, properties = find_peaks(x, prominence=threshold, height = 0)
+
+		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
 		
 		# subtract the position added above (first zero) 
 		peaks_idx = peaks_idx - 1 
@@ -2786,7 +2784,7 @@ class DistObj():
 		if (save is not None):
 			outfile.close()
 
-		return peaks
+		return peaks, threshold
 
 	def analyze_signal_all(self, smooth_window=3, prominence="zscore", stringency=2,  save=None):
 		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
@@ -2803,7 +2801,7 @@ class DistObj():
 				height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
 				Zero means only positive peaks are called.
 				Default: 0
-			prominence: number or ndarray or sequence or ["median","zscore"]
+			prominence: number or ndarray or sequence or ["median", "zscore"]
 				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
 				If "median", the median for the pairs is used
 				If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
@@ -2843,7 +2841,7 @@ class DistObj():
 			self.smooth(smooth_window)
 			smoothed = True
 		
-		self.shift_signal(smoothed)
+		self.shift_signal()
 
 		self.logger.info(f"Analyzing Signal")
 		all_peaks = []
@@ -2859,6 +2857,7 @@ class DistObj():
 			calc_zscore = True
 			prominence = 1
 
+		thresholds = {}
 		peaking_count = 0
 		for idx,row in self.corrected.iterrows():
 			tf1 = row["TF1"]
@@ -2873,20 +2872,26 @@ class DistObj():
 				
 			corrected_data = datasource.loc[ind].iloc[2:]
 
+			method = "flat"
+
 			if (calc_zscore):
 				corrected_data = (corrected_data - corrected_data.mean())/corrected_data.std()
+				method = "zscore"
 			if (calc_median):
-				prominence = corrected_data.mean()
-			
+				prominence = corrected_data.median()
+				method = "median"
+
 			corrected_data = corrected_data.tolist() #series -> list
 
-			peaks = self._analyze_signal_pair((tf1,tf2),
+			peaks,thresh = self._analyze_signal_pair((tf1,tf2),
 											  corrected_data, 
 											  smooth_window=1,  # smoothing already done
 											  prominence=prominence,
 											  stringency=stringency, 
 											  save=None)
-				
+
+			thresholds[tf1,tf2] = [tf1, tf2, thresh, method]
+
 			if len(peaks)>0:
 				for peak in peaks:
 					all_peaks.append(peak)
@@ -2898,10 +2903,50 @@ class DistObj():
 		self.smooth_window = smooth_window
 		self.peaking_count = peaking_count
 
+		self.thresh = pd.DataFrame.from_dict(thresholds, orient="index",
+											 columns=['TF1', 'TF2', 'Threshold', "method"]).reset_index(drop=True) 
+
 		if save is not None:
 			outfile.close()
 		
-		self.logger.info("Done analyzing signal. Results are found in .peaks")		
+		self.logger.info("Done analyzing signal. Results are found in .peaks")	
+
+	def analyze_hubs(self):
+		""" Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
+
+			Returns:
+			----------
+			pd.Series 
+				A panda series with the tf as index and the count as integer
+		"""
+		
+		self.check_peaks()
+
+		occurrences= collections.Counter([x for (x,z) in set(self.peaks.set_index(["TF1","TF2"]).index)])
+		
+		return pd.Series(occurrences)		
+
+	def classify_rules(self):
+		""" Classify all rulesm True if at least one peak was found, False otherwise.  
+
+			Returns:
+			----------
+			None adds a column to either .smoothed or .corrected
+		"""
+
+		self.check_peaks()
+
+		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
+
+
+		if self.is_smoothed():
+			datasource = self.smoothed
+		else:    
+			datasource = self.corrected
+
+		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
+
+		
 
 	def check_periodicity(self):
 		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
@@ -2945,22 +2990,31 @@ class DistObj():
 		ind = tf1 + "-" + tf2
 		weights = source_table.loc[ind].iloc[2:]
 		
+		negative = False
+		neg = weights[0]
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			negative = True
+			weights = weights[1:]
+			offset_neg = -4
 		
 
 		fig, ax = plt.subplots(1, 1)
 
 		x_data = range(0, len(weights))
 
-		plt.hist(x_data, bins=n_bins, weights=weights)
+		plt.hist(x_data, bins=n_bins, weights=weights, color='tab:blue')
 		plt.xlabel('Distance in bp')
 		
 		xt = ax.get_xticks() 
-		if self.min_dist == 0:
+		if negative:
+			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
+			xt[0] = offset_neg
 			xt[0] = -1
 			xt=xt[:-1]
 			xtl=xt.tolist()
 			xtl[0]="neg"
 		else:
+			xt=xt[1:-1]
 			xtl=xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
@@ -3002,18 +3056,27 @@ class DistObj():
 
 		ind = tf1 + "-" + tf2
 		weights = list(source_table.loc[ind].iloc[2:])
-		#TODO: Rename xticks
+		
+		negative = False
+		neg = weights[0]
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			negative = True
+			weights = weights[1:]
+			offset_neg = -4
+
 		fig, ax = plt.subplots(1, 1)
 
 		sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(f"{tf1} - {tf2}")
 
 		xt = ax.get_xticks() 
-		if self.min_dist == 0:
-			xt[0] = -1
+		if negative:
+			sns.kdeplot([offset_neg], bw_adjust=bwadjust, weights=[neg], color='tab:orange')
+			xt[0] = offset_neg
 			xt=xt[:-1]
 			xtl=xt.tolist()
 			xtl[0]="neg"
 		else:
+			xt=xt[1:-1]
 			xtl=xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
@@ -3052,7 +3115,7 @@ class DistObj():
 
 		ind = tf1 + "-" + tf2
 		data = self.distances.loc[ind].iloc[2:]
-		n_data = len(data)
+		
 
 		weights = self.corrected.loc[ind].iloc[2:]
 
@@ -3061,20 +3124,31 @@ class DistObj():
 
 		fig, ax = plt.subplots(1, 1)
 
+		negative = False
+		neg = weights[0]
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			negative = True
+			weights = weights[1:]
+			offset_neg = -4
+
+		n_data = len(weights)
 		x_data = np.linspace(0, n_data, n_bins)
-		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=False, alpha=0.6)
+		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=False, alpha=0.6, color='tab:blue')
 		linres = linregress(range(0, n_data), np.array(weights, dtype=float))
 		plt.plot(x_data, linres.intercept + linres.slope*x_data, 'r', label='fitted line')
 		plt.xlabel('Distance in bp')
 		plt.ylabel('Corrected count per distance')
 
 		xt = ax.get_xticks() 
-		if self.min_dist == 0:
-			xt[0] = -1
+		if negative:
+			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
+			xt[0] = offset_neg
 			xt=xt[:-1]
 			xtl=xt.tolist()
 			xtl[0]="neg"
+			ax.legend(["negative", "positive"])
 		else:
+			xt=xt[1:-1]
 			xtl=xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
@@ -3112,29 +3186,40 @@ class DistObj():
 		tf1, tf2 = pair
 
 		ind = tf1 + "-" + tf2
-		data = self.distances.loc[ind].iloc[2:]
-		n_data = len(data)
+		weights = self.distances.loc[ind].iloc[2:]
 		linres = self.linres.loc[ind].iloc[2]
 
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist + 1
 		
+		negative = False
+		neg = weights[0]
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			negative = True
+			weights = weights[1:]
+			offset_neg = -4
+		
+		n_data = len(weights)
+		
 		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
 
 		fig, ax = plt.subplots(1, 1)
 
-		plt.hist(range(0, n_data), weights=data, bins=n_bins, density=True, alpha=0.6)
+		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=True, alpha=0.6)
 		plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
 		plt.xlabel('Distance in bp')
 		plt.ylabel('Counts per distance')
 
 		xt = ax.get_xticks() 
-		if self.min_dist == 0:
+		if negative:
+			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
+			xt[0] = offset_neg
 			xt[0] = -1
 			xt=xt[:-1]
 			xtl=xt.tolist()
 			xtl[0]="neg"
 		else:
+			xt=xt[1:-1]
 			xtl=xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
@@ -3144,7 +3229,7 @@ class DistObj():
 			plt.savefig(save, dpi=600)
 			plt.close()
 
-	def plot_analyzed_signal(self, pair, only_peaking=True, save=None, zscore = False):
+	def plot_analyzed_signal(self, pair, only_peaking=True, save=None):
 		""" Plots the analyzed signal
 
 		 Parameters
@@ -3170,15 +3255,30 @@ class DistObj():
 		ind = tf1 + "-" + tf2
 		peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
 		                        (self.peaks["TF2"] == tf2))].Distance.to_numpy()
-		thresh = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-		                        (self.peaks["TF2"] == tf2))].iloc[0,-1]
+		thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
+		                        (self.thresh["TF2"] == tf2))].iloc[0,2]
+		method = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
+		                        (self.thresh["TF2"] == tf2))].iloc[0,3]
+
 		if self.is_smoothed():
 			x = self.smoothed.loc[ind].iloc[2:].to_numpy()
 		else:    
 			x = self.corrected.loc[ind].iloc[2:].to_numpy()
 		
-		if (zscore):
+		negative = False
+		neg = x[0]
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			negative = True
+			x = x[1:]
+			offset_neg = -4
+		
+		# if data is classified, exclude class from plotting
+		if (type(x[-1]) is np.bool_) or (type(x[-1]) is bool):
+			x = x[:-1]
+		
+		if (method =="zscore"):
 			x = (x - x.mean())/x.std()
+		
 
 		if (only_peaking) and (len(peaks) == 0):
 			self.logger.debug(f"Only plots for pairs with at least one peak should be plotted. {tf1}-{tf2} has no peak.")
@@ -3186,22 +3286,26 @@ class DistObj():
 
 		fig, ax = plt.subplots(1, 1)
 		plt.plot(x)
-		if self.min_dist == 0:
+		if self.min_dist == 0 :
 			crosses = peaks + 1 
 		else:
 			crosses = peaks
-		plt.plot(crosses, x[(crosses)], "x")
+		if(len(peaks) > 0):
+			plt.plot(crosses, x[(crosses)], "x")
 		plt.plot([thresh] * len(x), "--", color="gray")
 		plt.xlabel('Distance in bp')
 		plt.ylabel('Corrected count per distance')
 		
 		xt = ax.get_xticks() 
-		if self.min_dist == 0:
+		if negative:
+			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
+			xt[0] = offset_neg
 			xt[0] = -1
 			xt=xt[:-1]
 			xtl=xt.tolist()
 			xtl[0]="neg"
 		else:
+			xt=xt[1:-1]
 			xtl=xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
