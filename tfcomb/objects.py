@@ -1916,14 +1916,7 @@ class DistObj():
 		"""
 		smoothed = self.is_smoothed()
 
-		datasource = None
-		tfcomb.utils.check_type(smoothed, bool)
-		if smoothed:
-			self.check_smoothed()
-			datasource = self.smoothed
-		else:
-			self.check_corrected()
-			datasource = self.corrected
+		datasource = self._get_datasource()
 		
 		if self.shift is not None:
 			self.logger.info("Signals already above zero, skipping shift.")
@@ -1939,12 +1932,7 @@ class DistObj():
 		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
 		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
 
-		if smoothed:
-			self.check_smoothed()
-			self.smoothed = datasource
-		else:
-			self.check_corrected()
-			self.corrected = datasource		
+		self._set_datasource(datasource)	
 
 	def reset_signal(self, smoothed):
 		""" Resets the signals to their original state. 
@@ -1960,14 +1948,8 @@ class DistObj():
 			Resets the object variables .shift and fills either .smoothed or .corrected
 
 		"""
-		datasource = None
-		tfcomb.utils.check_type(smoothed, bool)
-		if smoothed:
-			self.check_smoothed()
-			datasource = self.smoothed
-		else:
-			self.check_corrected()
-			datasource = self.corrected
+
+		datasource = self._get_datasource()
 		
 		if self.shift is None:
 			self.logger.info("Signals already in original state.")
@@ -1985,16 +1967,47 @@ class DistObj():
 		#save the min values to reset the signals
 		self.shift = None
 
+		self.self._set_datasource(datasource)	
+		
+	def _get_datasource(self):
+		""" Determines whether .corrected or .smoothed should be used
+		and returns the base columns for this
 
-		if smoothed:
+		Returns:
+		----------
+		pandas.DataFrame 
+			Either .smoothed or .corrected
+
+		"""
+		if self.is_smoothed():
 			self.check_smoothed()
-			self.smoothed = datasource
-		else:
+			datasource = self.smoothed
+		else:    
 			self.check_corrected()
+			datasource = self.corrected
+
+		self.check_min_max_dist()
+		tfcomb.utils.check_value(self.max_overlap, vmin=0.0, vmax=1.0, name=".max_overlap")
+
+		text_cols = ["TF1", "TF2"]
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			text_cols += ["neg"]
+			
+		base_columns =  text_cols +  [str(x) for x in range(self.max_dist + 1)]
+
+		try:	 
+			return datasource[base_columns]
+		except KeyError:
+			raise InputError(f"columns: {list(set(base_columns) - set(datasource.columns))} ")
+
+	def _set_datasource(self, datasource):
+		""" Sets datasource
+		"""
+		if self.is_smoothed():
+			self.smoothed = datasource
+		else:    
 			self.corrected = datasource
-
-	
-
+		
 
 	#-------------------------------------------------------------------------------------------#
 	#----------------------------------------- Checks ------------------------------------------#
@@ -2284,10 +2297,6 @@ class DistObj():
 		for idx,row in self.distances.iterrows():
 			tf1 = row["TF1"]
 			tf2 = row["TF2"]
-			if save is not None:
-				out_file = str(os.path.join(save, f"{tf1}_{tf2}.png"))
-			else:
-				out_file = None
 			res = self._linregress_pair((tf1, tf2))
 			linres[tf1, tf2] = [tf1, tf2, res]
 		
@@ -2550,7 +2559,6 @@ class DistObj():
 				self.logger.error("Window size need to be positive or zero.")
 				sys.exit(0)
 			self.smooth(smooth_window)
-			smoothed = True
 		
 		self.shift_signal()
 
@@ -2575,14 +2583,11 @@ class DistObj():
 			tf2 = row["TF2"]
 			ind = tf1 + "-" + tf2
 			self.check_pair((tf1, tf2))
-			datasource = None
-			if smoothed:
-				datasource = self.smoothed
-			else:
-				datasource = self.corrected
+
+			datasource = self._get_datasource()
 				
 			corrected_data = datasource.loc[ind].iloc[2:]
-
+			
 			method = "flat"
 
 			if (calc_zscore):
@@ -2648,16 +2653,12 @@ class DistObj():
 		self.check_peaks()
 
 		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
-
-
-		if self.is_smoothed():
-			datasource = self.smoothed
-		else:    
-			datasource = self.corrected
+		
+		datasource = self._get_datasource()
 
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
-		
+		self._set_datasource(datasource)
 
 	def check_periodicity(self):
 		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
@@ -2825,8 +2826,6 @@ class DistObj():
 		tf1, tf2 = pair
 
 		ind = tf1 + "-" + tf2
-		data = self.distances.loc[ind].iloc[2:]
-		
 
 		weights = self.corrected.loc[ind].iloc[2:]
 
@@ -2971,10 +2970,10 @@ class DistObj():
 		method = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
 		                        (self.thresh["TF2"] == tf2))].iloc[0,3]
 
-		if self.is_smoothed():
-			x = self.smoothed.loc[ind].iloc[2:].to_numpy()
-		else:    
-			x = self.corrected.loc[ind].iloc[2:].to_numpy()
+
+		datasource = self._get_datasource()
+		
+		x = datasource.loc[ind].iloc[2:].to_numpy()
 		
 		negative = False
 		neg = x[0]
