@@ -9,6 +9,7 @@ import glob
 import fnmatch
 import pickle
 import csv 
+import collections
 
 #Statistics
 import qnorm #quantile normalization
@@ -1904,13 +1905,8 @@ class DistObj():
 			return False
 		return True
 
-	def shift_signal(self, smoothed):
+	def shift_signal(self):
 		""" Shifts the signal above zero. 
-
-		Parameters
-		----------
-		smoothed: bool 
-			True if the signal was smoothed beforehand, false otherwise
 
 		Returns:
 		----------
@@ -1918,6 +1914,8 @@ class DistObj():
 			Fills the object variables .shift and  either .smoothed or .corrected
 
 		"""
+		smoothed = self.is_smoothed()
+
 		datasource = None
 		tfcomb.utils.check_type(smoothed, bool)
 		if smoothed:
@@ -2469,7 +2467,7 @@ class DistObj():
 		x = [0] + list(x) + [0]
 		threshold = prominence * stringency
 
-		peaks_idx, properties = find_peaks(x, prominence=threshold, height = threshold)
+		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
 		
 		# subtract the position added above (first zero) 
 		peaks_idx = peaks_idx - 1 
@@ -2554,7 +2552,7 @@ class DistObj():
 			self.smooth(smooth_window)
 			smoothed = True
 		
-		self.shift_signal(smoothed)
+		self.shift_signal()
 
 		self.logger.info(f"Analyzing Signal")
 		all_peaks = []
@@ -2622,7 +2620,44 @@ class DistObj():
 		if save is not None:
 			outfile.close()
 		
-		self.logger.info("Done analyzing signal. Results are found in .peaks")		
+		self.logger.info("Done analyzing signal. Results are found in .peaks")	
+
+	def analyze_hubs(self):
+		""" Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
+
+			Returns:
+			----------
+			pd.Series 
+				A panda series with the tf as index and the count as integer
+		"""
+		
+		self.check_peaks()
+
+		occurrences= collections.Counter([x for (x,z) in set(self.peaks.set_index(["TF1","TF2"]).index)])
+		
+		return pd.Series(occurrences)		
+
+	def classify_rules(self):
+		""" Classify all rulesm True if at least one peak was found, False otherwise.  
+
+			Returns:
+			----------
+			None adds a column to either .smoothed or .corrected
+		"""
+
+		self.check_peaks()
+
+		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
+
+
+		if self.is_smoothed():
+			datasource = self.smoothed
+		else:    
+			datasource = self.corrected
+
+		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
+
+		
 
 	def check_periodicity(self):
 		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
@@ -2947,6 +2982,10 @@ class DistObj():
 			negative = True
 			x = x[1:]
 			offset_neg = -4
+		
+		# if data is classified, exclude class from plotting
+		if (type(x[-1]) is np.bool_) or (type(x[-1]) is bool):
+			x = x[:-1]
 		
 		if (method =="zscore"):
 			x = (x - x.mean())/x.std()
