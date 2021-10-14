@@ -13,11 +13,7 @@ import statsmodels.stats.multitest
 import pysam
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
-<<<<<<< HEAD
-import tfcomb
 import pathlib
-=======
->>>>>>> origin/restructuring
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
