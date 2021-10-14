@@ -2808,6 +2808,7 @@ class DistObj():
 			None 
 				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
 		"""
+		# checks
 		tfcomb.utils.check_value(smooth_window, vmin=0, integer=True, name="smooth_window")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
@@ -2833,44 +2834,59 @@ class DistObj():
 		if save is not None:
 			outfile = open(save, 'w')
 			outfile.write(self._PEAK_HEADER)
-		calc_median = False
-		calc_zscore = False
-		if (prominence == "median"):
-			calc_median = True
-		if (prominence == "zscore"):
-			calc_zscore = True
-			prominence = 1
+
+		
 
 		thresholds = {}
 		peaking_count = 0
-		for tf1,tf2 in list(zip(self.corrected.TF1, self.corrected.TF2)):
-			ind = tf1 + "-" + tf2
-			self.check_pair((tf1, tf2))
 
-			datasource = self._get_datasource()
-				
-			corrected_data = datasource.loc[ind].iloc[2:]
-			
+
+		# distinguish between median, zscore and flat
+		datasource = self._get_datasource()
+		if (prominence == "median"):
+			med = datasource.set_index(["TF1", "TF2"]).median(axis=1)
+			med = med.to_frame('median')
+			combined = pd.concat((datasource.set_index(["TF1", "TF2"]), med) , axis=1, ignore_index=False)
+			combined = combined.reset_index().set_index(["TF1", "TF2"], drop=False)
+			res = combined.apply(lambda row: self._analyze_signal_pair((str(row[0]), str(row[1])),
+																		row[2:-1],
+																		smooth_window=1,
+																		prominence=row[-1],
+																		stringency=stringency,
+																		save=None), axis=1)
+			method = "median"
+
+		elif (prominence == "zscore"):
+			stds = np.std(datasource, axis=1)
+			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
+			means = np.mean(datasource, axis=1)
+			# zscore (x-mean)/std
+			textcols = datasource[['TF1', 'TF2']]
+			zsc = datasource.drop(['TF1', 'TF2'], axis=1).subtract(means, axis =0).divide(stds, axis =0).fillna(0) 
+			zsc = pd.concat((textcols,zsc), axis=1)
+			zsc = zsc.reset_index(drop=True).set_index(["TF1", "TF2"], drop=False)
+			res = zsc.apply(lambda row: self._analyze_signal_pair((str(row[0]), str(row[1])),
+																	row[2:],
+																	smooth_window=1,
+																	prominence=1, # for zscore threshold is given via stringency
+																	stringency=stringency,
+																	save=None), axis=1)
+			method = "zscore"
+		else:
+			res = datasource.apply(lambda row: self._analyze_signal_pair((str(row[0]),str(row[1])),
+																								    row[2:],
+																									smooth_window=1,
+																									prominence=prominence, # for zscore threshold is given via stringency
+																									stringency=stringency,
+																									save=None), axis=1)
 			method = "flat"
 
-			if (calc_zscore):
-				corrected_data = (corrected_data - corrected_data.mean())/corrected_data.std()
-				method = "zscore"
-			if (calc_median):
-				prominence = corrected_data.median()
-				method = "median"
 
-			corrected_data = corrected_data.tolist() #series -> list
-
-			peaks,thresh = self._analyze_signal_pair((tf1,tf2),
-											  corrected_data, 
-											  smooth_window=1,  # smoothing already done
-											  prominence=prominence,
-											  stringency=stringency, 
-											  save=None)
-
+		for index, value in res.items():
+			tf1, tf2 = index
+			peaks, thresh = value
 			thresholds[tf1,tf2] = [tf1, tf2, thresh, method]
-
+			
 			if len(peaks)>0:
 				for peak in peaks:
 					all_peaks.append(peak)
@@ -3235,7 +3251,6 @@ class DistObj():
 
 
 		datasource = self._get_datasource()
-		print(datasource)
 		
 		x = datasource.loc[ind].iloc[2:].to_numpy()
 		
@@ -3275,12 +3290,12 @@ class DistObj():
 			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
 			xt[0] = offset_neg
 			xt[0] = -1
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
+			xt = xt[:-1]
+			xtl = xt.tolist()
+			xtl[0] = "neg"
 		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
+			xt = xt[1:-1]
+			xtl = xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
 		plt.title(f"Analyzed signal for {tf1}-{tf2}")
