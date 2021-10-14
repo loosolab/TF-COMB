@@ -714,12 +714,39 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 
 		return(locations)
 
-def merge_pair_locations(locations):
-	""" """
+def locations_to_bed(locations, outfile, fmt="bed"):
+		""" 
+		Write the locations of (TF1, TF2) pairs to a bed-file.
+		
+		Parameters
+		------------
+		locations : list
+			The output of get_pair_locations()
+		outfile : str
+			The path which the pair locations should be written to.
+		fmt : str, optional
+			The format of the output file. Bust be pne of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
+		"""
+		
+		tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
 
-	l = RegionList()
+		#Open output file
+		try:
+			f = open(outfile, "w")
+		except Exception as e:
+			raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
+		
+		#Write locations to file in format 'fmt'
+		if fmt == "bed":
+			s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[1].end), loc[0].name + "-" + loc[1].name, str(loc[-1]), "."]) for loc in locations]) + "\n"
 
-	return(l)
+		elif fmt == "bedpe":
+			s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[0].end),
+									  loc[1].chrom, str(loc[1].start), str(loc[1].end), 
+									  loc[0].name + "-" + loc[1].name, str(loc[-1]), loc[0].strand, loc[1].strand]) for loc in locations]) + "\n"
+		f.write(s)
+		f.close()
+
 
 #--------------------------------- Background calculation ---------------------------------#
 

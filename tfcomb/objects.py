@@ -794,6 +794,8 @@ class CombObj():
 	def get_pair_locations(self, TF1, TF2, 
 								 TF1_strand = None, 
 								 TF2_strand = None, 
+								 save = None,
+								 fmt = "bed",
 								 **kwargs):
 		""" 
 		Get genomic locations of a particular TF pair. Requires .TFBS to be filled. 
@@ -810,6 +812,10 @@ class CombObj():
 			Strand of TF1 in pair. Default: None (strand is not taken into account).
 		TF2_strand : str, optional
 			Strand of TF2 in pair. Default: None (strand is not taken into account).
+		save : str, optional
+			Path to save the pair locations to. Default: None (no file is written).
+		fmt : str, optional
+			If 'save' is set, 'fmt' controls the format of the output file. Bust be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
 		kwargs : arguments
 			Any additional arguments are passed to tfcomb.utils.get_pair_locations.
 
@@ -839,6 +845,9 @@ class CombObj():
 
 		#Get locations via utils function
 		locations = tfcomb.utils.get_pair_locations(self.TFBS, TF1, TF2, TF1_strand, TF2_strand, **kwargs)
+
+		if save is not None:
+			tfcomb.utils.locations_to_bed(locations, outfile=save, fmt=fmt)
 
 		return(locations)
 
