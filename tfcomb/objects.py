@@ -1063,9 +1063,7 @@ class CombObj():
 		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
 
 		if parent_directory is not None:
-			for idx,row in self.distObj.distances.iterrows():
-				tf1 = row[0]
-				tf2 = row[1]
+			for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 				self.plot_analyzed_signal((tf1, tf2), only_peaking=True, save=os.path.join(parent_directory, "peaks", f"{tf1}_{tf2}.png"))
 		
 
@@ -1871,26 +1869,15 @@ class DistObj():
 		if self.corrected is None:
 			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
 			sys.exit(0)
-		all_smoothed = []
 		
 		self.smooth_window = window_size
 		self.logger.info(f"Smoothing signals with window size {window_size}")
-		for idx, row in self.corrected.iterrows():
-			tf1 = row[0]
-			tf2 = row[1]
-			smoothed = fast_rolling_math(np.array(list(row[2:])), window_size, "mean")
-			x = np.nan_to_num(smoothed)
-			x = np.insert(np.array(x, dtype=object), 0, tf2)
-			x = np.insert(x, 0, tf1)
-			all_smoothed.append(x)
+ 
+		smoothed = self.corrected.apply(lambda row: fast_rolling_math(np.array(list(row[2:])), 3, "mean"), axis=1)
+		smoothed = smoothed.apply(lambda row: np.nan_to_num(row))
+		smoothed = pd.DataFrame.from_dict(dict(zip(smoothed.index, smoothed.values)), orient="index", columns=self.corrected.columns[2:])
 		
-		if self.min_dist == 0:    
-			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		else:
-			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		
-		self.smoothed = pd.DataFrame(all_smoothed, columns=columns)
-		self.smoothed.index = self.smoothed["TF1"] + "-" + self.smoothed["TF2"]
+		self.smoothed = pd.concat((self.corrected[["TF1","TF2"]],smoothed), axis=1)
 
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
@@ -2294,9 +2281,7 @@ class DistObj():
 
 		self.logger.info("Fitting linear regression.")
 		linres = {}
-		for idx,row in self.distances.iterrows():
-			tf1 = row["TF1"]
-			tf2 = row["TF2"]
+		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			res = self._linregress_pair((tf1, tf2))
 			linres[tf1, tf2] = [tf1, tf2, res]
 		
@@ -2406,9 +2391,7 @@ class DistObj():
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist + 1
 
-		for idx, row in self.distances.iterrows():
-			tf1 = row[0]
-			tf2 = row[1]
+		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			plot_func((tf1, tf2), n_bins=n_bins, save=os.path.join(save_path,f"{tf1}_{tf2}.png"))
 
 	# TODO: Check if kwargs is better suited tham height & prominence
@@ -2578,9 +2561,7 @@ class DistObj():
 
 		thresholds = {}
 		peaking_count = 0
-		for idx,row in self.corrected.iterrows():
-			tf1 = row["TF1"]
-			tf2 = row["TF2"]
+		for tf1,tf2 in list(zip(self.corrected.TF1, self.corrected.TF2)):
 			ind = tf1 + "-" + tf2
 			self.check_pair((tf1, tf2))
 
@@ -2972,6 +2953,7 @@ class DistObj():
 
 
 		datasource = self._get_datasource()
+		print(datasource)
 		
 		x = datasource.loc[ind].iloc[2:].to_numpy()
 		
