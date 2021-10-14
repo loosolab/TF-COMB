@@ -47,7 +47,6 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 
 	"""
 
-	cdef dict count_dict = {} #for saving co-occurrences
 	cdef int n_sites = len(sites)
 	
 	#Create n x n count matrix
@@ -63,6 +62,7 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, 
 	cdef int TF2_start, TF2_end, overlap_bp, short_bp, valid_pair
 	cdef int TF2_chr, TF2_name
+	cdef int TF1_mid, TF2_mid
 	cdef int distance
 	cdef int self_count
 
@@ -189,45 +189,6 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 
 	return((single_count_arr, pair_count_mat))
 
-def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
-	"""
-
-	"""
-
-	cdef int n_sites = len(sites)
-	cdef int total_bp = 0
-	cdef int current_chrom, current_start, current_end
-
-	cdef int previous_start = sites[0,1]
-	cdef int previous_end = sites[0,2]
-	cdef int i = 1
-
-	#Loop over all sites
-	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
-
-		current_chrom = sites[i,0]
-		current_start = sites[i,1]
-		current_end = sites[i,2]
-
-		if current_start > previous_end:
-			#Gap; add to total_bp
-			stretch_bp = previous_end - previous_start 
-
-			previous_start = current_start
-			previous_end = current_end
-
-		else:
-			previous_end = current_end
-
-		#current_end = "" #sites[]
-		#previous = ""
-
-		i += 1
-	
-	#Add last region
-	total_bp += previous_end - previous_start
-
-	return(total_bp)
 
 def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 					dict rules,

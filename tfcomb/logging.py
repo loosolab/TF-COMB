@@ -1,7 +1,6 @@
 import logging
 from logging import ERROR, INFO, DEBUG
 import sys
-from tfcomb.utils import InputError
 
 #Create additional level
 SPAM = DEBUG - 1
@@ -13,6 +12,12 @@ verbosity_to_level = {0: ERROR, #essentially silent
 					  3: SPAM #extreme spam debugging
 					  } 
 					  
+class InputError(Exception):
+	""" Raises an InputError exception without writing traceback """
+
+	def _render_traceback_(self):
+		etype, msg, tb = sys.exc_info()
+		sys.stderr.write("{0}: {1}".format(etype.__name__, msg))
 
 class TFcombLogger(logging.RootLogger):
 

@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 from copy import deepcopy
+import time
+import datetime
 import scipy.stats
 import random
 import string
@@ -11,6 +13,9 @@ from kneed import DataGenerator, KneeLocator
 import statsmodels.stats.multitest
 
 import pysam
+import tfcomb
+from tfcomb.logging import TFcombLogger, InputError
+from tfcomb.counting import count_co_occurrence
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
 import pathlib
@@ -347,7 +352,7 @@ def log_progress(jobs, logger, n=10):
 #--------------------------------------- Motif / TFBS scanning and processing ---------------------------------------#
 
 def prepare_motifs(motifs_file, motif_pvalue=0.0001, motif_naming="name"):
-	""" Read motifs from motifs_file """
+	""" Read motifs from motifs_file and set threshold/name. """
 
 	#Read and prepare motifs
 	motifs_obj = MotifList().from_file(motifs_file)
@@ -358,9 +363,68 @@ def prepare_motifs(motifs_file, motif_pvalue=0.0001, motif_naming="name"):
 	return(motifs_obj)
 
 def open_genome(genome_f):	
-	""" """
+	""" Opens an internal genome object for fetching sequences.
+
+	Parameters
+	------------
+	genome_f : str
+		The path to a fasta file.
+	
+	Returns
+	---------
+	pysam.FastaFile
+	"""
+
 	genome_obj = pysam.FastaFile(genome_f)
 	return(genome_obj)
+
+def check_boundaries(regions, genome):
+	""" Utility to check whether regions are within the boundaries of genome.
+	
+	Parameters
+	-----------
+	regions : tobias.utils.regions.RegionList 
+		A RegionList() object containing regions to check.
+	genome : pysam.FastaFile
+		An object (e.g. from open_genome()) to use as reference. 
+	
+	Raises
+	-------
+	InputError
+		If a region is not available within genome
+	"""
+
+	chromosomes = genome.references
+	lengths = genome.lengths
+	genome_bounds = dict(zip(chromosomes, lengths))
+
+	for region in regions:
+		if region.chrom not in chromosomes:
+			raise InputError("Region '{0} {1} {2} {3}' is not present in the given genome. Available chromosomes are: {4}.".format(region.chrom, chromosomes))
+		else:
+			if region.start < 0 or region.end > genome_bounds[region.chrom]:
+				raise InputError("Region '{0} {1} {2} {3}' is out of bounds in the given genome. The length of the chromosome is: {4}".format(region.chrom, region.start, region.end, genome_bounds[region.chrom]))
+
+
+def unique_region_names(regions):
+	""" 
+	Get a list of unique region names within regions. 
+
+	Parameters
+	-----------
+	regions : tobias.utils.regions.RegionList 
+		A RegionList() object containing regions with .name attributes.
+
+	Returns
+	--------
+	list
+		The list of sorted names from regions.
+	"""
+
+	names_dict = {r.name: True for r in regions}
+	names = sorted(list(names_dict.keys()))
+
+	return(names)
 
 def calculate_TFBS(regions, motifs, genome):
 	"""
@@ -410,9 +474,13 @@ def remove_duplicates(TFBS):
 
 	return(filtered)
 
-
 def resolve_overlapping(TFBS):
-	""" Remove self-overlapping regions """
+	""" Remove self-overlapping regions from TFBS 
+	
+	Parameters
+	-----------
+	TFBS : tobias.regions.RegionList
+	"""
 
 	#Split TFBS into dict per name
 	sites_per_name = {}
@@ -428,6 +496,55 @@ def resolve_overlapping(TFBS):
 	resolved.loc_sort()
 	
 	return(resolved)
+
+def merge_self_overlaps(regions):
+	""" Merge overlapping regions with the same name.
+	
+	Parameters
+	-----------
+	regions : RegionList()
+		A RegionList() object of regions 
+
+	Return
+	--------
+	RegionList()
+		The given regions merged per name
+	"""
+
+	#regions.loc_sort() #assume that the regions are already sorted due to computational overhead
+	no_regions = len(regions)
+
+	i = 0
+	j = 1
+	while i + j < no_regions:
+
+		reg_a = regions[i]
+		reg_b = regions[i+j]
+
+		if reg_a == None:
+			i += 1
+			j = 1
+		elif reg_b == None:
+			j += 1
+		else:
+			if (reg_a.chrom == reg_b.chrom) and (reg_b.start < reg_a.end): #if overlapping
+				if reg_a.name == reg_b.name:
+					
+					#Update reg_a and set reg_b to None
+					reg_a.end = reg_b.end
+					regions[i+j] = None
+
+				else: #overlapping but not the same - increment b
+					j += 1
+
+			else: #non-overlapping, increment reg_a
+				i += 1
+				j = 1
+
+	#Remove all None
+	merged = RegionList([reg for reg in regions if reg is not None])
+
+	return(merged)
 
 
 def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
@@ -597,8 +714,171 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 
 		return(locations)
 
+def merge_pair_locations(locations):
+	""" """
+
+	l = RegionList()
+
+	return(l)
+
+#--------------------------------- Background calculation ---------------------------------#
+
+def shuffle_array(arr, seed=1):
+	np.random.seed(seed)
+	length = arr.shape[0]
+	return(arr[np.random.permutation(length),:])
+
+def shuffle_sites(sites, seed=1):
+	""" Shuffle TFBS names to existing positions and updates lengths of the new positions.
+	
+	Parameters
+	-----------
+	sites : np.array
+		An array of sites in shape (n_sites,4), where each row is a site and columns correspond to chromosome, start, end, name.
+	
+	Returns
+	--------
+	An array containing shuffled names with site lengths corresponding to original length of sites.
+	"""
+	
+	#Establish lengths of regions
+	lengths = sites[:,2] - sites[:,1]
+	sites_plus = np.c_[sites, lengths]
+	
+	#Shuffle names (and corresponding lengths)
+	sites_plus[:,-2:] = shuffle_array(sites_plus[:,-2:], seed)
+	
+	#Adjust coordinates to new length
+	#new start = old start + old half length - new half length
+	#new end = new start + new length
+	sites_plus[:,1] = sites_plus[:,1] + ((sites_plus[:,2] - sites_plus[:,1])/2) - sites_plus[:,-1]/2 #new start
+	sites_plus[:,2] = sites_plus[:,1] + sites_plus[:,-1] #new end
+	
+	#Remove length again
+	sites_shuffled = sites_plus[:,:-1]
+	
+	return(sites_shuffled)
+
+def calculate_background(sites, min_distance, 
+								max_distance, 
+								max_overlap,
+								binary,
+								anchor,
+								n_TFs,
+								directional,
+								seed=1):
+	""" 
+	Wrapper to shuffle sites and count co-occurrence of the shuffled sites. 
+	
+	Parameters
+	------------
+	sites : np.array
+		An array of sites in shape (n_sites,4), where each row is a site and columns correspond to chromosome, start, end, name.
+	min_distance
+	max_distance
+	max_overlap
+	binary
+	anchor
+	n_TFs
+	directional
+	seed
+	"""
+	
+	#Shuffle sites
+	s = datetime.datetime.now()
+	shuffled = shuffle_sites(sites, seed=seed)
+	e = datetime.datetime.now()
+	#print("Shuffling: {0}".format(e-s))
+	
+	s = datetime.datetime.now()
+	_, pair_counts = count_co_occurrence(shuffled, 
+													min_distance,
+													max_distance,
+													max_overlap, 
+													binary,
+													anchor,
+													n_TFs)
+	e = datetime.datetime.now()
+	#print("counting: {0}".format(e-s))
+	pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
+	
+	return(pair_counts)
+
 
 #--------------------------------- P-value calculation ---------------------------------#
+
+def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
+	"""
+	Function to get upper/lower threshold(s) based on the distribution of data. The threshold is calculated as the probability of "percent" (upper=1-percent).
+	
+	Parameters
+	------------
+	data : list or array
+		An array of data to find threshold on.
+	which : str
+		Which threshold to calculate. Can be one of "upper", "lower", "both". Default: "upper".
+	percent : float between 0-1
+		Controls how strict the threshold should be set in comparison to the distribution. Default: 0.05.
+	
+	Returns
+	---------
+	If which is one of "upper"/"lower", get_threshold returns a float. If "both", get_threshold returns a list of two float thresholds.
+	"""
+	
+	distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace, 
+					 scipy.stats.expon, scipy.stats.truncnorm, scipy.stats.truncexpon, scipy.stats.wald, scipy.stats.weibull_min]
+	
+	logger = tfcomb.logging.TFcombLogger(verbosity)
+
+	#Check input parameters
+	check_string(which, ["upper", "lower", "both"], "which")
+	check_value(percent, vmin=0, vmax=1, name="percent")
+
+	#Subset data to _n_max:
+	if len(data) > _n_max:
+		np.random.seed(0)
+		data = np.random.choice(data, size=_n_max, replace=False)
+	
+	data_finite = np.array(data)[~np.isinf(data)]
+
+	#Fit data to each distribution
+	distribution_dict = {}
+	for distribution in distributions:
+		logger.debug("Fitting data to '{0}'".format(distribution))
+		params = distribution.fit(data_finite)
+
+		#Test fit using negative loglikelihood function
+		mle = distribution.nnlf(params, data_finite)
+
+		#Save info on distribution fit    
+		distribution_dict[distribution.name] = {"distribution": distribution,
+												"params": params, 
+												"mle": mle}
+
+	#Get best distribution
+	best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
+	parameters = distribution_dict[best_fit_name]["params"]
+	best_distribution = distribution_dict[best_fit_name]["distribution"]
+
+	#Get threshold
+	thresholds = best_distribution(*parameters).ppf([percent, 1-percent])
+	
+	if which == "upper":
+		final = thresholds[-1]
+	elif which == "lower":
+		final = thresholds[0]
+	elif which == "both":
+		final = tuple(thresholds)
+		
+	#Plot fit and threshold
+	#plt.hist(data, bins=20, density=True)
+	#xmin = np.min(data)
+	#xmax = np.max(data)
+	#x = np.linspace(xmin, xmax, 100)
+	#plt.plot(x, best_distribution(*params).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
+	#plt.legend()
+	
+	return(final)
 
 def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, logger=None):
 	"""
@@ -614,11 +894,8 @@ def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, l
 		One of: 'two-sided', 'greater', 'less'. Default: "greater".
 	threads : int, optional
 		Number of threads to use for multiprocessing. Default: 1.
-
-	Returns
-	--------
-	List of p-values in order of input table
-
+	logger : logger
+		A logger to use for logging progress.
 	"""
 	
 	if logger == None:
@@ -673,8 +950,7 @@ def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, l
 	tuples_chunks = [tuples[i:i+per_chunk] for i in range(0, n_tuples, per_chunk)]
 
 	### Calculate pvalues with/without multiprocessing
-	p = Progress(n_jobs, 10, logger)
-
+	
 	if threads == 1:
 		pvalues = []
 		p = Progress(n_jobs, 10, logger) #Setup progress object

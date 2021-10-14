@@ -71,6 +71,7 @@ for f in notebooks:
     with open("examples/" + f_name + ".nblink", 'w') as fp:
         json.dump(d, fp)
 
+nbsphinx_execute = 'never'
 
 # -- Options for HTML output -------------------------------------------------
 
