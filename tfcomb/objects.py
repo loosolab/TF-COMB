@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import os 
 import pandas as pd
 import itertools
@@ -92,11 +93,14 @@ class CombObj():
 	def __str__(self):
 		""" Returns a string representation of the CombObj """
 		
-		s = "<CombObj: "
-		s += "{0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
+		s = "<CombObj"
 
-		if self.rules is not None:
-			s += " | Market basket analysis: {0} rules".format(self.rules.shape[0])
+		if self.TFBS is not None:
+			s += ": {0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
+
+			if self.rules is not None:
+				s += " | Market basket analysis: {0} rules".format(self.rules.shape[0])
+
 		s += ">"
 		return(s)
 
@@ -535,9 +539,9 @@ class CombObj():
 		Parameters
 		-----------
 		min_distance : int
-			Minimum distance between two TFBS to be counted as co-occurring. Distances are calculated from end-to-end of regions, e.g. the smallest possible distance. Default: 0.
+			Minimum distance between two TFBS to be counted as co-occurring. Distances are calculated depending on the 'anchor' given. Default: 0.
 		max_distance : int
-			Maximum distance between two TFBS to be counted as co-occurring. Distances are calculated from end-to-end of regions, e.g. the smallest possible distance. Default: 100.
+			Maximum distance between two TFBS to be counted as co-occurring. Distances are calculated depending on the 'anchor' given. Default: 100.
 		max_overlap : float between 0-1
 			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
 			Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
@@ -549,7 +553,7 @@ class CombObj():
 		binarize : bool, optional
 			Whether to count a TF1-TF2 more than once per window (e.g. in the case of "<TF1> <TF2> <TF2> (...)"). Default: False.
 		anchor : str, optional
-			inner/mid/outer
+			The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
 
 		Returns
 		----------
@@ -562,7 +566,9 @@ class CombObj():
 			If .TFBS has not been filled.
 		"""
 
+		anchor_str_to_int = {"inner": 0, "outer": 1, "center": 2}
 
+		#Check input parameters
 		self._check_TFBS()
 
 		
@@ -586,7 +592,7 @@ class CombObj():
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
 		name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
 		sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, name_to_idx[site.name]) for site in TFBS]) #numpy integer array
-	
+
 		#Count number of bp covered by all TFBS
 		self.TFBS_bp = len(self.TFBS) #get_unique_bp(self.TFBS)
 
@@ -594,10 +600,12 @@ class CombObj():
 
 		self.logger.debug("Counting co-occurrences within sites")
 		binary = 0 if binarize == False else 1
+		anchor_int = anchor_str_to_int[anchor]
 		TF_counts, pair_counts = count_co_occurrence(sites, min_distance,
 															max_distance,
 															max_overlap, 
-															binary, 
+															binary,
+															anchor_int,
 															n_TFs)
 		pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
 
@@ -611,17 +619,16 @@ class CombObj():
 		self.stranded = stranded
 		self.directional = directional
 		self.max_overlap = max_overlap
+		self.anchor = anchor
 
 		self.logger.info("Done finding co-occurrences! Run .market_basket() to estimate significant pairs")
 
-
-	def get_pair_locations(self, TF1, TF2, TF1_strand=None,
-										   TF2_strand=None,
-										   min_distance=0, 
-										   max_distance=100, 
-										   max_overlap=0,
-										   directional=False):
-		""" Get genomic locations of a particular TF pair. Requires .TFBS to be filled.
+	def get_pair_locations(self, TF1, TF2, 
+								 TF1_strand = None, TF2_strand = None, **kwargs):
+		""" 
+		Get genomic locations of a particular TF pair. Requires .TFBS to be filled. 
+		If 'count_within' was run, the parameters used within the latest 'count_within' run are used. Else, the default values of tfcomb.utils.get_pair_locations() are used.
+		Both options can be overwritten by setting kwargs.
 		
 		Parameters
 		----------
@@ -629,18 +636,12 @@ class CombObj():
 			Name of TF1 in pair.
 		TF2 : str 
 			Name of TF2 in pair.
-		TF1_strand : str
+		TF1_strand : str, optional
 			Strand of TF1 in pair. Default: None (strand is not taken into account).
-		TF2_strand : str
+		TF2_strand : str, optional
 			Strand of TF2 in pair. Default: None (strand is not taken into account).
-		min_distance : int
-			Default: 0
-		max_distance : int
-			Default: 100
-		max_overlap : float
-			Default: 0
-		directional : bool
-			Default: False
+		kwargs : arguments
+			Any additional arguments are passed to tfcomb.utils.get_pair_locations.
 
 		Returns
 		-------
@@ -649,13 +650,24 @@ class CombObj():
 
 		See also
 		---------
-		count_within
+		tfcomb.utils.get_pair_results
+		tfcomb.CombObj.count_within
 
 		"""
 
 		self._check_TFBS()
+		self.logger.debug("kwargs given in function: {0}".format(kwargs))
 
-		locations = tfcomb.utils.get_pair_locations()
+		#If not set, fill in kwargs with internal arguments set by count_within()
+		attributes = ["min_distance", "max_distance", "directional", "max_overlap", "anchor"]
+		for att in attributes:
+			if hasattr(self, att):
+				if not att in kwargs:
+					kwargs[att] = getattr(self, att)
+		self.logger.debug("kwargs for get_pair_locations: {0}".format(kwargs))	
+
+		#Get locations via utils function
+		locations = tfcomb.utils.get_pair_locations(self.TFBS, TF1, TF2, TF1_strand, TF2_strand, **kwargs)
 
 		return(locations)
 

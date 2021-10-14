@@ -15,6 +15,7 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 						int max_distance = 100, 
 						float max_overlap = 0, 
 						int binary = 0,
+						int anchor = 0,
 						int n_names = 1000):
 
 	"""
@@ -26,23 +27,23 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
 	w : int
 		Windowsize
-
 	min_distance : int
 		Minimum allowed distance between two TFs. Default: 0
-
 	max_distance : int
 		Maximum allowed distance between two TFs. Default: 100
-
 	max_overlap (float): 
 		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.
-
 	binary : int
 		0 or 1 bool integer. If 0; counts are left raw. If 1; each pair is only counted once per window.
+	anchor : int
+		Anchor used to calculate distance with. One of [0,1,2] (0 = inner, 1 = outer, 2 = center). Default: 0
+	n_names : int
+		Number of unique names within sites. Used to initialize the count arrays.
 
 	Returns:
 	-----------
 	tuple
-
+		(np.array 1 x n_names, np.array(n_names x n_names))
 
 	"""
 
@@ -103,11 +104,19 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 				TF2_end = sites[i+j,2]
 				TF2_name = sites[i+j,3]
 				
-				#Calculate distance between the two sites
-				distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-				if distance < 0:
-					distance = 0
+				#Calculate distance between the two sites based on anchor
+				if anchor == 0:
+					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+					if distance < 0:
+						distance = 0
+				elif anchor == 1:
+					distance = TF2_end - TF1_start
+				elif anchor == 2:
+					TF1_mid = (TF1_start + TF1_end) / 2
+					TF2_mid = (TF2_start + TF2_end) / 2
+					distance = TF2_mid - TF1_mid
 
+				#Check if sites are valid as co-occurring
 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
 					if distance >= min_distance: #Check that sites are more than min distance away
 						
@@ -136,11 +145,27 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 							#Count TF1 self-counts for adjusting to binary flag
 							if binary == 1 and TF1_name == TF2_name:
 								self_count += 1
-			
-				else:
-					#The next site is out of window range; increment to next i
+
+				elif TF1_chr != TF2_chr: 
 					i += 1
 					finding_assoc = False   #break out of finding_assoc-loop
+
+				else: #This TF2 is on the same chromosome but more than max_distance away
+
+					#Establish if all valid sites were found for TF1
+					if anchor == 0:
+
+						#The next site is out of inner window range; increment to next i
+						i += 1
+						finding_assoc = False   #break out of finding_assoc-loop
+					
+					else: #If anchor is outer or center, there might still be valid pairs for future TF2's
+
+						#Check if it will be possible to find valid pairs in next sites
+						if TF2_start > TF1_start + max_distance:
+							#no longer possible to find valid pairs for TF1; increment to next i
+							i += 1
+							finding_assoc = False   #break out of finding_assoc-loop
 
 		## Done finding TF2's for current TF1
 		
