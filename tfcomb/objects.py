@@ -276,7 +276,8 @@ class CombObj():
 								gc=0.5, 
 								keep_overlaps=False, 
 								threads=1, 
-								overwrite=False):
+								overwrite=False,
+								_suffix=""): #suffix to add to output motif names
 
 		"""
 		Function to calculate TFBS from motifs and genome fasta within the given genomic regions.
@@ -301,7 +302,7 @@ class CombObj():
 			How many threads to use for multiprocessing. Default: 1. 
 		overwrite : boolean
 			Whether to overwrite existing sites within .TFBS. Default: False (sites are appended to .TFBS).
-		
+
 		Returns
 		-----------
 		None 
@@ -344,6 +345,10 @@ class CombObj():
 		else:
 			_ = [motif.get_threshold(motif_pvalue) for motif in motifs]
 			_ = [motif.set_prefix(motif_naming) for motif in motifs]
+
+		#Set suffix to motif names
+		for motif in motifs:
+			motif.prefix = motif.prefix + _suffix
 
 		#Check that regions are within the genome bounds
 		genome_obj = tfcomb.utils.open_genome(genome)
@@ -442,6 +447,7 @@ class CombObj():
 		read_TFBS = RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(bed_file)])
 		
 		#Add TFBS to internal .TFBS list and process
+		self.logger.info("Processing sites")
 		self.TFBS += read_TFBS
 		self.TFBS.loc_sort()
 		read_TF_names = unique_region_names(read_TFBS)
@@ -1153,23 +1159,64 @@ class CombObj():
 
 		#Create a CombObj with the subset of TFBS and rules
 		self.logger.info("Creating subset of TFBS and rules using thresholds")
+		self.logger.debug("Copying old to new object")
 		new_obj = self.copy()
 		new_obj.rules = selected
 
+		self.logger.debug("Getting names")
 		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
+
+		self.logger.debug("Setting TFBS in new object")
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
 
 		return(new_obj)
 
+	#-----------------------------------------------------------------------------------------#
+	#------------------------------ Integration of external data -----------------------------#
+	#-----------------------------------------------------------------------------------------#
+
+	def integrate_data(self, table, merge="pair", TF1_col="TF1", TF2_col="TF2"):
+		""" Function to add external data to object rules / TF_table.
+		
+		Parameters
+		-----------
+		table : str or pandas.DataFrame
+			A table containing data to add to either .rules or .TF_table. If table is a string, 'table' is assumed to be the path to a tab-separated table containing a header line and rows of data.
+		merge : str
+			Which information to merge - must be one of "pair" or "TF". If "pair", data given in table is added to <CombObj>.rules. 
+			If "TF", data is added to <CombObj>.Default: "pair".
+		TF1_col : str, optional
+			The column in table corresponding to "TF1" name. If merge == "TF", 'TF1' corresponds to the column containing the TF name. Default: "TF1"
+		TF2_col : str, optional
+			The column in table corresponding to "TF2" name. If merge == "TF", 'TF2' is ignored. Default: "TF2".
+		"""
+
+		check_type(table, [str, pd.DataFrame], "table")
+		check_string(merge, ["pair", "TF"], "merge")
+
+		#Read table if string (path) was given
+		if isinstance(table, str):
+			table = pd.read_csv(table, sep="\t")
+			self.logger.info("Read table of shape {0} with columns: {1}".format(table.shape, table.columns.tolist()))
+
+		#Merge table to object
+		if merge == "TF":
+			check_columns(table, [TF1_col])
+
+			self.TF_table = self.TF_table.merge(table, left_index=True, right_on=TF1_col, how="left")
+
+		elif merge == "pair":
+			check_columns(table, [TF1_col, TF2_col])
+
+			self.rules = self.rules.merge(table, left_on=["TF1", "TF2"], right_on=[TF1_col, TF2_col], how="left")
+		
+		#If data was integrated, .network must be recalculated	
+		self.network = None
+		
 
 	#-----------------------------------------------------------------------------------------#
 	#-------------------------------- Plotting functionality  --------------------------------#
 	#-----------------------------------------------------------------------------------------#
-
-	def plot_background(self, TF1, TF2):
-		""" Plot the background count distribution for a given TF pair """
-		pass
-	
 
 	def plot_heatmap(self, n_rules=20, color_by="cosine", sort_by=None, **kwargs):
 		"""
@@ -1252,6 +1299,14 @@ class CombObj():
 		#Plot
 		ax = tfcomb.plotting.bubble(top_rules, yaxis=yaxis, color_by=color_by, size_by=size_by, **kwargs)
 
+	def plot_scatter(self):
+		""" Plot """
+		
+
+
+		pass
+
+
 	#-------------------------------------------------------------------------------------------#
 	#----------------------------------- In-depth analysis -------------------------------------#
 	#-------------------------------------------------------------------------------------------#
@@ -1271,6 +1326,7 @@ class CombObj():
 			Use create_distObj for own workflow steps and more options!
 		"""
 		self.create_distObj()
+		self.distObj.set_verbosity(self.verbosity)
 		self.distObj.count_distances(normalize=normalize, directional=self.directional)
 		tfcomb.utils.check_type(parent_directory,[type(None),str])
 		if parent_directory is not None:
@@ -1297,75 +1353,6 @@ class CombObj():
 				tf2 = row[1]
 				self.plot_analyzed_signal((tf1, tf2), only_peaking=True, save=os.path.join(parent_directory, "peaks", f"{tf1}_{tf2}.png"))
 		
-	def bed_from_range(self, TF1, TF2, TF1_strand=None,
-									   TF2_strand=None,
-									   directional=False,
-									   dist_range=None,
-									   save=None,
-									   delim="\t"):
-		""" Creates a bed file ("chr","pos start","pos end","name TF1", "strand","chr","pos start","pos end","name TF2", "strand","distance")
-			for a given TF-pair. Optional a range can be specified e.g. dist_range = (30,40) gives all hist with distances between 30 and 40
-
-			Parameters
-			----------
-			TF1 : str 
-				Name of TF1 in pair.
-			TF2 : str 
-				Name of TF2 in pair.
-			TF1_strand : str
-				Strand of TF1 in pair. Default: None (strand is not taken into account).
-			TF2_strand : str
-				Strand of TF2 in pair. Default: None (strand is not taken into account).
-			directional : bool
-				Default: False
-			dist_range: tuple
-				Range start and end to save e.g. (30,40). Default: None (write all ranges)
-			save:
-				Output Path to write results to. (filename will be constructed automatically from TF1-/TF2-name)
-				Default: None (results will not be saved)
-
-				
-			Returns
-			-------
-			List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-				Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
-
-		"""
-		max_over = 0
-		if self.min_dist < 0: 
-			max_over = -self.min_dist
-		
-		b = self.get_pair_locations(TF1, TF2, TF1_strand = TF1_strand,
-										   TF2_strand = TF2_strand,
-										   min_distance = self.min_dist, 
-										   max_distance = self.max_dist, 
-										   max_overlap = max_over,
-										   directional = directional)
-		
-		if save is not None:
-			# TODO: Check if save is a valid path
-			with open(f'{save}{TF1}_{TF2}.csv', "w") as outfile :
-				header_row = ["chr", "pos start", "pos end", "name TF1", "strand",
-							  "chr", "pos start", "pos end", "name TF2", "strand", "distance"]
-				csv_file = csv.writer(outfile, delimiter=delim) 
-				csv_file.writerow(header_row) 
-				for line in b:
-					tf1_region = line[0]
-					tf2_region = line[1]
-					dist = line[2]
-					if dist_range is not None:
-						if (dist in range(dist_range[0], dist_range[1])):
-							content = [tf1_region.chrom, tf1_region.start, tf1_region.end, tf1_region.name,
-									   tf1_region.strand, tf2_region.chrom, tf2_region.start, tf2_region.end,
-									   tf2_region.name, tf2_region.strand, dist]
-							csv_file.writerow(content)
-						else:
-							content = [tf1_region.chrom, tf1_region.start, tf1_region.end, tf1_region.name,
-									   tf1_region.strand, tf2_region.chrom, tf2_region.start, tf2_region.end,
-									   tf2_region.name, tf2_region.strand, dist]
-						csv_file.writerow(content) 
-		return b
-
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------------------ Network analysis -------------------------------------#
@@ -1556,9 +1543,11 @@ class DiffCombObj():
 			self.add_object(obj, join=join)
 
 		#Use functions from CombObj
-		self.copy = CombObj.copy
-		self.set_verbosity = CombObj.set_verbosity
-		self.simplify_rules = CombObj.simplify_rules
+		self.copy = lambda : CombObj.copy(self)
+		self.set_verbosity = lambda *args, **kwargs: CombObj.set_verbosity(self, *args, **kwargs)
+		self.build_network = lambda : CombObj.build_network(self)
+		self.simplify_rules = lambda *args, **kwargs: CombObj.simplify_rules(self, *args, **kwargs)
+		self.integrate_data = lambda *args, **kwargs: CombObj.integrate_data(self, *args, **kwargs)
 
 	def __str__(self):
 		pass
@@ -1610,12 +1599,17 @@ class DiffCombObj():
 
 		#Format table from obj to contain TF1/TF2 + measures with prefix
 		columns_to_keep = ["TF1", "TF2"] + [self.measure]
+		
 		obj_table = obj.rules[columns_to_keep] #only keep necessary columns
 		obj_table.rename(columns={self.measure: str(prefix) + "_" + self.measure}, inplace=True) #rename column to <prefix>_<measure>
 
-		#Initialize table if this is the first object
+		obj_TF_table = obj.TF_table.copy()
+		obj_TF_table.columns = [str(prefix) + "_" + col for col in obj_TF_table.columns]
+
+		#Initialize tables if this is the first object
 		if self.n_objects == 0: 
 			self.rules = obj_table
+			self.TF_table = obj_TF_table
 
 		#Or add object to this DiffCombObj
 		else:
@@ -1640,9 +1634,12 @@ class DiffCombObj():
 			else: #join is outer
 				self.rules = self.rules.merge(obj_table, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"], how="outer")
 				self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
-		
+
+			#Merge TF tables
+			self.TF_table = self.TF_table.merge(obj_TF_table, left_index=True, right_index=True)
+
 		self.n_objects += 1 #current number of objects +1 for the one just added
-		
+	
 		#Set name of index for table
 		self.rules.index = self.rules["TF1"] + "-" + self.rules["TF2"]
 
@@ -1798,7 +1795,7 @@ class DiffCombObj():
 
 		#Create a DiffCombObj with the subset of  rules
 		self.logger.info("Creating subset of rules using thresholds")
-		new_obj = self.copy(self)
+		new_obj = self.copy()
 		new_obj.rules = selected
 
 		return(new_obj)
@@ -1950,7 +1947,7 @@ class DiffCombObj():
 		color_node_by : str, optional
 			Name of measure to color node by. If column is not in .rules, the name will be internally converted to "prefix1/prefix2_<color_edge_by>". Default: None.
 		size_node_by : str, optional
-			Column in .rules to size_node_by. 
+			Column in .rules to size_node_by. If column is not in .rules, the name will be internally converted to "prefix1/prefix2_<size_node_by>" Default: None. 
 		color_edge_by : str, optional
 			The name of measure or column to color edge by (will be internally converted to "prefix1/prefix2_<color_edge_by>"). Default: "cosine_log2fc".
 		size_edge_by : str, optional
@@ -1988,11 +1985,13 @@ class DiffCombObj():
 
 		#Build network
 		self.logger.debug("Building network using 'tfcomb.network.build_network'")
-		G = tfcomb.network.build_nx_network(selected)
+		self.build_network() #adds .network to self
+		#G = tfcomb.network.build_nx_network(selected)
+		#self.network = G
 		
 		#Plot network
 		self.logger.debug("Plotting network using 'tfcomb.plotting.network'")
-		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, size_node_by=size_node_by, 
+		dot = tfcomb.plotting.network(self.network, color_node_by=color_node_by, size_node_by=size_node_by, 
 										 color_edge_by=color_edge_by, size_edge_by=size_edge_by, 
 										 verbosity=self.verbosity, **kwargs)
 
@@ -2113,6 +2112,7 @@ class DistObj():
 		self.max_dist = comb_obj.max_distance
 		self.directional = comb_obj.directional
 		self.max_overlap = comb_obj.max_overlap
+		self.stranded = comb_obj.stranded
 		#self.anchor = comb_obj.anchor
 
 	def set_anchor(self, anchor):
@@ -2406,7 +2406,7 @@ class DistObj():
 	#---------------------------------------- Counting -----------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def count_distances(self, normalize=True, directional=None):
+	def count_distances(self, normalize=True, directional=None, stranded=None):
 		""" Count distances for co_occurring TFs, can be followed by analyze_distances
 			to determine preferred binding distances
 
@@ -2429,22 +2429,38 @@ class DistObj():
 		"""
 
 		tfcomb.utils.check_type(normalize, [bool], "normalize")
+		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
+		self.check_min_max_dist()
+
 		if directional is None:
 			tfcomb.utils.check_type(self.directional, [bool], "self.directional")
 			directional = self.directional
 		else:
 			tfcomb.utils.check_type(directional, [bool], "directional")
-		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
 
-		self.check_min_max_dist()
+		if stranded == None:
+			stranded = self.stranded
+		else:
+			tfcomb.utils.check_type(stranded, bool, "stranded")
 		
-		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
-		
+		#Should strand be taken into account?
+		TFBS = copy.deepcopy(self.TFBS)
+		if stranded == True:
+			for site in TFBS:
+				site.name = "{0}({1})".format(site.name, site.strand)
+			TF_names = unique_region_names(TFBS)
+		else:
+			TFBS = self.TFBS
+			TF_names = self.TF_names
+
 		# encode chromosome,pairs and name to int representation
+		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
-		self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
+		self.name_to_idx = {name: idx for idx, name in enumerate(TF_names)}
+		#self.logger.debug("name_to_idx: {0}".format(self.name_to_idx))
+
 		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
-				  for site in self.TFBS] #numpy integer array
+				  for site in TFBS] #numpy integer array
 		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, 
 							 (tf1,tf2) in enumerate(self.rules[(["TF1", "TF2"])].values.tolist())}
 		
@@ -2961,6 +2977,100 @@ class DistObj():
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 	
+	def _plot_distribution(self, 
+							pair, 
+							style="hist",
+							n_bins=None,
+							bwadjust=0.1, 
+							show_bg=True,
+							show_peaks=True,
+							save=None):
+		"""
+		WORK IN PROGRESS: Plots distribution of TFBS distances for the given TF-TF pair.
+
+		Parameters
+		----------
+		pair : tuple(str,str)
+			One of "histogram" or "kde". Pair to create plot for.
+		style : str,
+			Style of the plot
+		n_bins: int
+			Number of bins. Default: None (Binning is done automatically)
+		bwadjust: float
+			Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. See kdeplot() from seaborn. Default: 0.1
+		show_bg : bool
+			Default: True
+		show_peaks : bool 
+			Default: True
+		"""
+
+		#Check input parameter validity
+		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
+		self.check_distances()
+		self.check_min_max_dist()
+
+		#Define input data
+		self.check_pair(pair)
+		tf1, tf2 = pair
+		ind = tf1 + "-" + tf2
+		source_table = self.distances
+		weights = np.array(source_table.loc[ind].iloc[2:])
+
+		#Decide how to deal with negative values
+		negative = False
+		if (self.min_dist == 0) and (self.max_overlap > 0): #if site overlap is allowed
+			negative = True
+			neg_weights = weights[0]
+			weights = weights[1:]
+			offset_neg = -4
+
+		#Setup plot
+		fig, ax = plt.subplots(1, 1)
+		distances = range(0, len(weights))
+
+		if style == "histogram":
+			plt.hist(distances, weights=weights, bins=n_bins, color='tab:blue')
+			plt.ylabel('Count per distance')
+		elif style == "kde":
+			sns.kdeplot(distances, weights=weights, bw_adjust=bwadjust, x="distance")
+			plt.ylabel('Count per distance')
+		
+		#Handle xticks for negative distances 
+		xt = ax.get_xticks() 
+		if negative:
+			plt.hist([neg_weights], bins=1, color='tab:orange')
+			xt[0] = offset_neg
+			#xt[0] = -1
+			xt = xt[:-1]
+			xtl = xt.tolist()
+			xtl[0]="neg"
+		#else:
+		#	xt=xt[1:-1]
+		#	xtl=xt.tolist()
+		ax.set_xticks(xt)
+		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
+
+		if show_bg:
+			linres = self.linres.loc[ind].iloc[2]
+			linres = linregress(distances, weights)
+			plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted line')
+
+		if show_peaks:
+			peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
+						(self.peaks["TF2"] == tf2))].Distance.to_numpy()
+
+
+		#Pretty plot; legends, labels, titles
+		plt.xlabel('Distance in bp')
+		plt.title(f"{tf1} - {tf2}")
+		plt.legend()
+
+		if save is not None:
+			plt.savefig(save, dpi=600)
+			plt.close()
+
 
 	def plot_hist(self, pair, n_bins=None, save=None):
 		""" Histograms for a list of TF-pairs
