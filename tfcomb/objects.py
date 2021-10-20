@@ -1348,9 +1348,7 @@ class CombObj():
 		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
 
 		if parent_directory is not None:
-			for idx,row in self.distObj.distances.iterrows():
-				tf1 = row[0]
-				tf2 = row[1]
+			for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 				self.plot_analyzed_signal((tf1, tf2), only_peaking=True, save=os.path.join(parent_directory, "peaks", f"{tf1}_{tf2}.png"))
 		
 
@@ -2169,26 +2167,15 @@ class DistObj():
 		if self.corrected is None:
 			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
 			sys.exit(0)
-		all_smoothed = []
 		
 		self.smooth_window = window_size
 		self.logger.info(f"Smoothing signals with window size {window_size}")
-		for idx, row in self.corrected.iterrows():
-			tf1 = row[0]
-			tf2 = row[1]
-			smoothed = fast_rolling_math(np.array(list(row[2:])), window_size, "mean")
-			x = np.nan_to_num(smoothed)
-			x = np.insert(np.array(x, dtype=object), 0, tf2)
-			x = np.insert(x, 0, tf1)
-			all_smoothed.append(x)
+ 
+		smoothed = self.corrected.apply(lambda row: fast_rolling_math(np.array(list(row[2:])), 3, "mean"), axis=1)
+		smoothed = smoothed.apply(lambda row: np.nan_to_num(row))
+		smoothed = pd.DataFrame.from_dict(dict(zip(smoothed.index, smoothed.values)), orient="index", columns=self.corrected.columns[2:])
 		
-		if self.min_dist == 0:    
-			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		else:
-			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		
-		self.smoothed = pd.DataFrame(all_smoothed, columns=columns)
-		self.smoothed.index = self.smoothed["TF1"] + "-" + self.smoothed["TF2"]
+		self.smoothed = pd.concat((self.corrected[["TF1","TF2"]],smoothed), axis=1)
 
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
@@ -2601,9 +2588,7 @@ class DistObj():
 
 		self.logger.info("Fitting linear regression.")
 		linres = {}
-		for idx,row in self.distances.iterrows():
-			tf1 = row["TF1"]
-			tf2 = row["TF2"]
+		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			res = self._linregress_pair((tf1, tf2))
 			linres[tf1, tf2] = [tf1, tf2, res]
 		
@@ -2713,9 +2698,7 @@ class DistObj():
 		if n_bins is None:
 			n_bins = self.max_dist - self.min_dist + 1
 
-		for idx, row in self.distances.iterrows():
-			tf1 = row[0]
-			tf2 = row[1]
+		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			plot_func((tf1, tf2), n_bins=n_bins, save=os.path.join(save_path,f"{tf1}_{tf2}.png"))
 
 	# TODO: Check if kwargs is better suited tham height & prominence
@@ -2850,6 +2833,7 @@ class DistObj():
 			None 
 				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
 		"""
+		# checks
 		tfcomb.utils.check_value(smooth_window, vmin=0, integer=True, name="smooth_window")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
@@ -2875,46 +2859,59 @@ class DistObj():
 		if save is not None:
 			outfile = open(save, 'w')
 			outfile.write(self._PEAK_HEADER)
-		calc_median = False
-		calc_zscore = False
-		if (prominence == "median"):
-			calc_median = True
-		if (prominence == "zscore"):
-			calc_zscore = True
-			prominence = 1
+
+		
 
 		thresholds = {}
 		peaking_count = 0
-		for idx,row in self.corrected.iterrows():
-			tf1 = row["TF1"]
-			tf2 = row["TF2"]
-			ind = tf1 + "-" + tf2
-			self.check_pair((tf1, tf2))
 
-			datasource = self._get_datasource()
-				
-			corrected_data = datasource.loc[ind].iloc[2:]
-			
+
+		# distinguish between median, zscore and flat
+		datasource = self._get_datasource()
+		if (prominence == "median"):
+			med = datasource.set_index(["TF1", "TF2"]).median(axis=1)
+			med = med.to_frame('median')
+			combined = pd.concat((datasource.set_index(["TF1", "TF2"]), med) , axis=1, ignore_index=False)
+			combined = combined.reset_index().set_index(["TF1", "TF2"], drop=False)
+			res = combined.apply(lambda row: self._analyze_signal_pair((str(row[0]), str(row[1])),
+																		row[2:-1],
+																		smooth_window=1,
+																		prominence=row[-1],
+																		stringency=stringency,
+																		save=None), axis=1)
+			method = "median"
+
+		elif (prominence == "zscore"):
+			stds = np.std(datasource, axis=1)
+			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
+			means = np.mean(datasource, axis=1)
+			# zscore (x-mean)/std
+			textcols = datasource[['TF1', 'TF2']]
+			zsc = datasource.drop(['TF1', 'TF2'], axis=1).subtract(means, axis =0).divide(stds, axis =0).fillna(0) 
+			zsc = pd.concat((textcols,zsc), axis=1)
+			zsc = zsc.reset_index(drop=True).set_index(["TF1", "TF2"], drop=False)
+			res = zsc.apply(lambda row: self._analyze_signal_pair((str(row[0]), str(row[1])),
+																	row[2:],
+																	smooth_window=1,
+																	prominence=1, # for zscore threshold is given via stringency
+																	stringency=stringency,
+																	save=None), axis=1)
+			method = "zscore"
+		else:
+			res = datasource.apply(lambda row: self._analyze_signal_pair((str(row[0]),str(row[1])),
+																								    row[2:],
+																									smooth_window=1,
+																									prominence=prominence, # for zscore threshold is given via stringency
+																									stringency=stringency,
+																									save=None), axis=1)
 			method = "flat"
 
-			if (calc_zscore):
-				corrected_data = (corrected_data - corrected_data.mean())/corrected_data.std()
-				method = "zscore"
-			if (calc_median):
-				prominence = corrected_data.median()
-				method = "median"
 
-			corrected_data = corrected_data.tolist() #series -> list
-
-			peaks,thresh = self._analyze_signal_pair((tf1,tf2),
-											  corrected_data, 
-											  smooth_window=1,  # smoothing already done
-											  prominence=prominence,
-											  stringency=stringency, 
-											  save=None)
-
+		for index, value in res.items():
+			tf1, tf2 = index
+			peaks, thresh = value
 			thresholds[tf1,tf2] = [tf1, tf2, thresh, method]
-
+			
 			if len(peaks)>0:
 				for peak in peaks:
 					all_peaks.append(peak)
@@ -3412,12 +3409,12 @@ class DistObj():
 			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
 			xt[0] = offset_neg
 			xt[0] = -1
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
+			xt = xt[:-1]
+			xtl = xt.tolist()
+			xtl[0] = "neg"
 		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
+			xt = xt[1:-1]
+			xtl = xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
 		plt.title(f"Analyzed signal for {tf1}-{tf2}")
