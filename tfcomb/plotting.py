@@ -8,6 +8,7 @@ import seaborn as sns
 import networkx as nx
 import graphviz
 from adjustText import adjust_text
+import copy
 
 
 from tfcomb.utils import check_columns, check_type, check_string, check_value
@@ -42,7 +43,7 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	check_type(figsize, tuple, "figsize")
 
 	fig, ax = plt.subplots(figsize=figsize) 
-
+	ax.grid()
 	with sns.axes_style("whitegrid"):
 		
 		ax = sns.scatterplot(
@@ -55,8 +56,6 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 							palette="PuBu", 
 							edgecolor=".7",
 		)
-
-	ax.grid()
 
 	# Tweak the figure to finalize
 	labels = list(rules_table.index)
@@ -157,20 +156,18 @@ def scatter(table, x, y,
 	table : pd.DataFrame
 		A table containing columns of 'measure' and 'pvalue'.
 	x : str
-		The measure to show on the x-axis.
+		Name of column in table containing values to map on the x-axis.
 	y : str
-		The column containing p-values (without any log-transformation).
-	x_threshold : float, tuple of floats or None
-		If None, no measure threshold is set. Default: None
-	y_threshold : float, tuple of floats or None
-		Default: None
-	label : list of points to label
+		Name of column in table containing values to map on the y-axis.
+	x_threshold : float, tuple of floats or None, optional
+		Gives the option to visualize an x-axis threshold within plot. If None, no measure threshold is set. Default: None.
+	y_threshold : float, tuple of floats or None, optional
+		Gives the option to visualize an y-axis threshold within plot. If None, no measure threshold is set. Default: None.
+	label : str or list, optional
 		If None, no point labels are plotted. If "selection", the . Default: None.
 	"""
 
 	check_columns(table, [x, y])
-
-	#todo: mask np inf data
 	
 	#Handle thresholds being either float or tuple
 	if x_threshold is not None:
@@ -226,11 +223,14 @@ def scatter(table, x, y,
 	#Label given indices
 	if label is not None:
 		if isinstance(label, list):
+
+			#Check if labels are within table index
+			
 			pass
 
 
 		elif label == "selection":
-			_add_labels(selection, x, y, "index", g.ax_joint)
+			_add_labels(selection, x, y, "index", g.ax_joint, color="red", label_fontsize=label_fontsize)
 
 	#Save plot to file
 	if save is not None:
@@ -342,6 +342,8 @@ def _truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 	new_cmap = colors.LinearSegmentedColormap.from_list(
 		'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
 		cmap(np.linspace(minval, maxval, n)))
+
+	new_cmap.set_bad
 	return new_cmap
 
 def _rgb_to_hex(rgb):
@@ -366,7 +368,12 @@ def _values_to_cmap(values, plt_cmap=None):
 		color_func = lambda string: _rgb_to_hex(colormap_discrete(name2val[string], bytes=True)[:3])
 
 	else:
-		vmin, vmax = np.min(values), np.max(values)
+
+		#Check if values contain NaN
+		clean_values = np.array(values)[~np.isnan(values)]
+
+		#Get min and max
+		vmin, vmax = np.min(clean_values), np.max(clean_values)
 
 		if plt_cmap != None: #plt_cmap is given explicitly
 			pass #todo: check that plt_cmap is a colormap
@@ -381,6 +388,7 @@ def _values_to_cmap(values, plt_cmap=None):
 		norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
 		sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
 		cmap = sm.get_cmap()
+		cmap.set_bad(color="grey") #set color for np.nan
 		color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
 	
 	return(color_func)
@@ -550,12 +558,18 @@ def network(network,
 
 	############### Save to file ###############
 	if save != None:
+
+		#Set dpi for output render (not for visualized, as this doesn't work with notebook)
+		dot_render = copy.deepcopy(dot)
+		dot_render.attr(dpi="600")
+
 		splt = os.path.splitext(save)
 		file_prefix = "".join(splt[:-1])
 		fmt = splt[-1].replace(".", "")
 		
 		if fmt not in graphviz.FORMATS:
+			logger.warning("File ending .{0} is not supported by graphviz/dot. Network will be saved as .pdf.".format(fmt))
 			fmt = "pdf"
-		dot.render(filename=file_prefix, format=fmt, cleanup=True)
+		dot_render.render(filename=file_prefix, format=fmt, cleanup=True)
 	
 	return(dot)
