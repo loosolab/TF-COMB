@@ -15,7 +15,6 @@ import copy
 import glob
 import fnmatch
 import pickle
-import csv 
 import collections
 
 #Statistics
@@ -589,14 +588,17 @@ class CombObj():
 		self.logger.info("TFBS were clustered from {0} to {1} unique names. The new TF names can be seen in <CombObj>.TFBS and <CombObj>.TF_names.",format(n_names_orig, n_names_clustered))
 
 
-	def subset_TFBS(self, regions):
+	def subset_TFBS(self, names=None, 
+						  regions=None):
 		"""
-		Subset .TFBS in object to specific regions. Can be used to select only a subset of TFBS (e.g. only in promoters) to run analysis on.
+		Subset .TFBS in object to specific regions or TF names. Can be used to select only a subset of TFBS (e.g. only in promoters) to run analysis on. Note: Either 'names' or 'regions' must be given - not both.
 
 		Parameters
 		-----------
-		regions : str or RegionList
-			Path to a .bed-file containing regions or a tobias-format RegionList object. 
+		names : list of strings, optional
+			A list of names to keep. Default: None.
+		regions : str or RegionList, optional
+			Path to a .bed-file containing regions or a tobias-format RegionList object. Default: None.
 
 		Returns
 		-------
@@ -606,22 +608,43 @@ class CombObj():
 
 		#Check given input
 		self._check_TFBS()
-		tfcomb.utils.check_type(regions, [str, tobias.utils.regions.RegionList], "regions")
+		if (names is None and regions is None) or (names is not None and regions is not None):
+			raise InputError("You must give either 'names' or 'regions' to .subset_TFBS.")
 
-		#If regions are string, read to internal format
-		if isinstance(regions, str):
-			regions = RegionList().from_bed(regions)
+		#Subset TFBS based on input
+		if regions is not None:
+			tfcomb.utils.check_type(regions, [str, tobias.utils.regions.RegionList], "regions")
+
+			#If regions are string, read to internal format
+			if isinstance(regions, str):
+				regions = RegionList().from_bed(regions)
+			
+			#Create regions->sites dict
+			n_TFBS = len(self.TFBS)
+			self.logger("Overlapping {0} TFBS with {1} regions".format(n_TFBS, len(regions)))
+			TFBS_in_regions = tfcomb.utils.assign_sites_to_regions(self.TFBS, regions)
+
+			#Merge across keys
+			self.TFBS = RegionList(sum([TFBS_in_regions[key] for key in TFBS_in_regions], []))
+			self.TFBS.loc_sort()
 		
-		#Create regions->sites dict
-		n_TFBS = len(self.TFBS)
-		self.logger("Overlapping {0} TFBS with {1} regions".format(n_TFBS, len(regions)))
-		TFBS_in_regions = tfcomb.utils.assign_sites_to_regions(self.TFBS, regions)
+		elif names is not None:
+			tfcomb.utils.check_type(names, [list, set, tuple], "names")
 
-		#Merge across keys
-		self.TFBS = RegionList(sum([TFBS_in_regions[key] for key in TFBS_in_regions], []))
-		self.TFBS.loc_sort()
+			#Check that strings overlap with TFBS
+			names = set(names)			  #input names to overlap
+			TF_names = set(self.TF_names) #names from object
+			not_in_TFBS = names - TF_names
+			if len(not_in_TFBS) > 0:
+				self.logger.warning("{0} names from 'names' were not found in <CombObj> names and could therefore not be selected. These names are: {1}".format(len(not_in_TFBS), not_in_TFBS))
+			in_TFBS = TF_names.intersection(names)
 
-		self.logger("Subset finished! The attribute .TFBS now contains {0} sites overlapping regions.".format(self.TFBS))
+			if len(in_TFBS) == 0:
+				raise InputError("No overlap found between 'names' and names from <CombObj>.TFBS. Please select names of TFs within the data.")
+
+			self.TFBS = RegionList([site for site in self.TFBS if site.name in in_TFBS])
+
+		self.logger.info("Subset finished! The attribute .TFBS now contains {0} sites.".format(len(self.TFBS)))
 
 	def TFBS_to_bed(self, path):
 		"""
@@ -1175,39 +1198,63 @@ class CombObj():
 	#------------------------------ Integration of external data -----------------------------#
 	#-----------------------------------------------------------------------------------------#
 
-	def integrate_data(self, table, merge="pair", TF1_col="TF1", TF2_col="TF2"):
-		""" Function to add external data to object rules / TF_table.
+	def integrate_data(self, table, merge="pair", TF1_col="TF1", TF2_col="TF2", prefix=None):
+		""" Function to add external data to object rules.
 		
 		Parameters
-		-----------
+		------------
 		table : str or pandas.DataFrame
-			A table containing data to add to either .rules or .TF_table. If table is a string, 'table' is assumed to be the path to a tab-separated table containing a header line and rows of data.
+			A table containing data to add to .rules. If table is a string, 'table' is assumed to be the path to a tab-separated table containing a header line and rows of data.
 		merge : str
-			Which information to merge - must be one of "pair" or "TF". If "pair", data given in table is added to <CombObj>.rules. 
-			If "TF", data is added to <CombObj>.Default: "pair".
+			Which information to merge - must be one of "pair", "TF1" or "TF2". The option "pair" is used to merge infromation about TF-TF pairs such as protein-protein-interactions.
+			The 'TF1' and 'TF2' can be used to include TF-specific information such as expression levels.
 		TF1_col : str, optional
-			The column in table corresponding to "TF1" name. If merge == "TF", 'TF1' corresponds to the column containing the TF name. Default: "TF1"
+			The column in table corresponding to "TF1" name. If merge == "TF2", 'TF1' is ignored. Default: "TF1".
 		TF2_col : str, optional
-			The column in table corresponding to "TF2" name. If merge == "TF", 'TF2' is ignored. Default: "TF2".
+			The column in table corresponding to "TF2" name. If merge == "TF1", 'TF2' is ignored. Default: "TF2".
+		prefix : str, optional
+			A prefix to add to the columns. Can be useful for adding the same information to both TF1 and TF2 (e.g. by using "TF1_" and "TF2_" prefixes),
+			or adding same-name columns from different tables. Default: None (no prefix).
 		"""
 
+		self._check_rules()
 		check_type(table, [str, pd.DataFrame], "table")
-		check_string(merge, ["pair", "TF"], "merge")
+		check_string(merge, ["pair", "TF1", "TF2"], "merge")
 
 		#Read table if string (path) was given
 		if isinstance(table, str):
 			table = pd.read_csv(table, sep="\t")
 			self.logger.info("Read table of shape {0} with columns: {1}".format(table.shape, table.columns.tolist()))
+		
+		table = table.drop_duplicates()
+
+		#Add prefix to columns
+		if prefix is not None:
+			check_type(prefix, str)
+			table.columns = [prefix + str(col) if col not in [TF1_col, TF2_col] else col for col in table.columns]
+
+		#Check if columns in table were already existing
+		current_columns = [col for col in self.rules.columns if col not in ["TF1", "TF2"]]
+		adding_columns = [col for col in table.columns if col not in [TF1_col, TF2_col]]
+		duplicates = list(set(current_columns) & set(adding_columns))
+		if len(duplicates) > 1:
+			self.logger.warning("Column(s) '{0}' from input table are already present in .rules, and could not be integrated.".format(duplicates))
+			self.logger.warning("Please set 'prefix' in order to make the column names unique.")
+			table.drop(columns=duplicates, inplace=True)
 
 		#Merge table to object
-		if merge == "TF":
+		if merge == "TF1":
 			check_columns(table, [TF1_col])
-
-			self.TF_table = self.TF_table.merge(table, left_index=True, right_on=TF1_col, how="left")
+			self.rules = self.rules.merge(table, left_on="TF1", right_on=TF1_col, how="left")
+			self.rules = self.rules.drop(columns=[TF1_col])
+		
+		elif merge == "TF2":
+			check_columns(table, [TF2_col])
+			self.rules = self.rules.merge(table, left_on="TF2", right_on=TF2_col, how="left")
+			self.rules = self.rules.drop(columns=[TF2_col])
 
 		elif merge == "pair":
 			check_columns(table, [TF1_col, TF2_col])
-
 			self.rules = self.rules.merge(table, left_on=["TF1", "TF2"], right_on=[TF1_col, TF2_col], how="left")
 		
 		#If data was integrated, .network must be recalculated	
@@ -1287,6 +1334,8 @@ class CombObj():
 		tfcomb.plotting.bubble
 		"""
 
+		self._check_rules()
+
 		#Sort rules
 		table = self.rules.copy()
 		if sort_by is not None:
@@ -1299,12 +1348,22 @@ class CombObj():
 		#Plot
 		ax = tfcomb.plotting.bubble(top_rules, yaxis=yaxis, color_by=color_by, size_by=size_by, **kwargs)
 
-	def plot_scatter(self):
-		""" Plot """
+
+	def plot_scatter(self, x, y, hue=None, **kwargs):
+		""" Plot a scatterplot of information from .rules.
 		
+		Parameters
+		------------
+		x : str
+			The name of the column in .rules containing values to plot on x-axis.
+		y : str
+			The name of the column in .rules containing values to plot on y-axis.
+		"""
+		
+		#Check that market basket was run
+		self._check_rules()
 
-
-		pass
+		tfcomb.plotting.scatter(self.rules, x, y)
 
 
 	#-------------------------------------------------------------------------------------------#
@@ -2981,6 +3040,7 @@ class DistObj():
 							bwadjust=0.1, 
 							show_bg=True,
 							show_peaks=True,
+							corrected=False,
 							save=None):
 		"""
 		WORK IN PROGRESS: Plots distribution of TFBS distances for the given TF-TF pair.
@@ -2988,82 +3048,110 @@ class DistObj():
 		Parameters
 		----------
 		pair : tuple(str,str)
-			One of "histogram" or "kde". Pair to create plot for.
+			Pair to create plot for.
 		style : str,
-			Style of the plot
+			Style of the plot. One of "hist" (histogram) or "kde". 
 		n_bins: int
-			Number of bins. Default: None (Binning is done automatically)
+			Number of bins of style == "hist". Default: None (Binning is done automatically)
 		bwadjust: float
 			Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. See kdeplot() from seaborn. Default: 0.1
 		show_bg : bool
-			Default: True
+			Default: True.
 		show_peaks : bool 
-			Default: True
+			Default: True.
 		"""
 
 		#Check input parameter validity
+		tfcomb.utils.check_string(style, ["hist", "kde"], "style")
 		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		self.check_distances()
 		self.check_min_max_dist()
 
+		#Invalid combinations
+
+
 		#Define input data
 		self.check_pair(pair)
 		tf1, tf2 = pair
 		ind = tf1 + "-" + tf2
-		source_table = self.distances
+
+		if corrected == False:
+			source_table = self.distances
+		else: 
+			source_table = self.corrected
+
+		#data_start_i = 2 if 	
+		distances = source_table.columns[2:].tolist() #names of distances counted (includes "neg")
 		weights = np.array(source_table.loc[ind].iloc[2:])
 
 		#Decide how to deal with negative values
 		negative = False
-		if (self.min_dist == 0) and (self.max_overlap > 0): #if site overlap is allowed
+		if (self.min_dist == 0) and (self.max_overlap > 0): #negative values can occur
 			negative = True
-			neg_weights = weights[0]
-			weights = weights[1:]
 			offset_neg = -4
+			distances[distances.index("neg")] = offset_neg #replace "neg" with a value
+		else:
+			weights = weights[1:] #remove "neg" column
+			distances = distances[1:]
+
+		distances = np.array([int(dist) for dist in distances]) #convert column-name strings to int
 
 		#Setup plot
 		fig, ax = plt.subplots(1, 1)
-		distances = range(0, len(weights))
 
-		if style == "histogram":
-			plt.hist(distances, weights=weights, bins=n_bins, color='tab:blue')
-			plt.ylabel('Count per distance')
+		if style == "hist":
+			if n_bins is None:
+				n_bins = np.max(distances) - np.min(distances) #as many bins as 'bp' between min/max distance
+
+			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', label="counts")
+			ax.set_ylabel('Count per distance')
+
 		elif style == "kde":
-			sns.kdeplot(distances, weights=weights, bw_adjust=bwadjust, x="distance")
-			plt.ylabel('Count per distance')
-		
-		#Handle xticks for negative distances 
+			sns.kdeplot(distances, weights=weights, bw_adjust=bwadjust, x="distance", ax=ax)
+			ax.set_ylabel('Count per distance')
+
+		#Handle xtick labels for negative distances 
 		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([neg_weights], bins=1, color='tab:orange')
+		xtl = xt.tolist() #labels
+		if negative == True:
 			xt[0] = offset_neg
-			#xt[0] = -1
-			xt = xt[:-1]
-			xtl = xt.tolist()
-			xtl[0]="neg"
-		#else:
-		#	xt=xt[1:-1]
-		#	xtl=xt.tolist()
+			xtl[0] = "neg"
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
 
+		#Handle xlimit to be equal padding left/right
+		xmin, _ = ax.get_xlim()
+		pad_left = xmin - xt[0] #padding between xlim and first label
+		ax.set_xlim(xmin, xt[-1]+pad_left)
+
+		#Add flavors to plot
 		if show_bg:
-			linres = self.linres.loc[ind].iloc[2]
-			linres = linregress(distances, weights)
-			plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted line')
+			if self.linres is not None:
+				linres = self.linres.loc[ind, "Linear Regression"]
+				plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted line')
+			else:
+				self.logger.warning("show_bw == True, but there was no linres available")
 
 		if show_peaks:
-			peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-						(self.peaks["TF2"] == tf2))].Distance.to_numpy()
+			if self.peaks is not None:
+				peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
+										(self.peaks["TF2"] == tf2))].Distance.to_numpy()
+				
+				#Establish x-axis
 
+				if (len(peaks) > 0):
+					plt.plot(crosses, x[(crosses)], "x")
+			else:
+				self.logger.warning("")
 
 		#Pretty plot; legends, labels, titles
-		plt.xlabel('Distance in bp')
+		ax.set_xlabel('Distance in bp')
 		plt.title(f"{tf1} - {tf2}")
 		plt.legend()
 
+		#Save final plot to file
 		if save is not None:
 			plt.savefig(save, dpi=600)
 			plt.close()
