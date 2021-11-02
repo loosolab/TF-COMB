@@ -1600,10 +1600,16 @@ class DiffCombObj():
 			self.add_object(obj, join=join)
 
 		#Use functions from CombObj
+		self._set_combobj_functions()
+
+	def _set_combobj_functions(self):
+		""" Reuse CombObj functions"""
+
 		self.copy = lambda : CombObj.copy(self)
 		self.set_verbosity = lambda *args, **kwargs: CombObj.set_verbosity(self, *args, **kwargs)
 		self.build_network = lambda : CombObj.build_network(self)
-		self.simplify_rules = lambda *args, **kwargs: CombObj.simplify_rules(self, *args, **kwargs)
+		self._check_rules = lambda : CombObj._check_rules(self)
+		self.simplify_rules = lambda : CombObj.simplify_rules(self)
 		self.integrate_data = lambda *args, **kwargs: CombObj.integrate_data(self, *args, **kwargs)
 
 	def __str__(self):
@@ -1853,6 +1859,7 @@ class DiffCombObj():
 		#Create a DiffCombObj with the subset of  rules
 		self.logger.info("Creating subset of rules using thresholds")
 		new_obj = self.copy()
+		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
 
 		return(new_obj)
