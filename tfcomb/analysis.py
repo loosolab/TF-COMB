@@ -11,10 +11,10 @@ import copy
 import multiprocessing as mp
 
 #Internal functions
-from tfcomb.logging import TFcombLogger
+from tfcomb.logging import TFcombLogger, InputError
 from tfcomb.utils import check_columns
 
-
+import seaborn as sns
 
 #-------------------------------------------------------------------------------#
 #-------------------------- Directionality analysis ----------------------------#
@@ -67,15 +67,14 @@ def directionality(rules):
 	"""
 	
 	#TODO: Test input format
-	#TODO: Test that input is stranded and directional
-	
-
-
 
 	rules = rules.copy() #ensures that rules-table is not changed
 	
 	#Split TF names from strands
-	rules[["TF1_name", "TF1_strand"]] = rules["TF1"].str.split("(", expand=True)
+	try:
+		rules[["TF1_name", "TF1_strand"]] = rules["TF1"].str.split("(", expand=True)
+	except:
+		raise InputError("Failed to split TF name from strand. Please ensure that .count_within() was run with '--directionality=True' and '--stranded=True'.")
 	rules["TF1_strand"] = rules["TF1_strand"].str.replace(")", "", regex=False)
 
 	rules[["TF2_name", "TF2_strand"]] = rules["TF2"].str.split("(", expand=True)
@@ -152,5 +151,15 @@ def directionality(rules):
 				  "scenario3": "scenario3_convergent",
 				  "scenario4": "scenario4_divergent"}, inplace=True) 
 
+	#Merge counts for same-TF pairs
+	
+
 	return(frame)
+
+def plot_directionality(table):
+	""" Plot directionality heatmap for the output of 'directionality' """
+
+	scenario_columns = ["scenario1_TF1-TF2", "scenario2_TF2-TF1", "scenario3_convergent", "scenario4_divergent"]
+
+	h = sns.clustermap(table[scenario_columns])
 

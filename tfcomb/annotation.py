@@ -3,7 +3,9 @@ pd.options.mode.chained_assignment = None #suppress 'SettingWithCopyWarning' pri
 import copy
 import os
 import numpy as np
-
+import gzip
+import shutil
+import requests
 import tobias
 
 #UROPA annotation
@@ -22,7 +24,7 @@ from goatools.obo_parser import GODag
 #Import tfcomb
 import tfcomb
 from tfcomb.utils import check_type, check_value
-from tfcomb.logging import TFcombLogger
+from tfcomb.logging import TFcombLogger, InputError
 
 #Load internal data
 import pkg_resources
@@ -69,7 +71,7 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 	---------
 	custom_config = {"queries": [{"distance": [10000, 1000], 
 								  "feature_anchor": "start", 
-					              "feature": "gene"}],
+								  "feature": "gene"}],
 					"priority": True, 
 					"show_attributes": "all"}
 
@@ -77,7 +79,7 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 	"""
 	
 	#Check input types
-	check_type(regions, tobias.utils.regions.RegionList(), "regions")
+	check_type(regions, [list, tobias.utils.regions.RegionList], "regions")
 	check_type(gtf, str, "gtf")
 	check_type(config, [type(None), dict], "config")
 	check_value(threads, vmin=1, name="threads")
@@ -211,6 +213,35 @@ def _annotate_peaks_chunk(region_dicts, gtf, cfg_dict):
 
 	return(best_annotations)
 
+def get_annotated_genes(regions, attribute="gene_name"):
+	""" Get list of genes from the list of annotated regions from annotate_regions(). 
+	
+	Parameters
+	-----------
+	regions : RegionList() or list of OneTFBS objects 
+	
+	attribute : str
+		The name of the attribute in the 9th column of the .gtf file. Default: 'gene_name'.
+	"""
+	
+	genes = []
+	for region in regions:
+		
+		#Check if region has any annotation
+		if "feature" in region.annotation: 
+			att_dict = region.annotation.get("feat_attributes", {})
+			gene = att_dict.get(attribute, [None])[0]
+			
+			#if gene == None:
+			#    print(region.annotation)
+			genes.append(gene)
+	
+	#Format gene list
+	genes = [gene for gene in genes if gene is not None] #Remove None from list
+	genes = list(set(genes)) #remove duplicates
+	
+	return(genes)
+
 #-------------------------------------------------------------------------------#
 #------------------------------- GO-term enrichment ----------------------------#
 #-------------------------------------------------------------------------------#
@@ -240,7 +271,7 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	organism : :obj:`str`, optional
 		The organism of which the gene_ids originate. If organism 'background_gene_ids' are given, organism is not needed. Defaults to 'human'.
 	background_gene_ids : list, optional
-		A specific list of background gene ids to use. Default: uniprot proteins of the 'organism' given. 
+		A specific list of background gene ids to use. Default: The list of Uniprot proteins of the 'organism' given. 
 	verbosity : int
 		
 	plot : bool
@@ -269,20 +300,51 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	
 	#Organism must be in human/mouse
 	if organism not in name_to_taxid:
-		raise ValueError("Organism '{0}' not available. Please choose any of: {1}".format(organism, list(name_to_taxid.keys())))
+		raise InputError("Organism '{0}' not available. Please choose any of: {1}".format(organism, list(name_to_taxid.keys())))
 	else:
 		taxid = name_to_taxid[organism]
 	
+	logger.info("Running GO-term enrichment for organism {0} (taxid: {1})".format(organism, taxid))
+	
 	##### Read data #####
 
-	#Setup GOATOOLS GO DAG
-	logger.info("Downloading GO")
-	obo_fname = download_go_basic_obo()
+	## Setup GOATOOLS GO DAG
+	obo_fname = "go-basic.obo"
+	if not os.path.isfile(obo_fname):
+		logger.info("Downloading ontologies")
+		obo_fname = download_go_basic_obo()
 	obodag = GODag(obo_fname)
 	
-	#Setup gene -> GO term associations
-	logger.info("Downloading NCBI associations")
-	fin_gene2go = download_ncbi_associations()
+	## Setup gene -> GO term associations
+	#check if gene2go contains any data; delete if not
+	fin_gene2go = "gene2go"
+	if os.path.exists(fin_gene2go):
+		s = os.path.getsize(fin_gene2go)
+		if s == 0:
+			logger.warning("gene2go has size 0; deleting the file")
+			os.remove(fin_gene2go)
+
+	else: #file does not exist; try downloading
+		logger.info("Downloading NCBI associations")
+		try:
+			fin_gene2go = download_ncbi_associations()
+		except:
+			logger.warning("An error occurred downloading NCBI associations using goatools.")
+			logger.warning("TF-COMB will attempt to download and extract manually")
+			
+			url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2go.gz"
+			base = os.path.basename(url) #gene2go.gz
+			
+			logger.debug("Downloading {0}".format(url))
+			with open(base, "wb") as f:
+				r = requests.get(url)
+				f.write(r.content)
+
+			logger.debug("Decompressing {0}".format(base))
+			with gzip.open(base, 'rb') as f_in:
+				with open(fin_gene2go, 'wb') as f_out:
+					shutil.copyfileobj(f_in, f_out)
+
 	logger.debug("fin_gene2go: {0}".format(fin_gene2go))
 
 	logger.info("Gene2GoReader")
@@ -294,30 +356,32 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 
 	#Read data from package
 	gene_table = pd.read_csv(DATA_PATH + organism + "_genes.txt", sep="\t")
-	
-	##### Setup analysis ####
+
+	###### Setup analysis #####
 	#Setup background gene ids 
 	if background_gene_ids == None:
 		logger.debug("Getting background_gene_ids from gene_table")
+
+
 		background_gene_ids = list(set(gene_table["GeneID"].tolist())) #unique gene ids from table
 	else:
 
 		#Find best-fitting column in gene_table
 
-
 		pass
 		#check if background_gene_ids are in ns2assoc
 	
 	#Setup goeaobj
+	logger.info("Setting up GO enrichment")
 	goeaobj = GOEnrichmentStudyNS(
 				background_gene_ids, # List of protein-coding genes
 				ns2assoc, # geneid/GO associations
 				obodag, # Ontologies
 				propagate_counts = False,
 				alpha = 0.05, # default significance cut-off
-				methods = ['fdr_bh'],
+				methods = ['fdr_bh'], # defult multipletest correction method
 				prt=None, 
-				log=None) # defult multipletest correction method
+				log=None) 
 	
 
 	##### Run study #####
@@ -363,6 +427,8 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	#Convert e (enriched)/p (purified) to increased/decreased
 	translation_dict = {"e": "increased", "p": "decreased"}
 	table.replace({"enrichment": translation_dict}, inplace=True)
+
+	logger.debug("Finished go_enrichment!")
 
 	return(table)
 
