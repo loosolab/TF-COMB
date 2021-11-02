@@ -9,6 +9,7 @@ import networkx as nx
 import graphviz
 from adjustText import adjust_text
 import copy
+import distutils
 
 
 from tfcomb.utils import check_columns, check_type, check_string, check_value
@@ -353,20 +354,38 @@ def _values_to_cmap(values, plt_cmap=None):
 	""" Map values onto a cmap function taking value and returning hex color """
 
 	#Decide which colormap to use
+	colormap_binary = colors.ListedColormap(['lightblue', 'blue'])
 	colormap_red = _truncate_colormap(plt.cm.Reds, minval=0.3, maxval=0.7)
 	colormap_blue = _truncate_colormap(plt.cm.Blues_r, minval=0.3, maxval=0.7)
 	colormap_divergent = _truncate_colormap(plt.cm.bwr, minval=0.1, maxval=0.9)
 	colormap_discrete = _truncate_colormap(plt.cm.jet, minval=0.3, maxval=0.7)
 	
+	#First, convert values to bool if possible
+	values = _convert_boolean(values)
+
 	#Check if values are strings 
 	if sum([isinstance(s, str) for s in values]) > 0: #values are strings, cmap should be discrete
+		cmap = colormap_discrete
+		cmap.set_bad(color="grey")
+
 		values_unique = list(set(values))
 		floats = np.linspace(0,1,len(values_unique))
 		name2val = dict(zip(values_unique, floats)) #map strings to cmap values
 
+		color_func = lambda string: _rgb_to_hex(cmap(name2val[string], bytes=True)[:3])
 
-		color_func = lambda string: _rgb_to_hex(colormap_discrete(name2val[string], bytes=True)[:3])
+	#Check if values are boolean
+	elif sum([isinstance(s, bool) for s in values]) > 0:
 
+		cmap = colormap_binary
+		cmap.set_bad(color="grey") #color for NaN
+
+		color_func = lambda value: _rgb_to_hex(cmap(int(value), bytes=True)[:3])
+
+		#sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
+		#cmap = sm.get_cmap()
+
+	#Values are int/float
 	else:
 
 		#Check if values contain NaN
@@ -392,7 +411,25 @@ def _values_to_cmap(values, plt_cmap=None):
 		color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
 	
 	return(color_func)
+
+def _isnan(num):
+	return num != num
+
+def _convert_boolean(values):
+	""" Converts a list of boolean/string/nan values into boolean values - but only if all values could be converted """
+
+	#Convert any boolean values
+	bool_vals = ["y", "yes", "t", "true", "on", "1", "n", "no", "f", "false", "off", "0"]
+	converted = [bool(distutils.util.strtobool(val)) if (isinstance(val, str) and (val.lower() in bool_vals)) else val for val in values]
+
+	#Check if clean values contain only bool
+	clean = [val for val in converted if _isnan(val) == False]
+	n_bool = sum([isinstance(val, bool) for val in clean])
 	
+	if n_bool == len(clean):
+		return(converted) #all values could be converted - these are boolean values
+	else:
+		return(values)     #not all values could be converted - these are not boolean values
 
 def network(network, 
 				color_node_by=None,
