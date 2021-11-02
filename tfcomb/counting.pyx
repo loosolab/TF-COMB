@@ -15,6 +15,7 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 						int max_distance = 100, 
 						float max_overlap = 0, 
 						int binary = 0,
+						int anchor = 0,
 						int n_names = 1000):
 
 	"""
@@ -26,27 +27,26 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
 	w : int
 		Windowsize
-
 	min_distance : int
 		Minimum allowed distance between two TFs. Default: 0
-
 	max_distance : int
 		Maximum allowed distance between two TFs. Default: 100
-
 	max_overlap (float): 
 		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.
-
 	binary : int
 		0 or 1 bool integer. If 0; counts are left raw. If 1; each pair is only counted once per window.
+	anchor : int
+		Anchor used to calculate distance with. One of [0,1,2] (0 = inner, 1 = outer, 2 = center). Default: 0
+	n_names : int
+		Number of unique names within sites. Used to initialize the count arrays.
 
 	Returns:
 	-----------
 	tuple
-
+		(np.array 1 x n_names, np.array(n_names x n_names))
 
 	"""
 
-	cdef dict count_dict = {} #for saving co-occurrences
 	cdef int n_sites = len(sites)
 	
 	#Create n x n count matrix
@@ -62,6 +62,7 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, 
 	cdef int TF2_start, TF2_end, overlap_bp, short_bp, valid_pair
 	cdef int TF2_chr, TF2_name
+	cdef int TF1_mid, TF2_mid
 	cdef int distance
 	cdef int self_count
 
@@ -103,24 +104,36 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 				TF2_end = sites[i+j,2]
 				TF2_name = sites[i+j,3]
 				
-				#Calculate distance between the two sites
-				distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-				if distance < 0:
-					distance = 0
+				#Calculate distance between the two sites based on anchor
+				if anchor == 0:
+					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+					if distance < 0:
+						distance = 0
+				elif anchor == 1:
+					distance = TF2_end - TF1_start
+				elif anchor == 2:
+					TF1_mid = (TF1_start + TF1_end) / 2
+					TF2_mid = (TF2_start + TF2_end) / 2
+					distance = TF2_mid - TF1_mid
 
+				#Check if sites are valid as co-occurring
 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
 					if distance >= min_distance: #Check that sites are more than min distance away
 						
 						# check if they are overlapping more than the threshold
 						valid_pair = 1
 						if distance == 0:	#distance is 0 if the sites are overlapping or book-ended
-							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
-							
+
 							# Get the length of the shorter TF
 							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-							
+
+							#Calculate overlap between TF1/TF2
+							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+								overlap_bp = short_bp
+
 							#Invalid pair, overlap is higher than threshold
-							if overlap_bp / (short_bp*1.0) > max_overlap:  #if overlap_bp is negative; this will always be False
+							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
 								valid_pair = 0
 
 						#Save counts of association
@@ -132,11 +145,27 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 							#Count TF1 self-counts for adjusting to binary flag
 							if binary == 1 and TF1_name == TF2_name:
 								self_count += 1
-			
-				else:
-					#The next site is out of window range; increment to next i
+
+				elif TF1_chr != TF2_chr: 
 					i += 1
 					finding_assoc = False   #break out of finding_assoc-loop
+
+				else: #This TF2 is on the same chromosome but more than max_distance away
+
+					#Establish if all valid sites were found for TF1
+					if anchor == 0:
+
+						#The next site is out of inner window range; increment to next i
+						i += 1
+						finding_assoc = False   #break out of finding_assoc-loop
+					
+					else: #If anchor is outer or center, there might still be valid pairs for future TF2's
+
+						#Check if it will be possible to find valid pairs in next sites
+						if TF2_start > TF1_start + max_distance:
+							#no longer possible to find valid pairs for TF1; increment to next i
+							i += 1
+							finding_assoc = False   #break out of finding_assoc-loop
 
 		## Done finding TF2's for current TF1
 		
@@ -160,42 +189,161 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 
 	return((single_count_arr, pair_count_mat))
 
-def get_unique_bp(np.ndarray[np.int_t, ndim=2] sites):
+
+def count_distances(np.ndarray[np.int_t, ndim=2] sites,
+					dict rules,
+					int min_distance = 0,
+					int max_distance = 100,
+					float max_overlap = 0, 
+					short anchor_mode = 0):
+
 	"""
+	Superfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction 
+	
+	Parameters:
+	------------
+	sites : np.ndarray
+		List of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)
+	
+	rules :dict
+		dict of pairs (tf1 name, tf2 name):index with tf1 name, tf2 name encoded as int
+
+	min_distance : int
+		Minimum allowed distance between two TFs. Default: 0
+
+	max_distance : int
+		Maximum allowed distance between two TFs. Default: 100
+	
+	max_overlap (float): 
+		maximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.
+
+	anchor_mode : short
+		anchor mode to calculate distance with. One of [0,1,2]. 
+		0 = inner, 1 = outer, 2 = center. Default: 0
+
+	Returns:
+	-----------
+	dist_count_mat: np.ndarray
+		n x (distance range) matrix. 
+
 
 	"""
 
 	cdef int n_sites = len(sites)
-	cdef int total_bp = 0
-	cdef int current_chrom, current_start, current_end
+	
+	cdef list pairs = list()
+	cdef np.ndarray[np.int64_t, ndim=1] rule
+	cdef int offset = 3
 
-	cdef int previous_start = sites[0,1]
-	cdef int previous_end = sites[0,2]
-	cdef int i = 1
+	# include negative counting 
+	if min_distance == 0:
+		offset += 1
+	#Create n x distance range matrix || +3 for 2 tf names + 1-off
+	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset+(max_distance-min_distance)), dtype=int)
 
+	cdef int i = 0
+	cdef int j = 0
+	cdef bint finding_assoc = True
+	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, TF1_anchor 
+	cdef int TF2_start, TF2_end, TF2_anchor, valid_pair, overlap_bp, short_bp
+	cdef int TF2_chr, TF2_name
+	cdef int distance
+	cdef int pair_ind = 0
+	cdef int ind = 0
+	
+	# initialize tfnames
+	for tf1,tf2 in rules:
+		dist_count_mat[ind, 0] = tf1
+		dist_count_mat[ind, 1] = tf2
+		ind += 1
 	#Loop over all sites
 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
+		#Get current TF information
+		TF1_chr = sites[i,0]
+		TF1_start = sites[i,1]
+		TF1_end = sites[i,2]
+		TF1_name = sites[i,3]
 
-		current_chrom = sites[i,0]
-		current_start = sites[i,1]
-		current_end = sites[i,2]
+		#Find possible associations with TF1 within window 
+		finding_assoc = True
+		j = 0
+		while finding_assoc == True:
+			#Next site relative to TF1
+			j += 1
+			if j+i >= n_sites: #j+i index site is beyond end of list, increment i
+				i += 1
+				finding_assoc = False #break out of finding_assoc
 
-		if current_start > previous_end:
-			#Gap; add to total_bp
-			stretch_bp = previous_end - previous_start 
+			else:	#There are still sites available
 
-			previous_start = current_start
-			previous_end = current_end
+				#Fetch information on TF2-site
+				TF2_chr = sites[i+j,0]
+				TF2_start = sites[i+j,1]
+				TF2_end = sites[i+j,2]
+				TF2_name = sites[i+j,3]
+				
+				# Check anchor mode 	
+    			# 1 = outer
+				if (anchor_mode == 1): 
+					TF1_anchor = TF1_start
+					TF2_anchor = TF2_end
+				# 2 = center
+				elif (anchor_mode == 2):
+					TF1_anchor = int(np.ceil((TF1_end + TF1_start) / 2))
+					TF2_anchor = int(np.ceil((TF2_end + TF2_start) / 2))
+				# 0 = inner (default)
+				else:
+					TF1_anchor = TF1_end
+					TF2_anchor = TF2_start
 
-		else:
-			previous_end = current_end
+				#Calculate distance between the two sites
+				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+				if distance < 0:
+					distance = 0
 
-		#current_end = "" #sites[]
-		#previous = ""
+				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
+					if distance >= min_distance: #Check that sites are more than min distance away
+						valid_pair = 0
+						pair_ind = -1
 
-		i += 1
-	
-	#Add last region
-	total_bp += previous_end - previous_start
+						if (TF1_name,TF2_name) in rules:
+							valid_pair = 1
+							pair_ind = rules[(TF1_name,TF2_name)]
+						
+							if distance == 0:	#distance is 0 if the sites are overlapping or book-ended
 
-	return(total_bp)
+								# Get the length of the shorter TF
+								short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+
+								#Calculate overlap between TF1/TF2
+								overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
+								if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+									overlap_bp = short_bp
+
+								#Invalid pair, overlap is higher than threshold
+								if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+
+									valid_pair = 0
+				
+								if TF2_anchor - TF1_anchor <= -1:
+									distance = -1
+								
+
+						#Save counts of association
+						if valid_pair == 1:
+							offset = 2
+							# if min_distance is 0, overlapping is true, so we need to include distance -1
+							if min_distance == 0: 
+								offset += 1
+							# min_distance is offset ( positive decrease the index) || +2 for TF names [+1 if min_dist == 0, meaning overlapps are counted (-1 == overlapping)]
+							dist_count_mat[pair_ind, (distance - min_distance)+offset] += 1
+			
+				else:
+					#The next site is out of window range; increment to next i
+					i += 1
+					finding_assoc = False   #break out of finding_assoc-loop
+
+		## Done finding TF2's for current TF1
+		
+
+	return (dist_count_mat)

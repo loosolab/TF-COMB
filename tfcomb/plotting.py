@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -6,13 +7,16 @@ import matplotlib.colors as colors
 import seaborn as sns
 import networkx as nx
 import graphviz
+from adjustText import adjust_text
+import copy
+import distutils
 
 
-from tfcomb.utils import check_columns, check_type
+from tfcomb.utils import check_columns, check_type, check_string, check_value
 from tfcomb.logging import TFcombLogger
 
 
-def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,7), save=None):
+def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,4), save=None):
 	""" 
 	Plot bubble plot with TF1-TF2 pairs on the x-axis and a choice of measure on the y-axis, as well as color and size of bubbles. 
 
@@ -37,9 +41,10 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	"""
 
 	check_columns(rules_table, [yaxis, color_by, size_by])	
+	check_type(figsize, tuple, "figsize")
 
 	fig, ax = plt.subplots(figsize=figsize) 
-
+	ax.grid()
 	with sns.axes_style("whitegrid"):
 		
 		ax = sns.scatterplot(
@@ -53,11 +58,8 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 							edgecolor=".7",
 		)
 
-	ax.grid()
-
-	labels = list(rules_table.index)
-
 	# Tweak the figure to finalize
+	labels = list(rules_table.index)
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
 	ax.set_xticklabels(labels, rotation=45, ha="right")
 
@@ -74,22 +76,21 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 	Parameters
 	----------
 	rules_table : pandas.DataFrame
-
+		The <CombObj>.rules table calculated by market basket analysis
 	columns : str, optional
-
+		The name of the column in rules_table to use as heatmap column names. Default: TF1.
 	rows : str, optional
-
+		The name of the column in rules_table to use as heatmap row names. Default: TF2.
 	color_by : str, optional
-
+		The name of the column in rules_table to use as heatmap colors. Default: "cosine".
 	figsize : tuple
-		. Default: (7,7)
-
+		The size of the output heatmap. Default: (7,7)
 	save : str
 		Save the plot to the file given in 'save'. Default: None.
 	"""
 
 	#Test input format
-	check_columns(rules_table, [columns, rows, color_by])	
+	check_columns(rules_table, [columns, rows, color_by])
 
 	# Create support table for the heatmap
 	pivot_table = rules_table.pivot(index=rows, columns=columns, values=color_by)
@@ -110,12 +111,17 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 		cmap = "PuBu"
 		center = None
 
+	row_cluster = True if pivot_table.shape[0] > 1 else False
+	col_cluster = True if pivot_table.shape[1] > 1 else False
+
 	#Plot heatmap
 	h = sns.clustermap(pivot_table, 
 								mask=mask,
 								cbar=True, 
 								cmap=cmap,
 								center=center,
+								row_cluster=row_cluster,
+								col_cluster=col_cluster,
 								cbar_kws={'label': color_by}, 
 								xticklabels=True,
 								yticklabels=True,
@@ -137,68 +143,140 @@ def heatmap(rules_table, columns="TF1", rows="TF2", color_by="cosine", figsize=(
 
 	return(h)
 
-def volcano(table, measure=None, pvalue=None, measure_threshold=None, pvalue_threshold=None, save=None):
+def scatter(table, x, y, 
+				   x_threshold=None, 
+				   y_threshold=None, 
+				   label=None, 
+				   label_fontsize=9, 
+				   save=None):
 	"""
-	Plot volcano-style plots combining a measure and a pvalue.
+	Plot scatter-plot of x/y values within table. Can also set thresholds and label values within plot.
 
 	Parameters
 	-----------
 	table : pd.DataFrame
 		A table containing columns of 'measure' and 'pvalue'.
-	measure : str
-		The measure to show on the x-axis.
-	pvalue : str
-		The column containing p-values (without any log-transformation).
-	measure_threshold : float or list of floats or "off"
-		If 'off', no measure threshold is set
-	pvalue_threshold : float between 0-1
-		Default: 0.05.
+	x : str
+		Name of column in table containing values to map on the x-axis.
+	y : str
+		Name of column in table containing values to map on the y-axis.
+	x_threshold : float, tuple of floats or None, optional
+		Gives the option to visualize an x-axis threshold within plot. If None, no measure threshold is set. Default: None.
+	y_threshold : float, tuple of floats or None, optional
+		Gives the option to visualize an y-axis threshold within plot. If None, no measure threshold is set. Default: None.
+	label : str or list, optional
+		If None, no point labels are plotted. If "selection", the . Default: None.
 	"""
 
-	check_columns(table, [measure, pvalue])	
-	pseudo = 10**(-300) #smallest pvalue possible
+	check_columns(table, [x, y])
+	
+	#Handle thresholds being either float or tuple
+	if x_threshold is not None:
+		x_threshold = (x_threshold,) if not isinstance(x_threshold, tuple) else x_threshold
+		for threshold in x_threshold:
+			check_value(threshold, name="x_threshold")
 
-	#Convert pvalue to -log10
-	table = table.copy() #ensures that we don't change the table in place
-	pval_col = "-log10({0})".format(pvalue)
-	table[pval_col] = -np.log10(table[pvalue] + pseudo)
+	if y_threshold is not None:
+		y_threshold = (y_threshold,) if not isinstance(y_threshold, tuple) else y_threshold
+		for threshold in y_threshold:
+			check_value(threshold, name="y_threshold")
 
-	g = sns.jointplot(data=table, x=measure, y=pval_col, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	#Plot all data
+	x_finite = table[x][~np.isinf(table[x])]
+	y_finite = table[y][~np.isinf(table[y])]
+
+	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2) #, joint_kws={"s": 100})
 
 	#Plot thresholds
-	if pvalue_threshold is not None:
-		g.ax_joint.axhline(-np.log10(pvalue_threshold + pseudo), linestyle="--", color="grey")
-		g.ax_marg_y.axhline(-np.log10(pvalue_threshold + pseudo), linestyle="--", color="grey") #y-axis (pvalue)
+	if x_threshold is not None:
+		for threshold in x_threshold:
+				g.ax_joint.axvline(threshold, linestyle="--", color="grey")
+				g.ax_marg_x.axvline(threshold, linestyle="--", color="grey")
 
-	if measure_threshold is not None:
-		
-		#if measure_threshold
+	if y_threshold is not None:
+		for threshold in y_threshold:
+			g.ax_joint.axhline(threshold, linestyle="--", color="grey")
+			g.ax_marg_y.axhline(threshold, linestyle="--", color="grey")
 
-		g.ax_joint.axvline(measure_threshold, linestyle="--", color="grey")
-		g.ax_marg_x.axvline(measure_threshold, linestyle="--", color="grey")	#x-axis (measure) threshold
+	## Mark selection of pairs below above thresholds in red
+	if x_threshold is not None or y_threshold is not None:
+		if x_threshold is not None:
+			if len(x_threshold) == 1: 
+				 x_threshold = (-np.inf, x_threshold[0])  #assume that value is lower bound
 
-	## Create selection of pairs below above thresholds
-	if measure_threshold is not None or pvalue_threshold is not None:
+		if y_threshold is not None:
+			if len(y_threshold) == 1:
+				y_threshold = (-np.inf, y_threshold[0]) 
 
 		#Set threshold to minimum if not set
-		pvalue_threshold = np.min(table[pval_col]) if pvalue_threshold is None else pvalue_threshold
-		measure_threshold = np.min(table[measure]) if measure_threshold is None else measure_threshold
-
-		selection = table[(table[measure] >= measure_threshold) & 
-						  (table[pvalue] <= pvalue_threshold)]
-		n_selected = len(selection)
-
+		selection = table[((table[x] <= x_threshold[0]) | (table[x] >= x_threshold[1])) &
+						 ((table[y] <= y_threshold[0]) | (table[y] >= y_threshold[1]))]
+		n_selected = len(selection) #including any non-finite values
+		
 		#Mark chosen TF pairs in red
-		xvals = selection[measure]
-		yvals = selection[pval_col]
-		_ = sns.scatterplot(x=xvals, y=yvals, ax=g.ax_joint, color="red", linewidth=0.2, 
+		xvals = selection[x]
+		xvals_finite = xvals[~np.isinf(xvals)]
+		yvals = selection[y]
+		yvals_finite = yvals[~np.isinf(yvals)]
+		_ = sns.scatterplot(x=xvals_finite, y=yvals_finite, ax=g.ax_joint, color="red", linewidth=0.2, 
 							label="Selection (n={0})".format(n_selected))
 
+	#Label given indices
+	if label is not None:
+		if isinstance(label, list):
+
+			#Check if labels are within table index
+			
+			pass
+
+
+		elif label == "selection":
+			_add_labels(selection, x, y, "index", g.ax_joint, color="red", label_fontsize=label_fontsize)
+
+	#Save plot to file
 	if save is not None:
 		plt.savefig(save, dpi=600)
 
 	return(g)
+
+#Add labels to ax
+def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
+	""" Utility to add labels to coordinates 
+
+	Parameters
+	----------
+	table : pandas.DataFrame
+		A dataframe containing coordinates and labels to plot.
+	x : str
+		The name of a column in table containing x coordinates.
+	y : str
+		The name of a column in table containing y cooordinates.
+	label : str
+		Name of column or "index" containing labels to plot.
+	ax : plt axes
+
+
+	Returns 
+	--------
+	None 
+		The labels are added to ax in place
+	"""
+
+	txts = []
+	for l in label:
+		coord = [table.loc[l,measure_col], table.loc[l,log_col]]
+		
+		ax = g.ax_joint
+		ax.scatter(coord[0], coord[1], color="red")
 	
+		txts.append(ax.text(coord[0], coord[1], l, fontsize=label_fontsize))
+	
+	#Adjust overlapping labels
+	adjust_text(txts, ax=ax, add_objects=[], text_from_points=True, arrowprops=dict(arrowstyle='-', color='black', lw=0.5))  #, expand_text=(0.1,1.2), expand_objects=(0.1,0.1))
+
+
+
+
 def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	"""
 	Plot a bubble-style plot of GO-enrichment results.
@@ -214,7 +292,7 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	threshold : float between 0-1
 		The p-value-threshold to show in plot.
 	save : str, optional
-		""
+		Save the plot to the file given in 'save'. Default: None.
 	
 	Returns
 	----------
@@ -222,18 +300,18 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 
 	"""
 	
+	check_string(aspect, ["BP", "CC", "MF"], "aspect")
 	#aspect has to be one of {'BP', 'CC', 'MF'}
 	
-
 	#Choose aspect
 	aspect_table = table[table["NS"] == aspect]
 	aspect_table.loc[:,"-log(p-value)"] = -np.log(aspect_table["p_fdr_bh"])
 	aspect_table.loc[:,"n_genes"] = aspect_table["study_count"]
 
 	#Sort by pvalue and ngenes
-	aspect_table.sort_values("-log(p-value)", ascending=False, inplace=True)
+	aspect_table = aspect_table.sort_values("-log(p-value)", ascending=False)
 	aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
-	
+
 	#Plot enriched terms 
 	ax = sns.scatterplot(x="-log(p-value)", 
 								y="name",
@@ -251,6 +329,9 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	ax.legend(bbox_to_anchor=(1.01, 1), borderaxespad=0)
 	ax.grid()
 
+	if save is not None:
+		plt.savefig(save, dpi=600)
+
 	return(ax)
 
 def _truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
@@ -262,6 +343,8 @@ def _truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 	new_cmap = colors.LinearSegmentedColormap.from_list(
 		'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
 		cmap(np.linspace(minval, maxval, n)))
+
+	new_cmap.set_bad
 	return new_cmap
 
 def _rgb_to_hex(rgb):
@@ -271,22 +354,45 @@ def _values_to_cmap(values, plt_cmap=None):
 	""" Map values onto a cmap function taking value and returning hex color """
 
 	#Decide which colormap to use
+	colormap_binary = colors.ListedColormap(['lightblue', 'blue'])
 	colormap_red = _truncate_colormap(plt.cm.Reds, minval=0.3, maxval=0.7)
 	colormap_blue = _truncate_colormap(plt.cm.Blues_r, minval=0.3, maxval=0.7)
 	colormap_divergent = _truncate_colormap(plt.cm.bwr, minval=0.1, maxval=0.9)
 	colormap_discrete = _truncate_colormap(plt.cm.jet, minval=0.3, maxval=0.7)
 	
+	#First, convert values to bool if possible
+	values = _convert_boolean(values)
+
 	#Check if values are strings 
 	if sum([isinstance(s, str) for s in values]) > 0: #values are strings, cmap should be discrete
+		cmap = colormap_discrete
+		cmap.set_bad(color="grey")
+
 		values_unique = list(set(values))
 		floats = np.linspace(0,1,len(values_unique))
 		name2val = dict(zip(values_unique, floats)) #map strings to cmap values
 
+		color_func = lambda string: _rgb_to_hex(cmap(name2val[string], bytes=True)[:3])
 
-		color_func = lambda string: _rgb_to_hex(colormap_discrete(name2val[string], bytes=True)[:3])
+	#Check if values are boolean
+	elif sum([isinstance(s, bool) for s in values]) > 0:
 
+		cmap = colormap_binary
+		cmap.set_bad(color="grey") #color for NaN
+
+		color_func = lambda value: _rgb_to_hex(cmap(int(value), bytes=True)[:3])
+
+		#sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
+		#cmap = sm.get_cmap()
+
+	#Values are int/float
 	else:
-		vmin, vmax = np.min(values), np.max(values)
+
+		#Check if values contain NaN
+		clean_values = np.array(values)[~np.isnan(values)]
+
+		#Get min and max
+		vmin, vmax = np.min(clean_values), np.max(clean_values)
 
 		if plt_cmap != None: #plt_cmap is given explicitly
 			pass #todo: check that plt_cmap is a colormap
@@ -301,10 +407,29 @@ def _values_to_cmap(values, plt_cmap=None):
 		norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
 		sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
 		cmap = sm.get_cmap()
+		cmap.set_bad(color="grey") #set color for np.nan
 		color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
 	
 	return(color_func)
+
+def _isnan(num):
+	return num != num
+
+def _convert_boolean(values):
+	""" Converts a list of boolean/string/nan values into boolean values - but only if all values could be converted """
+
+	#Convert any boolean values
+	bool_vals = ["y", "yes", "t", "true", "on", "1", "n", "no", "f", "false", "off", "0"]
+	converted = [bool(distutils.util.strtobool(val)) if (isinstance(val, str) and (val.lower() in bool_vals)) else val for val in values]
+
+	#Check if clean values contain only bool
+	clean = [val for val in converted if _isnan(val) == False]
+	n_bool = sum([isinstance(val, bool) for val in clean])
 	
+	if n_bool == len(clean):
+		return(converted) #all values could be converted - these are boolean values
+	else:
+		return(values)     #not all values could be converted - these are not boolean values
 
 def network(network, 
 				color_node_by=None,
@@ -470,12 +595,18 @@ def network(network,
 
 	############### Save to file ###############
 	if save != None:
+
+		#Set dpi for output render (not for visualized, as this doesn't work with notebook)
+		dot_render = copy.deepcopy(dot)
+		dot_render.attr(dpi="600")
+
 		splt = os.path.splitext(save)
 		file_prefix = "".join(splt[:-1])
 		fmt = splt[-1].replace(".", "")
 		
 		if fmt not in graphviz.FORMATS:
+			logger.warning("File ending .{0} is not supported by graphviz/dot. Network will be saved as .pdf.".format(fmt))
 			fmt = "pdf"
-		dot.render(filename=file_prefix, format=fmt, cleanup=True)
+		dot_render.render(filename=file_prefix, format=fmt, cleanup=True)
 	
 	return(dot)

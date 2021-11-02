@@ -21,4 +21,3 @@ Contents of this documentation
    examples/index
    API/index
    changelog
-   genindex
