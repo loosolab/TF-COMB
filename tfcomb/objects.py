@@ -2092,7 +2092,7 @@ class DistObj():
 		#Variables for storing data
 		self.rules = None  		     # Filled in by .fill_rules()
 		self.TF_names = []		     # List of TF names
-		self._raw = None             # Raw distance data [Numpy array of size n_pairs x maxDist]
+		self._raw = None             # Raw distance data [Pandas DataFrame of size n_pairs x maxDist]
 
 		self.distances = None 	     # Pandas DataFrame of size n_pairs x maxDist
 		self.corrected = None        # Pandas DataFrame of size n_pairs x maxDist
@@ -2121,7 +2121,7 @@ class DistObj():
 		self.directional = None      # True if direction is taken into account, false otherwise 
    
 		# private constants
-		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\n"
+		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\tCount\n"
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
 		self._XLBL_FONTSIZE = 10    # label fontsize adjustment for plotting x labels
 
@@ -2453,6 +2453,13 @@ class DistObj():
 		
 		if len(self.rules.loc[((self.rules["TF1"] == tf1) & (self.rules["TF2"] == tf2))]) == 0:
 			raise InputError(f"No rules for pair {tf1} - {tf2} found.")
+	
+	def get_pair_count(self, pair):
+		
+		self.check_pair(pair)
+		tf1, tf2 = pair
+
+		return self._raw.loc[[f"{tf1}-{tf2}"]].iloc[0,2:].sum()
 
 		
 	#-------------------------------------------------------------------------------------------#
@@ -2581,7 +2588,6 @@ class DistObj():
 		self.distances = pd.DataFrame(self._raw, columns=columns)
 		self.distances["TF1"] = [idx_to_name[idx] for idx in self.distances["TF1"]]
 		self.distances["TF2"] = [idx_to_name[idx] for idx in self.distances["TF2"]]
-
 		#Normalize
 		if normalize:
 			self.logger.info("Normalizing data.")
@@ -2593,6 +2599,12 @@ class DistObj():
 
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
 		self.normalized = normalize
+
+		# Transform _raw ro DataFrame
+		self._raw = pd.DataFrame(self._raw, columns=columns)
+		self._raw["TF1"] = [idx_to_name[idx] for idx in self._raw["TF1"]]
+		self._raw["TF2"] = [idx_to_name[idx] for idx in self._raw["TF2"]]
+		self._raw.index = self._raw["TF1"] + "-" + self._raw["TF2"]
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------------------ Analysis steps ---------------------------------------#
@@ -2852,7 +2864,8 @@ class DistObj():
 		if (len(peaks_idx) > 0):
 			for i in range(len(peaks_idx)):
 				peak = [tf1, tf2, peaks_idx[i], round(properties["peak_heights"][i], 4),
-				        round(properties["prominences"][i], 4), round(threshold, 4)]
+				        round(properties["prominences"][i], 4), round(threshold, 4),
+						self.get_pair_count((tf1,tf2))]
 				peaks.append(peak)
 				if (save is not None):
 					outfile.write('\t'.join(str(x) for x in peak) + '\n')
