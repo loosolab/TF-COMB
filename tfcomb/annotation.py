@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 pd.options.mode.chained_assignment = None #suppress 'SettingWithCopyWarning' prints
 import copy
@@ -7,6 +8,7 @@ import gzip
 import shutil
 import requests
 import tobias
+import glob
 
 #UROPA annotation
 import logging
@@ -29,11 +31,11 @@ from tfcomb.logging import TFcombLogger, InputError
 #Load internal data
 import pkg_resources
 DATA_PATH = pkg_resources.resource_filename("tfcomb", 'data/')
+gene_tables = glob.glob(DATA_PATH + "*_genes.txt")
+available_organisms = [os.path.basename(gene_table.replace("_genes.txt", "")) for gene_table in gene_tables]
 
-name_to_taxid = {"human": 9606, 
-				 "mouse": 10090}
-
-
+taxid_table = pd.read_csv(DATA_PATH + "tax_ids.txt", sep="\t", header=None)
+organism_to_taxid = dict(zip(taxid_table[0], taxid_table[1]))
 
 #-------------------------------------------------------------------------------#
 #----------------------------- Annotation of sites -----------------------------#
@@ -260,7 +262,19 @@ def _fmt_field(v):
 		s = v
 	return(s)
 
-def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosity=1, plot=True):
+class GOAnalysis():
+
+	def __init__():
+		pass
+
+
+	def plot_enrichment():
+		pass
+	
+
+
+
+def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, plot=True):
 	"""
 	Perform a GO-term enrichment based on the input gene_ids. 
 
@@ -269,11 +283,13 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	gene_ids : list
 		A list of gene ids
 	organism : :obj:`str`, optional
-		The organism of which the gene_ids originate. If organism 'background_gene_ids' are given, organism is not needed. Defaults to 'human'.
-	background_gene_ids : list, optional
-		A specific list of background gene ids to use. Default: The list of Uniprot proteins of the 'organism' given. 
+		The organism of which the gene_ids originate. Defaults to 'hsapiens'.
+	background : list, optional
+		A specific list of background gene ids to use. Default: The list of protein coding genes of the 'organism' given. 
 	verbosity : int
-		
+	
+	cutoff : float
+		0.05
 	plot : bool
 
 	See also
@@ -299,11 +315,9 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	tfcomb.utils.check_type(gene_ids, [list], "gene_ids")
 	
 	#Organism must be in human/mouse
-	if organism not in name_to_taxid:
-		raise InputError("Organism '{0}' not available. Please choose any of: {1}".format(organism, list(name_to_taxid.keys())))
-	else:
-		taxid = name_to_taxid[organism]
-	
+	if organism not in available_organisms:
+		raise InputError("Organism '{0}' not available. Please choose any of: {1}".format(organism, available_organisms))
+	taxid = organism_to_taxid[organism]
 	logger.info("Running GO-term enrichment for organism {0} (taxid: {1})".format(organism, taxid))
 	
 	##### Read data #####
@@ -329,8 +343,8 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 		try:
 			fin_gene2go = download_ncbi_associations()
 		except:
-			logger.warning("An error occurred downloading NCBI associations using goatools.")
-			logger.warning("TF-COMB will attempt to download and extract manually")
+			logger.warning("An error occurred downloading NCBI associations using goatools")
+			logger.warning("TF-COMB will attempt to download and extract the file manually")
 			
 			url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2go.gz"
 			base = os.path.basename(url) #gene2go.gz
@@ -354,38 +368,16 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	ns2assoc = objanno.get_ns2assc()
 	#logger.debug(ns2assoc)
 
+	
+	###### Setup analysis #####
+
 	#Read data from package
 	gene_table = pd.read_csv(DATA_PATH + organism + "_genes.txt", sep="\t")
 
-	###### Setup analysis #####
-	#Setup background gene ids 
-	if background_gene_ids == None:
-		logger.debug("Getting background_gene_ids from gene_table")
+	###### Setup gene ids ####### 
+	target_col = "entrezgene_id"
 
-
-		background_gene_ids = list(set(gene_table["GeneID"].tolist())) #unique gene ids from table
-	else:
-
-		#Find best-fitting column in gene_table
-
-		pass
-		#check if background_gene_ids are in ns2assoc
-	
-	#Setup goeaobj
-	logger.info("Setting up GO enrichment")
-	goeaobj = GOEnrichmentStudyNS(
-				background_gene_ids, # List of protein-coding genes
-				ns2assoc, # geneid/GO associations
-				obodag, # Ontologies
-				propagate_counts = False,
-				alpha = 0.05, # default significance cut-off
-				methods = ['fdr_bh'], # defult multipletest correction method
-				prt=None, 
-				log=None) 
-	
-
-	##### Run study #####
-	
+	##Setup input gene ids
 	#Check if gene_ids are in ns2assoc; else, try to convert
 	all_gene_ids = set(sum([list(ns2assoc[aspect].keys()) for aspect in ns2assoc.keys()], []))
 	n_found = sum([gene_id in all_gene_ids for gene_id in gene_ids])
@@ -393,21 +385,61 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 	if n_found == 0:
 		
 		#Which column from gene_table has the best match?
-		match = []
-		for column in gene_table.columns:
-			tup = (column, sum([gene_id in gene_table[column].tolist() for gene_id in gene_ids]))
-			match.append(tup)
+		id_col = match_column(gene_table, gene_ids)
+		logger.debug("gene_ids best match column: {0}".format(id_col))
 		
-		id_col = sorted(match, key=lambda t: -t[1])[0][0] #column with best matching IDs
-		
+		#Find out how many ids can be converted
+		not_found = set(gene_ids) - set(gene_table[id_col])
+		logger.warning("{0} gene ids from 'gene_ids' could not be converted to entrez ids for {1}".format(len(not_found), organism))
+
 		#Convert to entrez id
-		ids2entrez = dict(zip(gene_table[id_col], gene_table["GeneID"]))
+		ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
 		gene_ids_entrez = [ids2entrez.get(s, -1) for s in gene_ids]
 		gene_ids_entrez = set([gene for gene in gene_ids_entrez if gene > 0]) #only genes for which there was a match
 
+		#Save dict for converting back to original values
+		entrez2id = dict(zip(gene_table[target_col], gene_table[id_col]))
+
 	else:
-		gene_ids_entrez = gene_ids
+		gene_ids_entrez = gene_ids #gene ids were already entrez
+		entrez2id = dict(zip(gene_ids, gene_ids))
+
+	##Setup background gene ids 
+	if background == None:
+
+		#Read data from package
+		gene_table = pd.read_csv(DATA_PATH + organism + "_genes.txt", sep="\t")
+
+		logger.debug("Getting background_gene_ids from gene_table")
+		background_gene_ids_entrez = list(set(gene_table["entrezgene_id"].tolist())) #unique gene ids from table
+
+	else:
+
+		#Find best-fitting column in gene_table
+		id_col = match_column(gene_table, background)
+		ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
+		background_gene_ids_entrez = [ids2entrez.get(s, -1) for s in background]
+		background_gene_ids_entrez = set([gene for gene in background_gene_ids_entrez if gene > 0]) #only genes for which there was a match
 	
+	#Check if genes were in ns2assoc
+
+
+
+
+	#Setup goeaobj
+	logger.info("Setting up GO enrichment")
+	goeaobj = GOEnrichmentStudyNS(
+				background_gene_ids_entrez, # List of protein-coding genes in entrezgene format
+				ns2assoc, # geneid/GO associations
+				obodag, # Ontologies
+				propagate_counts = True,
+				alpha = 0.05, # default significance cut-off
+				methods = ['fdr_bh'], # defult multipletest correction method
+				prt=None, 
+				log=None) 
+	
+
+	##### Run study #####
 	logger.debug("Running .run_study():")
 	if verbosity <= 1:
 		goea_results_all = goeaobj.run_study(gene_ids_entrez, prt=None)
@@ -415,7 +447,7 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 		goea_results_all = goeaobj.run_study(gene_ids_entrez)
 	
 	#Convert study items to original ids
-
+	#entrez2id
 
 	##### Format to dataframe #####
 
@@ -432,5 +464,15 @@ def go_enrichment(gene_ids, organism="human", background_gene_ids=None, verbosit
 
 	return(table)
 
-def match_column():
-	pass
+def match_column(table, lst):
+	""" Returns the column name with the best match to the list of ids/values """
+
+	#Which column from gene_table has the best match?
+	match = []
+	for column in table.columns:
+		tup = (column, sum([value in table[column].tolist() for value in lst]))
+		match.append(tup)
+	
+	id_col = sorted(match, key=lambda t: -t[1])[0][0] #column with best matching IDs
+
+	return(id_col)

@@ -309,7 +309,7 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	aspect_table.loc[:,"n_genes"] = aspect_table["study_count"]
 
 	#Sort by pvalue and ngenes
-	aspect_table = aspect_table.sort_values("-log(p-value)", ascending=False)
+	aspect_table = aspect_table.sort_values(["-log(p-value)", "p_uncorrected"], ascending=False)
 	aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
 
 	#Plot enriched terms 
