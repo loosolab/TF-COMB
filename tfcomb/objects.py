@@ -272,7 +272,7 @@ class CombObj():
 	def TFBS_from_motifs(self, regions, 
 								motifs, 
 								genome,
-								motif_pvalue=0.0001,
+								motif_pvalue=1e-05,
 								motif_naming="name",
 								gc=0.5, 
 								keep_overlaps=False, 
@@ -292,7 +292,7 @@ class CombObj():
 		genome : str
 			Path to the genome fasta-file to use for scan.
 		motif_pvalue : float, optional
-			The pvalue threshold for the motif search. Default: 0.0001.
+			The pvalue threshold for the motif search. Default: 1e-05.
 		motif_naming : str, optional
 			How to name TFs based on input motifs. Must be one of: 'name', 'id', 'name_id' or 'id_name'. Default: "name".
 		gc : float between 0-1, optional
