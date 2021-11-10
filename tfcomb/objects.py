@@ -275,7 +275,7 @@ class CombObj():
 								motif_pvalue=1e-05,
 								motif_naming="name",
 								gc=0.5, 
-								keep_overlaps=False, 
+								resolve_overlapping="merge", 
 								threads=1, 
 								overwrite=False,
 								_suffix=""): #suffix to add to output motif names
@@ -297,8 +297,9 @@ class CombObj():
 			How to name TFs based on input motifs. Must be one of: 'name', 'id', 'name_id' or 'id_name'. Default: "name".
 		gc : float between 0-1, optional
 			Set GC-content for the motif background model. Default: 0.5.
-		keep_overlaps : bool, optional
-			Whether to keep overlapping occurrences of the same TFBS. Setting 'False' removes overlapping TFBS keeping the TFBS with the highest match score. Default: False.
+		resolve_overlapping : str
+			Control how to treat overlapping occurrences of the same TF. Must be one of "merge", "highest_scoring" or "off". If "highest_score", the highest scoring overlapping site is kept.
+			If "merge", the sites are merged, keeping the information of the first site. If "off", overlapping TFBS are kept. Default: "merge".
 		threads : int, optional
 			How many threads to use for multiprocessing. Default: 1. 
 		overwrite : boolean
@@ -319,7 +320,7 @@ class CombObj():
 		check_value(motif_pvalue, vmin=0, vmax=1, name="motif_pvalue")
 		check_string(motif_naming, allowed_motif_naming, "motif_naming")
 		check_value(gc, vmin=0, vmax=1, name="gc")
-		check_type(keep_overlaps, bool, "keep_overlap")
+		check_string(resolve_overlapping, ["off", "merge", "highest_score"], "resolve_overlapping")
 		check_value(threads, vmin=1, name="threads")
 		check_type(overwrite, bool, "overwrite")
 		
@@ -344,8 +345,13 @@ class CombObj():
 			motifs = tfcomb.utils.prepare_motifs(motifs_f, motif_pvalue, motif_naming)
 			self.logger.debug("Read {0} motifs from '{1}'".format(len(motifs), motifs_f))
 		else:
+			
+			#set gc for motifs
+			bg = 
+
 			_ = [motif.get_threshold(motif_pvalue) for motif in motifs]
 			_ = [motif.set_prefix(motif_naming) for motif in motifs]
+
 
 		#Set suffix to motif names
 		for motif in motifs:
@@ -368,7 +374,7 @@ class CombObj():
 			TFBS = RegionList([])	#initialize empty list	
 			for region_chunk in chunks:
 
-				region_TFBS = tfcomb.utils.calculate_TFBS(region_chunk, motifs, genome_obj)
+				region_TFBS = tfcomb.utils.calculate_TFBS(region_chunk, motifs, genome_obj, resolve_overlapping)
 				TFBS += region_TFBS
 
 				#Update progress
@@ -385,7 +391,7 @@ class CombObj():
 			jobs = []
 			for region_chunk in chunks:
 				self.logger.spam("Starting job for region_chunk of length: {0}".format(len(region_chunk)))
-				jobs.append(pool.apply_async(tfcomb.utils.calculate_TFBS, (region_chunk, motifs, genome, )))
+				jobs.append(pool.apply_async(tfcomb.utils.calculate_TFBS, (region_chunk, motifs, genome, resolve_overlapping)))
 			pool.close()
 			
 			log_progress(jobs, self.logger) #only exits when the jobs are complete
@@ -396,12 +402,7 @@ class CombObj():
 			#Join all TFBS to one list
 			TFBS = RegionList(sum(results, []))
 
-		self.logger.info("Formatting scanned TFBS")
-
-		#Resolve overlaps
-		if keep_overlaps == False:
-			self.logger.debug("keep_overlaps == False; Resolving overlaps for TFBS")
-			TFBS = tfcomb.utils.resolve_overlapping(TFBS)
+		self.logger.info("Processing scanned TFBS")
 
 		#Join and process TFBS
 		self.TFBS += TFBS
@@ -660,7 +661,7 @@ class CombObj():
 
 		#Check input
 		self._check_TFBS()
-		check_writeability(path)
+		#check_writeability(path)
 
 		#Call the .write_bed utility from tobias
 		self.TFBS.write_bed(path)
@@ -968,7 +969,7 @@ class CombObj():
 		table = table[table["TF1_TF2_count"] != 0]
 
 		#Sort for highest measure pairs
-		table.sort_values(measure, ascending=False, inplace=True)
+		table.sort_values([measure, "TF1"], ascending=[False, True], inplace=True) #if two pairs have equal measure, sort by TF1 name
 		table.reset_index(inplace=True, drop=True)
 
 		#Add z-score per pair

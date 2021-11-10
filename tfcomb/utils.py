@@ -2,6 +2,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+import copy
 from copy import deepcopy
 import time
 import datetime
@@ -426,7 +427,7 @@ def unique_region_names(regions):
 
 	return(names)
 
-def calculate_TFBS(regions, motifs, genome):
+def calculate_TFBS(regions, motifs, genome, resolve="merge"):
 	"""
 	Multiprocessing-safe function to scan for motif occurrences
 
@@ -434,15 +435,19 @@ def calculate_TFBS(regions, motifs, genome):
 	----------
 	genome : str or 
 		If string , genome will be opened 
-	
 	regions : RegionList()
 		A RegionList() object of regions 
+	resolve : str
+		How to resolve overlapping sites from the same TF. Must be one of "off", "highest_score" or "merge". If "highest_score", the highest scoring overlapping site is kept.
+		If "merge", the sites are merged, keeping the information of the first site. If "off", overlapping TFBS are kept. Default: "merge".
 
 	Returns
 	----------
 	List of TFBS within regions
 
 	"""
+
+	check_string(resolve, ["merge", "highest_score", "off"], "resolve")
 
 	#open the genome given
 	if isinstance(genome, str):
@@ -461,10 +466,88 @@ def calculate_TFBS(regions, motifs, genome):
 
 		TFBS_list += region_TFBS
 
+	#Sort all sites
+	TFBS_list.loc_sort()
+
+	#Resolve overlapping
+	if resolve is not "off":
+		TFBS_list = resolve_overlapping(TFBS_list, how=resolve)
+
 	if isinstance(genome, str):
 		genome_obj.close()
 
 	return(TFBS_list)
+
+def resolve_overlapping(sites, how="merge"):
+	""" 
+	Resolve overlapping sites with the same names within a list of genomic regions.
+
+	Parameters
+	------------
+	sites : RegionList
+		A list of TFBS/regions with .chrom, .start, .end and .name information.
+	how : str
+		How to resolve the overlapping site. Must be one of "highest_score", "merge". If "highest_score", the highest scoring overlapping site is kept.
+		If "merge", the sites are merged, keeping the information of the first site. Default: "merge".
+	"""
+	
+	check_string(how, ["highest_score", "merge"], "how")
+
+	#Create a copy of sites to ensure that original sites are not changed
+	sites = copy.copy(sites)
+	
+	n_sites = len(sites)
+	tracking = {} # dictionary for tracking positions of TFBS per name
+	
+	for site_i in range(n_sites):
+		
+		site = sites[site_i]
+		site_name = site.name
+		
+		if site_name in tracking: #if not in tracking, site is the first site of this name
+			
+			previous_site = tracking[site_name]["site"]
+			previous_i = tracking[site_name]["i"]
+
+			if (site.chrom == previous_site.chrom) and (site.start < previous_site.end): #overlapping
+								
+				#How to deal with overlap:
+				if how == "highest_score":
+					
+					if site.score >= previous.score: #keep current site
+						sites[previous_i] = None
+						tracking[site_name] = {"i": site_i, "site": site} #new tracking
+						
+					else: #keep previous site
+						sites[site_i] = None
+						#tracking stays the same
+						
+				elif how == "merge":
+					
+					merged_end = max([previous_site.end, site.end])
+					
+					#merge site into the previous
+					merged = OneTFBS(**{"chrom": site.chrom, 
+									  "start": previous_site.start, 
+									  "end": merged_end, 
+									  "name": site_name, 
+									  "score": previous_site.score,
+									  "strand": previous_site.strand})
+					
+					sites[previous_i] = merged
+					sites[site_i] = None
+					#tracking stays the same
+					
+			else: #no overlaps with previous; save this site to tracking
+				tracking[site_name] = {"i": site_i, "site": site}
+				
+		else: #Save first site to tracking
+			tracking[site_name] = {"i": site_i, "site": site}
+	
+
+	resolved = [site for site in sites if site is not None]
+	
+	return(resolved)
 
 
 def remove_duplicates(TFBS):
@@ -473,29 +556,6 @@ def remove_duplicates(TFBS):
 	filtered = TFBS
 
 	return(filtered)
-
-def resolve_overlapping(TFBS):
-	""" Remove self-overlapping regions from TFBS 
-	
-	Parameters
-	-----------
-	TFBS : tobias.regions.RegionList
-	"""
-
-	#Split TFBS into dict per name
-	sites_per_name = {}
-	for site in TFBS:
-		if site.name not in sites_per_name:
-			sites_per_name[site.name] = RegionList()
-		sites_per_name[site.name].append(site)
-
-	#Resolve overlaps
-	resolved = RegionList()
-	for name in sites_per_name:
-		resolved.extend(sites_per_name[name].resolve_overlaps())
-	resolved.loc_sort()
-	
-	return(resolved)
 
 def merge_self_overlaps(regions):
 	""" Merge overlapping regions with the same name.
