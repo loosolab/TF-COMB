@@ -347,7 +347,7 @@ class CombObj():
 		else:
 			
 			#set gc for motifs
-			bg = 
+			#bg = 
 
 			_ = [motif.get_threshold(motif_pvalue) for motif in motifs]
 			_ = [motif.set_prefix(motif_naming) for motif in motifs]
@@ -661,7 +661,7 @@ class CombObj():
 
 		#Check input
 		self._check_TFBS()
-		#check_writeability(path)
+		check_writeability(path)
 
 		#Call the .write_bed utility from tobias
 		self.TFBS.write_bed(path)
@@ -969,7 +969,7 @@ class CombObj():
 		table = table[table["TF1_TF2_count"] != 0]
 
 		#Sort for highest measure pairs
-		table.sort_values([measure, "TF1"], ascending=[False, True], inplace=True) #if two pairs have equal measure, sort by TF1 name
+		table.sort_values([measure[0], "TF1"], ascending=[False, True], inplace=True) #if two pairs have equal measure, sort by TF1 name
 		table.reset_index(inplace=True, drop=True)
 
 		#Add z-score per pair
@@ -3128,7 +3128,7 @@ class DistObj():
 			if n_bins is None:
 				n_bins = np.max(distances) - np.min(distances) #as many bins as 'bp' between min/max distance
 
-			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', label="counts")
+			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', ec='tab:blue', label="counts") #ec needed to plot thin bars
 			ax.set_ylabel('Count per distance')
 
 		elif style == "kde":
@@ -3153,7 +3153,7 @@ class DistObj():
 		if show_bg:
 			if self.linres is not None:
 				linres = self.linres.loc[ind, "Linear Regression"]
-				plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted line')
+				plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted background')
 			else:
 				self.logger.warning("show_bw == True, but there was no linres available")
 
@@ -3424,7 +3424,7 @@ class DistObj():
 
 		fig, ax = plt.subplots(1, 1)
 
-		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=True, alpha=0.6)
+		plt.hist(range(0, n_data), weights=weights, bins=n_bins, alpha=0.6)
 		plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
 		plt.xlabel('Distance in bp')
 		plt.ylabel('Counts per distance')
