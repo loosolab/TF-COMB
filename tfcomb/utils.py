@@ -143,22 +143,24 @@ def check_writeability(file_path):
 		If file_path is not writeable.
 	"""
 
+	check_type(file_path, str)
+
 	#Check if file already exists
-	if file_path is not None: #don't check path given as None; assume that this is taken care of elsewhere
-		error_str = None
-		if os.path.exists(file_path):
-			if not os.path.isfile(file_path): # is it a file or a dir?
-				error_str = "Path '{0}' is not a file".format(file_path)
+	error_str = None
+	if os.path.exists(file_path):
+		if not os.path.isfile(file_path): # is it a file or a dir?
+			error_str = "Path '{0}' is not a file".format(file_path)
 
-		#check writeability of parent dir
-		else:
-			pdir = os.path.dirname(file_path)
-			if os.access(pdir, os.W_OK) == False:
-				error_str = "File '{0}' within dir {1} is not writeable".format(file_path, pdir)
+	#check writeability of parent dir
+	else:
+		pdir = os.path.dirname(file_path)
+		pdir = "." if pdir == "" else pdir #if file_path is in current folder, pdir is empty string
+		if os.access(pdir, os.W_OK) == False:
+			error_str = "Parent directory '{0}' is not writeable".format(pdir)
 
-		#If any errors were found
-		if error_str is not None:
-			raise InputError(error_str)
+	#If any errors were found
+	if error_str is not None:
+		raise InputError(error_str)
 
 
 def check_type(obj, allowed, name=None):
@@ -470,7 +472,7 @@ def calculate_TFBS(regions, motifs, genome, resolve="merge"):
 	TFBS_list.loc_sort()
 
 	#Resolve overlapping
-	if resolve is not "off":
+	if resolve != "off":
 		TFBS_list = resolve_overlapping(TFBS_list, how=resolve)
 
 	if isinstance(genome, str):
