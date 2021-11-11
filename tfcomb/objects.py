@@ -410,6 +410,10 @@ class CombObj():
 		TF_names = unique_region_names(TFBS)
 		self.TF_names = sorted(list(set(self.TF_names + TF_names)))
 
+		#Resolve any leftover overlaps between jobs
+		if resolve_overlapping != "off":
+			TFBS = tfcomb.utils.resolve_overlaps(TFBS, how=resolve_overlapping)
+
 		#Final info log
 		self.logger.info("Identified {0} TFBS ({1} unique names) within given regions".format(len(TFBS), len(TF_names)))
 		if initialized == 0: #if sites were added, log the updated
@@ -664,7 +668,10 @@ class CombObj():
 		check_writeability(path)
 
 		#Call the .write_bed utility from tobias
-		self.TFBS.write_bed(path)
+		f = open(path, "w")
+		s = "\n".join([str(site) for site in self.TFBS]) + "\n"
+		f.write(s)
+		f.close()
 
 
 	#-------------------------------------------------------------------------------------------------------------#

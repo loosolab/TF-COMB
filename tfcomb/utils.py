@@ -473,16 +473,16 @@ def calculate_TFBS(regions, motifs, genome, resolve="merge"):
 
 	#Resolve overlapping
 	if resolve != "off":
-		TFBS_list = resolve_overlapping(TFBS_list, how=resolve)
+		TFBS_list = resolve_overlaps(TFBS_list, how=resolve)
 
 	if isinstance(genome, str):
 		genome_obj.close()
 
 	return(TFBS_list)
 
-def resolve_overlapping(sites, how="merge"):
+def resolve_overlaps(sites, how="merge", per_name=True):
 	""" 
-	Resolve overlapping sites with the same names within a list of genomic regions.
+	Resolve overlapping sites within a list of genomic regions.
 
 	Parameters
 	------------
@@ -491,6 +491,9 @@ def resolve_overlapping(sites, how="merge"):
 	how : str
 		How to resolve the overlapping site. Must be one of "highest_score", "merge". If "highest_score", the highest scoring overlapping site is kept.
 		If "merge", the sites are merged, keeping the information of the first site. Default: "merge".
+	per_name : bool
+		Whether to resolve overlapping only per name or across all sites. If 'True' overlaps are only resolved if the name of the sites are equal. 
+		If 'False', overlaps are resolved across all sites. Default: True.
 	"""
 	
 	check_string(how, ["highest_score", "merge"], "how")
@@ -499,12 +502,12 @@ def resolve_overlapping(sites, how="merge"):
 	sites = copy.copy(sites)
 	
 	n_sites = len(sites)
-	tracking = {} # dictionary for tracking positions of TFBS per name
+	tracking = {} # dictionary for tracking positions of TFBS per name (or across all)
 	
 	for site_i in range(n_sites):
 		
 		site = sites[site_i]
-		site_name = site.name
+		site_name = site.name if per_name == True else "." #control which site to fetch as 'previous'
 		
 		if site_name in tracking: #if not in tracking, site is the first site of this name
 			
@@ -516,7 +519,7 @@ def resolve_overlapping(sites, how="merge"):
 				#How to deal with overlap:
 				if how == "highest_score":
 					
-					if site.score >= previous.score: #keep current site
+					if site.score >= previous_site.score: #keep current site
 						sites[previous_i] = None
 						tracking[site_name] = {"i": site_i, "site": site} #new tracking
 						
@@ -532,7 +535,7 @@ def resolve_overlapping(sites, how="merge"):
 					merged = OneTFBS(**{"chrom": site.chrom, 
 									  "start": previous_site.start, 
 									  "end": merged_end, 
-									  "name": site_name, 
+									  "name": site.name, 
 									  "score": previous_site.score,
 									  "strand": previous_site.strand})
 					
@@ -551,64 +554,6 @@ def resolve_overlapping(sites, how="merge"):
 	
 	return(resolved)
 
-
-def remove_duplicates(TFBS):
-	""" """
-
-	filtered = TFBS
-
-	return(filtered)
-
-def merge_self_overlaps(regions):
-	""" Merge overlapping regions with the same name.
-	
-	Parameters
-	-----------
-	regions : RegionList()
-		A RegionList() object of regions 
-
-	Return
-	--------
-	RegionList()
-		The given regions merged per name
-	"""
-
-	#regions.loc_sort() #assume that the regions are already sorted due to computational overhead
-	no_regions = len(regions)
-
-	i = 0
-	j = 1
-	while i + j < no_regions:
-
-		reg_a = regions[i]
-		reg_b = regions[i+j]
-
-		if reg_a == None:
-			i += 1
-			j = 1
-		elif reg_b == None:
-			j += 1
-		else:
-			if (reg_a.chrom == reg_b.chrom) and (reg_b.start < reg_a.end): #if overlapping
-				if reg_a.name == reg_b.name:
-					
-					#Update reg_a and set reg_b to None
-					reg_a.end = reg_b.end
-					regions[i+j] = None
-
-				else: #overlapping but not the same - increment b
-					j += 1
-
-			else: #non-overlapping, increment reg_a
-				i += 1
-				j = 1
-
-	#Remove all None
-	merged = RegionList([reg for reg in regions if reg is not None])
-
-	return(merged)
-
-
 def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 										   TF2_strand = None,
 										   min_distance = 0, 
@@ -616,198 +561,198 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 										   max_overlap = 0,
 										   directional = False,
 										   anchor = "inner"):
-		""" Get genomic locations of a particular TF pair.
-		
-		Parameters
-		----------
-		sites : RegionList()
-			A list of TFBS regions.
-		TF1 : str 
-			Name of TF1 in pair.
-		TF2 : str 
-			Name of TF2 in pair.
-		TF1_strand : str, optional
-			Strand of TF1 in pair. Default: None (strand is not taken into account).
-		TF2_strand : str, optional
-			Strand of TF2 in pair. Default: None (strand is not taken into account).
-		min_distance : int, optional
-			Minimum distance allowed between two TFBS. Default: 0
-		max_distance : int, optional
-			Maximum distance allowed between two TFBS. Default: 100
-		max_overlap : float between 0-1, optional
-			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
-			Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
-		directional : bool, optional
-			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
-			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
-		anchor : str, optional
-			The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
-
-		Returns
-		-------
-		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
-
-		See also
-		---------
-		count_within
-
-		"""
-
-		#Check input types
-		check_string(anchor, ["inner", "outer", "center"], "anchor")
-
-		#Subset sites to TF1/TF2 sites
-		sites = [site for site in sites if site.name in [TF1, TF2]]
-
-		locations = [] #empty list of regions
-
-		TF1_tup = (TF1, TF1_strand)
-		TF2_tup = (TF2, TF2_strand)
-		n_sites = len(sites)
-
-		#Find out which TF is queried
-		if directional == True:
-			TF1_to_check = [TF1_tup]
-		else:
-			TF1_to_check = [TF1_tup, TF2_tup]
-
-		#Loop over all sites
-		i = 0
-		while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
-			
-			#Get current TF information
-			TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
-			this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
-
-			#Check whether TF is valid
-			if this_TF1_tup in TF1_to_check:
+	""" Get genomic locations of a particular TF pair.
 	
-				#Find possible associations with TF1 within window 
-				finding_assoc = True
-				j = 0
-				while finding_assoc == True:
+	Parameters
+	----------
+	sites : RegionList()
+		A list of TFBS regions.
+	TF1 : str 
+		Name of TF1 in pair.
+	TF2 : str 
+		Name of TF2 in pair.
+	TF1_strand : str, optional
+		Strand of TF1 in pair. Default: None (strand is not taken into account).
+	TF2_strand : str, optional
+		Strand of TF2 in pair. Default: None (strand is not taken into account).
+	min_distance : int, optional
+		Minimum distance allowed between two TFBS. Default: 0
+	max_distance : int, optional
+		Maximum distance allowed between two TFBS. Default: 100
+	max_overlap : float between 0-1, optional
+		Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
+		Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
+	directional : bool, optional
+		Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
+		TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
+	anchor : str, optional
+		The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
+
+	Returns
+	-------
+	List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
+		Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
+
+	See also
+	---------
+	count_within
+
+	"""
+
+	#Check input types
+	check_string(anchor, ["inner", "outer", "center"], "anchor")
+
+	#Subset sites to TF1/TF2 sites
+	sites = [site for site in sites if site.name in [TF1, TF2]]
+
+	locations = [] #empty list of regions
+
+	TF1_tup = (TF1, TF1_strand)
+	TF2_tup = (TF2, TF2_strand)
+	n_sites = len(sites)
+
+	#Find out which TF is queried
+	if directional == True:
+		TF1_to_check = [TF1_tup]
+	else:
+		TF1_to_check = [TF1_tup, TF2_tup]
+
+	#Loop over all sites
+	i = 0
+	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
+		
+		#Get current TF information
+		TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
+		this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
+
+		#Check whether TF is valid
+		if this_TF1_tup in TF1_to_check:
+
+			#Find possible associations with TF1 within window 
+			finding_assoc = True
+			j = 0
+			while finding_assoc == True:
+				
+				#Next site relative to TF1
+				j += 1
+				if j+i >= n_sites - 1: #next site is beyond end of list, increment i
+					i += 1
+					finding_assoc = False #break out of finding_assoc
+
+				else:	#There are still sites available
+
+					#Fetch information on TF2-site
+					TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
+					this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
 					
-					#Next site relative to TF1
-					j += 1
-					if j+i >= n_sites - 1: #next site is beyond end of list, increment i
-						i += 1
-						finding_assoc = False #break out of finding_assoc
+					#Find out whether this TF2 is TF1/TF2
+					if this_TF1_tup == TF1_tup:
+						to_check = TF2_tup
+					elif this_TF1_tup == TF2_tup:
+						to_check = TF1_tup
 
-					else:	#There are still sites available
+					#Check whether TF2 is either TF1/TF2
+					if this_TF2_tup == to_check:
+					
+						#Calculate distance between the two sites based on anchor
+						if anchor == "inner":
+							distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+							if distance < 0:
+								distance = 0
+						elif anchor == "outer":
+							distance = TF2_end - TF1_start
+						elif anchor == "center":
+							TF1_mid = (TF1_start + TF1_end) / 2
+							TF2_mid = (TF2_start + TF2_end) / 2
+							distance = TF2_mid - TF1_mid
 
-						#Fetch information on TF2-site
-						TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
-						this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
-						
-						#Find out whether this TF2 is TF1/TF2
-						if this_TF1_tup == TF1_tup:
-							to_check = TF2_tup
-						elif this_TF1_tup == TF2_tup:
-							to_check = TF1_tup
+						#True if these TFBS co-occur within window
+						if TF1_chr == TF2_chr and (distance <= max_distance):
 
-						#Check whether TF2 is either TF1/TF2
-						if this_TF2_tup == to_check:
-						
-							#Calculate distance between the two sites based on anchor
+							if distance >= min_distance:
+							
+								# check if they are overlapping more than the threshold
+								valid_pair = 1
+								if distance == 0:
+
+									# Get the length of the shorter TF
+									short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+
+									#Calculate overlap between TF1/TF2
+									overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+									if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+										overlap_bp = short_bp
+									
+									#Invalid pair, overlap is higher than threshold
+									if overlap_bp / (short_bp*1.0) > max_overlap: 
+										valid_pair = 0
+
+								#Save association
+								if valid_pair == 1:
+
+									#Save location
+									reg1 = OneTFBS(chrom=TF1_chr, start=TF1_start, end=TF1_end, name=TF1_name, strand=TF1_strand_i)
+									reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
+									location = (reg1, reg2, distance)
+									locations.append(location)
+						elif TF1_chr != TF2_chr: 
+							i += 1
+							finding_assoc = False   #break out of finding_assoc-loop
+
+						else: #This TF2 is on the same chromosome but more than max_distance away
+
+							#Establish if all valid sites were found for TF1
 							if anchor == "inner":
-								distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-								if distance < 0:
-									distance = 0
-							elif anchor == "outer":
-								distance = TF2_end - TF1_start
-							elif anchor == "center":
-								TF1_mid = (TF1_start + TF1_end) / 2
-								TF2_mid = (TF2_start + TF2_end) / 2
-								distance = TF2_mid - TF1_mid
 
-							#True if these TFBS co-occur within window
-							if TF1_chr == TF2_chr and (distance <= max_distance):
-
-								if distance >= min_distance:
-								
-									# check if they are overlapping more than the threshold
-									valid_pair = 1
-									if distance == 0:
-
-										# Get the length of the shorter TF
-										short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-
-										#Calculate overlap between TF1/TF2
-										overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
-										if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
-											overlap_bp = short_bp
-										
-										#Invalid pair, overlap is higher than threshold
-										if overlap_bp / (short_bp*1.0) > max_overlap: 
-											valid_pair = 0
-
-									#Save association
-									if valid_pair == 1:
-
-										#Save location
-										reg1 = OneTFBS(chrom=TF1_chr, start=TF1_start, end=TF1_end, name=TF1_name, strand=TF1_strand_i)
-										reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
-										location = (reg1, reg2, distance)
-										locations.append(location)
-							elif TF1_chr != TF2_chr: 
+								#The next site is out of inner window range; increment to next i
 								i += 1
 								finding_assoc = False   #break out of finding_assoc-loop
+							
+							else: #If anchor is outer or center, there might still be valid pairs for future TF2's
 
-							else: #This TF2 is on the same chromosome but more than max_distance away
-
-								#Establish if all valid sites were found for TF1
-								if anchor == "inner":
-
-									#The next site is out of inner window range; increment to next i
+								#Check if it will be possible to find valid pairs in next sites
+								if TF2_start > TF1_start + max_distance:
+									#no longer possible to find valid pairs for TF1; increment to next i
 									i += 1
 									finding_assoc = False   #break out of finding_assoc-loop
-								
-								else: #If anchor is outer or center, there might still be valid pairs for future TF2's
+		
+		else: #current TF1 is not TF1/TF2; go to next site
+			i += 1
 
-									#Check if it will be possible to find valid pairs in next sites
-									if TF2_start > TF1_start + max_distance:
-										#no longer possible to find valid pairs for TF1; increment to next i
-										i += 1
-										finding_assoc = False   #break out of finding_assoc-loop
-			
-			else: #current TF1 is not TF1/TF2; go to next site
-				i += 1
-
-		return(locations)
+	return(locations)
 
 def locations_to_bed(locations, outfile, fmt="bed"):
-		""" 
-		Write the locations of (TF1, TF2) pairs to a bed-file.
-		
-		Parameters
-		------------
-		locations : list
-			The output of get_pair_locations()
-		outfile : str
-			The path which the pair locations should be written to.
-		fmt : str, optional
-			The format of the output file. Bust be pne of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
-		"""
-		
-		tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
+	""" 
+	Write the locations of (TF1, TF2) pairs to a bed-file.
+	
+	Parameters
+	------------
+	locations : list
+		The output of get_pair_locations()
+	outfile : str
+		The path which the pair locations should be written to.
+	fmt : str, optional
+		The format of the output file. Bust be pne of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
+	"""
+	
+	tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
 
-		#Open output file
-		try:
-			f = open(outfile, "w")
-		except Exception as e:
-			raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
-		
-		#Write locations to file in format 'fmt'
-		if fmt == "bed":
-			s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[1].end), loc[0].name + "-" + loc[1].name, str(loc[-1]), "."]) for loc in locations]) + "\n"
+	#Open output file
+	try:
+		f = open(outfile, "w")
+	except Exception as e:
+		raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
+	
+	#Write locations to file in format 'fmt'
+	if fmt == "bed":
+		s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[1].end), loc[0].name + "-" + loc[1].name, str(loc[-1]), "."]) for loc in locations]) + "\n"
 
-		elif fmt == "bedpe":
-			s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[0].end),
-									  loc[1].chrom, str(loc[1].start), str(loc[1].end), 
-									  loc[0].name + "-" + loc[1].name, str(loc[-1]), loc[0].strand, loc[1].strand]) for loc in locations]) + "\n"
-		f.write(s)
-		f.close()
+	elif fmt == "bedpe":
+		s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[0].end),
+									loc[1].chrom, str(loc[1].start), str(loc[1].end), 
+									loc[0].name + "-" + loc[1].name, str(loc[-1]), loc[0].strand, loc[1].strand]) for loc in locations]) + "\n"
+	f.write(s)
+	f.close()
 
 
 #--------------------------------- Background calculation ---------------------------------#
