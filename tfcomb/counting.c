@@ -886,7 +886,7 @@ typedef struct {
 } __Pyx_BufFmt_Context;
 
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":690
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":690
  * # in Cython to enable them only on the right systems.
  * 
  * ctypedef npy_int8       int8_t             # <<<<<<<<<<<<<<
@@ -895,7 +895,7 @@ typedef struct {
  */
 typedef npy_int8 __pyx_t_5numpy_int8_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":691
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":691
  * 
  * ctypedef npy_int8       int8_t
  * ctypedef npy_int16      int16_t             # <<<<<<<<<<<<<<
@@ -904,7 +904,7 @@ typedef npy_int8 __pyx_t_5numpy_int8_t;
  */
 typedef npy_int16 __pyx_t_5numpy_int16_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":692
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":692
  * ctypedef npy_int8       int8_t
  * ctypedef npy_int16      int16_t
  * ctypedef npy_int32      int32_t             # <<<<<<<<<<<<<<
@@ -913,7 +913,7 @@ typedef npy_int16 __pyx_t_5numpy_int16_t;
  */
 typedef npy_int32 __pyx_t_5numpy_int32_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":693
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":693
  * ctypedef npy_int16      int16_t
  * ctypedef npy_int32      int32_t
  * ctypedef npy_int64      int64_t             # <<<<<<<<<<<<<<
@@ -922,7 +922,7 @@ typedef npy_int32 __pyx_t_5numpy_int32_t;
  */
 typedef npy_int64 __pyx_t_5numpy_int64_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":697
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":697
  * #ctypedef npy_int128     int128_t
  * 
  * ctypedef npy_uint8      uint8_t             # <<<<<<<<<<<<<<
@@ -931,7 +931,7 @@ typedef npy_int64 __pyx_t_5numpy_int64_t;
  */
 typedef npy_uint8 __pyx_t_5numpy_uint8_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":698
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":698
  * 
  * ctypedef npy_uint8      uint8_t
  * ctypedef npy_uint16     uint16_t             # <<<<<<<<<<<<<<
@@ -940,7 +940,7 @@ typedef npy_uint8 __pyx_t_5numpy_uint8_t;
  */
 typedef npy_uint16 __pyx_t_5numpy_uint16_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":699
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":699
  * ctypedef npy_uint8      uint8_t
  * ctypedef npy_uint16     uint16_t
  * ctypedef npy_uint32     uint32_t             # <<<<<<<<<<<<<<
@@ -949,7 +949,7 @@ typedef npy_uint16 __pyx_t_5numpy_uint16_t;
  */
 typedef npy_uint32 __pyx_t_5numpy_uint32_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":700
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":700
  * ctypedef npy_uint16     uint16_t
  * ctypedef npy_uint32     uint32_t
  * ctypedef npy_uint64     uint64_t             # <<<<<<<<<<<<<<
@@ -958,7 +958,7 @@ typedef npy_uint32 __pyx_t_5numpy_uint32_t;
  */
 typedef npy_uint64 __pyx_t_5numpy_uint64_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":704
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":704
  * #ctypedef npy_uint128    uint128_t
  * 
  * ctypedef npy_float32    float32_t             # <<<<<<<<<<<<<<
@@ -967,7 +967,7 @@ typedef npy_uint64 __pyx_t_5numpy_uint64_t;
  */
 typedef npy_float32 __pyx_t_5numpy_float32_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":705
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":705
  * 
  * ctypedef npy_float32    float32_t
  * ctypedef npy_float64    float64_t             # <<<<<<<<<<<<<<
@@ -976,7 +976,7 @@ typedef npy_float32 __pyx_t_5numpy_float32_t;
  */
 typedef npy_float64 __pyx_t_5numpy_float64_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":714
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":714
  * # The int types are mapped a bit surprising --
  * # numpy.int corresponds to 'l' and numpy.long to 'q'
  * ctypedef npy_long       int_t             # <<<<<<<<<<<<<<
@@ -985,7 +985,7 @@ typedef npy_float64 __pyx_t_5numpy_float64_t;
  */
 typedef npy_long __pyx_t_5numpy_int_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":715
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":715
  * # numpy.int corresponds to 'l' and numpy.long to 'q'
  * ctypedef npy_long       int_t
  * ctypedef npy_longlong   long_t             # <<<<<<<<<<<<<<
@@ -994,7 +994,7 @@ typedef npy_long __pyx_t_5numpy_int_t;
  */
 typedef npy_longlong __pyx_t_5numpy_long_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":716
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":716
  * ctypedef npy_long       int_t
  * ctypedef npy_longlong   long_t
  * ctypedef npy_longlong   longlong_t             # <<<<<<<<<<<<<<
@@ -1003,7 +1003,7 @@ typedef npy_longlong __pyx_t_5numpy_long_t;
  */
 typedef npy_longlong __pyx_t_5numpy_longlong_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":718
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":718
  * ctypedef npy_longlong   longlong_t
  * 
  * ctypedef npy_ulong      uint_t             # <<<<<<<<<<<<<<
@@ -1012,7 +1012,7 @@ typedef npy_longlong __pyx_t_5numpy_longlong_t;
  */
 typedef npy_ulong __pyx_t_5numpy_uint_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":719
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":719
  * 
  * ctypedef npy_ulong      uint_t
  * ctypedef npy_ulonglong  ulong_t             # <<<<<<<<<<<<<<
@@ -1021,7 +1021,7 @@ typedef npy_ulong __pyx_t_5numpy_uint_t;
  */
 typedef npy_ulonglong __pyx_t_5numpy_ulong_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":720
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":720
  * ctypedef npy_ulong      uint_t
  * ctypedef npy_ulonglong  ulong_t
  * ctypedef npy_ulonglong  ulonglong_t             # <<<<<<<<<<<<<<
@@ -1030,7 +1030,7 @@ typedef npy_ulonglong __pyx_t_5numpy_ulong_t;
  */
 typedef npy_ulonglong __pyx_t_5numpy_ulonglong_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":722
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":722
  * ctypedef npy_ulonglong  ulonglong_t
  * 
  * ctypedef npy_intp       intp_t             # <<<<<<<<<<<<<<
@@ -1039,7 +1039,7 @@ typedef npy_ulonglong __pyx_t_5numpy_ulonglong_t;
  */
 typedef npy_intp __pyx_t_5numpy_intp_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":723
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":723
  * 
  * ctypedef npy_intp       intp_t
  * ctypedef npy_uintp      uintp_t             # <<<<<<<<<<<<<<
@@ -1048,7 +1048,7 @@ typedef npy_intp __pyx_t_5numpy_intp_t;
  */
 typedef npy_uintp __pyx_t_5numpy_uintp_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":725
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":725
  * ctypedef npy_uintp      uintp_t
  * 
  * ctypedef npy_double     float_t             # <<<<<<<<<<<<<<
@@ -1057,7 +1057,7 @@ typedef npy_uintp __pyx_t_5numpy_uintp_t;
  */
 typedef npy_double __pyx_t_5numpy_float_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":726
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":726
  * 
  * ctypedef npy_double     float_t
  * ctypedef npy_double     double_t             # <<<<<<<<<<<<<<
@@ -1066,7 +1066,7 @@ typedef npy_double __pyx_t_5numpy_float_t;
  */
 typedef npy_double __pyx_t_5numpy_double_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":727
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":727
  * ctypedef npy_double     float_t
  * ctypedef npy_double     double_t
  * ctypedef npy_longdouble longdouble_t             # <<<<<<<<<<<<<<
@@ -1101,7 +1101,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
 
 /*--- Type declarations ---*/
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":729
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":729
  * ctypedef npy_longdouble longdouble_t
  * 
  * ctypedef npy_cfloat      cfloat_t             # <<<<<<<<<<<<<<
@@ -1110,7 +1110,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
  */
 typedef npy_cfloat __pyx_t_5numpy_cfloat_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":730
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":730
  * 
  * ctypedef npy_cfloat      cfloat_t
  * ctypedef npy_cdouble     cdouble_t             # <<<<<<<<<<<<<<
@@ -1119,7 +1119,7 @@ typedef npy_cfloat __pyx_t_5numpy_cfloat_t;
  */
 typedef npy_cdouble __pyx_t_5numpy_cdouble_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":731
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":731
  * ctypedef npy_cfloat      cfloat_t
  * ctypedef npy_cdouble     cdouble_t
  * ctypedef npy_clongdouble clongdouble_t             # <<<<<<<<<<<<<<
@@ -1128,7 +1128,7 @@ typedef npy_cdouble __pyx_t_5numpy_cdouble_t;
  */
 typedef npy_clongdouble __pyx_t_5numpy_clongdouble_t;
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":733
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":733
  * ctypedef npy_clongdouble clongdouble_t
  * 
  * ctypedef npy_cdouble     complex_t             # <<<<<<<<<<<<<<
@@ -1431,12 +1431,6 @@ static CYTHON_INLINE PyObject* __Pyx_dict_iterator(PyObject* dict, int is_dict, 
                                                    Py_ssize_t* p_orig_length, int* p_is_dict);
 static CYTHON_INLINE int __Pyx_dict_iter_next(PyObject* dict_or_iter, Py_ssize_t orig_length, Py_ssize_t* ppos,
                                               PyObject** pkey, PyObject** pvalue, PyObject** pitem, int is_dict);
-
-/* BufferIndexError.proto */
-static void __Pyx_RaiseBufferIndexError(int axis);
-
-/* PyObjectCall2Args.proto */
-static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2);
 
 /* PyDictContains.proto */
 static CYTHON_INLINE int __Pyx_PyDict_ContainsTF(PyObject* item, PyObject* dict, int eq) {
@@ -1751,14 +1745,11 @@ static const char __pyx_k_np[] = "np";
 static const char __pyx_k_ind[] = "ind";
 static const char __pyx_k_tf1[] = "tf1";
 static const char __pyx_k_tf2[] = "tf2";
-static const char __pyx_k_ceil[] = "ceil";
 static const char __pyx_k_main[] = "__main__";
 static const char __pyx_k_name[] = "__name__";
-static const char __pyx_k_rule[] = "rule";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_dtype[] = "dtype";
 static const char __pyx_k_numpy[] = "numpy";
-static const char __pyx_k_pairs[] = "pairs";
 static const char __pyx_k_range[] = "range";
 static const char __pyx_k_rules[] = "rules";
 static const char __pyx_k_sites[] = "sites";
@@ -1769,14 +1760,13 @@ static const char __pyx_k_import[] = "__import__";
 static const char __pyx_k_offset[] = "offset";
 static const char __pyx_k_TF1_chr[] = "TF1_chr";
 static const char __pyx_k_TF1_end[] = "TF1_end";
-static const char __pyx_k_TF1_mid[] = "TF1_mid";
 static const char __pyx_k_TF2_chr[] = "TF2_chr";
 static const char __pyx_k_TF2_end[] = "TF2_end";
-static const char __pyx_k_TF2_mid[] = "TF2_mid";
 static const char __pyx_k_n_names[] = "n_names";
 static const char __pyx_k_n_sites[] = "n_sites";
 static const char __pyx_k_TF1_name[] = "TF1_name";
 static const char __pyx_k_TF2_name[] = "TF2_name";
+static const char __pyx_k_dist_ind[] = "dist_ind";
 static const char __pyx_k_distance[] = "distance";
 static const char __pyx_k_pair_ind[] = "pair_ind";
 static const char __pyx_k_short_bp[] = "short_bp";
@@ -1790,6 +1780,7 @@ static const char __pyx_k_self_count[] = "self_count";
 static const char __pyx_k_valid_pair[] = "valid_pair";
 static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_anchor_mode[] = "anchor_mode";
+static const char __pyx_k_directional[] = "directional";
 static const char __pyx_k_max_overlap[] = "max_overlap";
 static const char __pyx_k_max_distance[] = "max_distance";
 static const char __pyx_k_min_distance[] = "min_distance";
@@ -1809,7 +1800,6 @@ static PyObject *__pyx_n_s_ImportError;
 static PyObject *__pyx_n_s_TF1_anchor;
 static PyObject *__pyx_n_s_TF1_chr;
 static PyObject *__pyx_n_s_TF1_end;
-static PyObject *__pyx_n_s_TF1_mid;
 static PyObject *__pyx_n_s_TF1_name;
 static PyObject *__pyx_n_s_TF1_start;
 static PyObject *__pyx_n_s_TF2_anchor;
@@ -1817,17 +1807,17 @@ static PyObject *__pyx_n_s_TF2_chr;
 static PyObject *__pyx_n_s_TF2_counts;
 static PyObject *__pyx_n_s_TF2_counts_adjustment;
 static PyObject *__pyx_n_s_TF2_end;
-static PyObject *__pyx_n_s_TF2_mid;
 static PyObject *__pyx_n_s_TF2_name;
 static PyObject *__pyx_n_s_TF2_start;
 static PyObject *__pyx_n_s_anchor;
 static PyObject *__pyx_n_s_anchor_mode;
 static PyObject *__pyx_n_s_binary;
-static PyObject *__pyx_n_s_ceil;
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_count_co_occurrence;
 static PyObject *__pyx_n_s_count_distances;
+static PyObject *__pyx_n_s_directional;
 static PyObject *__pyx_n_s_dist_count_mat;
+static PyObject *__pyx_n_s_dist_ind;
 static PyObject *__pyx_n_s_distance;
 static PyObject *__pyx_n_s_dtype;
 static PyObject *__pyx_n_s_finding_assoc;
@@ -1851,9 +1841,7 @@ static PyObject *__pyx_n_s_offset;
 static PyObject *__pyx_n_s_overlap_bp;
 static PyObject *__pyx_n_s_pair_count_mat;
 static PyObject *__pyx_n_s_pair_ind;
-static PyObject *__pyx_n_s_pairs;
 static PyObject *__pyx_n_s_range;
-static PyObject *__pyx_n_s_rule;
 static PyObject *__pyx_n_s_rules;
 static PyObject *__pyx_n_s_self_count;
 static PyObject *__pyx_n_s_short_bp;
@@ -1867,7 +1855,7 @@ static PyObject *__pyx_kp_s_tfcomb_counting_pyx;
 static PyObject *__pyx_n_s_valid_pair;
 static PyObject *__pyx_n_s_zeros;
 static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, int __pyx_v_min_distance, int __pyx_v_max_distance, float __pyx_v_max_overlap, int __pyx_v_binary, int __pyx_v_anchor, int __pyx_v_n_names); /* proto */
-static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, PyObject *__pyx_v_rules, int __pyx_v_min_distance, int __pyx_v_max_distance, float __pyx_v_max_overlap, short __pyx_v_anchor_mode); /* proto */
+static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, PyObject *__pyx_v_rules, int __pyx_v_min_distance, int __pyx_v_max_distance, float __pyx_v_max_overlap, short __pyx_v_anchor_mode, int __pyx_v_directional); /* proto */
 static PyObject *__pyx_tuple_;
 static PyObject *__pyx_tuple__2;
 static PyObject *__pyx_tuple__3;
@@ -2056,15 +2044,15 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   int __pyx_v_TF1_name;
   int __pyx_v_TF1_start;
   int __pyx_v_TF1_end;
+  int __pyx_v_TF2_chr;
+  int __pyx_v_TF2_name;
   int __pyx_v_TF2_start;
   int __pyx_v_TF2_end;
   int __pyx_v_overlap_bp;
   int __pyx_v_short_bp;
   int __pyx_v_valid_pair;
-  int __pyx_v_TF2_chr;
-  int __pyx_v_TF2_name;
-  int __pyx_v_TF1_mid;
-  int __pyx_v_TF2_mid;
+  int __pyx_v_TF1_anchor;
+  int __pyx_v_TF2_anchor;
   int __pyx_v_distance;
   int __pyx_v_self_count;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_TF2_counts;
@@ -2333,7 +2321,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 	cdef int k
  * 	cdef bint finding_assoc = True             # <<<<<<<<<<<<<<
  * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end,
- * 	cdef int TF2_start, TF2_end, overlap_bp, short_bp, valid_pair
+ * 	cdef int TF2_chr, TF2_name, TF2_start, TF2_end
  */
   __pyx_v_finding_assoc = 1;
 
@@ -2568,123 +2556,132 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
         /* "tfcomb/counting.pyx":108
  * 
  * 				#Calculate distance between the two sites based on anchor
- * 				if anchor == 0:             # <<<<<<<<<<<<<<
- * 					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 					if distance < 0:
+ * 				if (anchor == 1): # 1 = outer             # <<<<<<<<<<<<<<
+ * 					TF1_anchor = TF1_start
+ * 					TF2_anchor = TF2_end
  */
         switch (__pyx_v_anchor) {
-          case 0:
+          case 1:
 
           /* "tfcomb/counting.pyx":109
  * 				#Calculate distance between the two sites based on anchor
- * 				if anchor == 0:
- * 					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping             # <<<<<<<<<<<<<<
- * 					if distance < 0:
- * 						distance = 0
+ * 				if (anchor == 1): # 1 = outer
+ * 					TF1_anchor = TF1_start             # <<<<<<<<<<<<<<
+ * 					TF2_anchor = TF2_end
+ * 				elif (anchor == 2): # 2 = center
  */
-          __pyx_v_distance = (__pyx_v_TF2_start - __pyx_v_TF1_end);
+          __pyx_v_TF1_anchor = __pyx_v_TF1_start;
 
           /* "tfcomb/counting.pyx":110
- * 				if anchor == 0:
- * 					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 					if distance < 0:             # <<<<<<<<<<<<<<
- * 						distance = 0
- * 				elif anchor == 1:
+ * 				if (anchor == 1): # 1 = outer
+ * 					TF1_anchor = TF1_start
+ * 					TF2_anchor = TF2_end             # <<<<<<<<<<<<<<
+ * 				elif (anchor == 2): # 2 = center
+ * 					TF1_anchor = (TF1_start + TF1_end) / 2
  */
-          __pyx_t_10 = ((__pyx_v_distance < 0) != 0);
-          if (__pyx_t_10) {
-
-            /* "tfcomb/counting.pyx":111
- * 					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 					if distance < 0:
- * 						distance = 0             # <<<<<<<<<<<<<<
- * 				elif anchor == 1:
- * 					distance = TF2_end - TF1_start
- */
-            __pyx_v_distance = 0;
-
-            /* "tfcomb/counting.pyx":110
- * 				if anchor == 0:
- * 					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 					if distance < 0:             # <<<<<<<<<<<<<<
- * 						distance = 0
- * 				elif anchor == 1:
- */
-          }
+          __pyx_v_TF2_anchor = __pyx_v_TF2_end;
 
           /* "tfcomb/counting.pyx":108
  * 
  * 				#Calculate distance between the two sites based on anchor
- * 				if anchor == 0:             # <<<<<<<<<<<<<<
- * 					distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 					if distance < 0:
- */
-          break;
-          case 1:
-
-          /* "tfcomb/counting.pyx":113
- * 						distance = 0
- * 				elif anchor == 1:
- * 					distance = TF2_end - TF1_start             # <<<<<<<<<<<<<<
- * 				elif anchor == 2:
- * 					TF1_mid = (TF1_start + TF1_end) / 2
- */
-          __pyx_v_distance = (__pyx_v_TF2_end - __pyx_v_TF1_start);
-
-          /* "tfcomb/counting.pyx":112
- * 					if distance < 0:
- * 						distance = 0
- * 				elif anchor == 1:             # <<<<<<<<<<<<<<
- * 					distance = TF2_end - TF1_start
- * 				elif anchor == 2:
+ * 				if (anchor == 1): # 1 = outer             # <<<<<<<<<<<<<<
+ * 					TF1_anchor = TF1_start
+ * 					TF2_anchor = TF2_end
  */
           break;
           case 2:
 
-          /* "tfcomb/counting.pyx":115
- * 					distance = TF2_end - TF1_start
- * 				elif anchor == 2:
- * 					TF1_mid = (TF1_start + TF1_end) / 2             # <<<<<<<<<<<<<<
- * 					TF2_mid = (TF2_start + TF2_end) / 2
- * 					distance = TF2_mid - TF1_mid
+          /* "tfcomb/counting.pyx":112
+ * 					TF2_anchor = TF2_end
+ * 				elif (anchor == 2): # 2 = center
+ * 					TF1_anchor = (TF1_start + TF1_end) / 2             # <<<<<<<<<<<<<<
+ * 					TF2_anchor = (TF2_start + TF2_end) / 2
+ * 				else: #0 = inner (default)
  */
-          __pyx_v_TF1_mid = (((long)(__pyx_v_TF1_start + __pyx_v_TF1_end)) / 2);
+          __pyx_v_TF1_anchor = (((long)(__pyx_v_TF1_start + __pyx_v_TF1_end)) / 2);
 
-          /* "tfcomb/counting.pyx":116
- * 				elif anchor == 2:
- * 					TF1_mid = (TF1_start + TF1_end) / 2
- * 					TF2_mid = (TF2_start + TF2_end) / 2             # <<<<<<<<<<<<<<
- * 					distance = TF2_mid - TF1_mid
- * 
+          /* "tfcomb/counting.pyx":113
+ * 				elif (anchor == 2): # 2 = center
+ * 					TF1_anchor = (TF1_start + TF1_end) / 2
+ * 					TF2_anchor = (TF2_start + TF2_end) / 2             # <<<<<<<<<<<<<<
+ * 				else: #0 = inner (default)
+ * 					TF1_anchor = TF1_end
  */
-          __pyx_v_TF2_mid = (((long)(__pyx_v_TF2_start + __pyx_v_TF2_end)) / 2);
+          __pyx_v_TF2_anchor = (((long)(__pyx_v_TF2_start + __pyx_v_TF2_end)) / 2);
 
-          /* "tfcomb/counting.pyx":117
- * 					TF1_mid = (TF1_start + TF1_end) / 2
- * 					TF2_mid = (TF2_start + TF2_end) / 2
- * 					distance = TF2_mid - TF1_mid             # <<<<<<<<<<<<<<
- * 
- * 				#Check if sites are valid as co-occurring
- */
-          __pyx_v_distance = (__pyx_v_TF2_mid - __pyx_v_TF1_mid);
-
-          /* "tfcomb/counting.pyx":114
- * 				elif anchor == 1:
- * 					distance = TF2_end - TF1_start
- * 				elif anchor == 2:             # <<<<<<<<<<<<<<
- * 					TF1_mid = (TF1_start + TF1_end) / 2
- * 					TF2_mid = (TF2_start + TF2_end) / 2
+          /* "tfcomb/counting.pyx":111
+ * 					TF1_anchor = TF1_start
+ * 					TF2_anchor = TF2_end
+ * 				elif (anchor == 2): # 2 = center             # <<<<<<<<<<<<<<
+ * 					TF1_anchor = (TF1_start + TF1_end) / 2
+ * 					TF2_anchor = (TF2_start + TF2_end) / 2
  */
           break;
-          default: break;
+          default:
+
+          /* "tfcomb/counting.pyx":115
+ * 					TF2_anchor = (TF2_start + TF2_end) / 2
+ * 				else: #0 = inner (default)
+ * 					TF1_anchor = TF1_end             # <<<<<<<<<<<<<<
+ * 					TF2_anchor = TF2_start
+ * 
+ */
+          __pyx_v_TF1_anchor = __pyx_v_TF1_end;
+
+          /* "tfcomb/counting.pyx":116
+ * 				else: #0 = inner (default)
+ * 					TF1_anchor = TF1_end
+ * 					TF2_anchor = TF2_start             # <<<<<<<<<<<<<<
+ * 
+ * 				#Calculate distance between the two sites
+ */
+          __pyx_v_TF2_anchor = __pyx_v_TF2_start;
+          break;
         }
 
+        /* "tfcomb/counting.pyx":119
+ * 
+ * 				#Calculate distance between the two sites
+ * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping             # <<<<<<<<<<<<<<
+ * 				if distance < 0:
+ * 					distance = 0 #cap any negative distances to 0
+ */
+        __pyx_v_distance = (__pyx_v_TF2_anchor - __pyx_v_TF1_anchor);
+
         /* "tfcomb/counting.pyx":120
+ * 				#Calculate distance between the two sites
+ * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+ * 				if distance < 0:             # <<<<<<<<<<<<<<
+ * 					distance = 0 #cap any negative distances to 0
+ * 
+ */
+        __pyx_t_10 = ((__pyx_v_distance < 0) != 0);
+        if (__pyx_t_10) {
+
+          /* "tfcomb/counting.pyx":121
+ * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+ * 				if distance < 0:
+ * 					distance = 0 #cap any negative distances to 0             # <<<<<<<<<<<<<<
  * 
  * 				#Check if sites are valid as co-occurring
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window             # <<<<<<<<<<<<<<
- * 					if distance >= min_distance: #Check that sites are more than min distance away
+ */
+          __pyx_v_distance = 0;
+
+          /* "tfcomb/counting.pyx":120
+ * 				#Calculate distance between the two sites
+ * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+ * 				if distance < 0:             # <<<<<<<<<<<<<<
+ * 					distance = 0 #cap any negative distances to 0
  * 
+ */
+        }
+
+        /* "tfcomb/counting.pyx":125
+ * 				#Check if sites are valid as co-occurring
+ * 				#valid_pair = 0 #initialize as non-valid
+ * 				if (TF1_chr == TF2_chr) and (distance <= max_distance):             # <<<<<<<<<<<<<<
+ * 					if distance >= min_distance: #check that sites are within window; else we stay in finding_assoc and increment j
+ * 						valid_pair = 1
  */
         __pyx_t_16 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
         if (__pyx_t_16) {
@@ -2697,122 +2694,103 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
         __pyx_L12_bool_binop_done:;
         if (__pyx_t_10) {
 
-          /* "tfcomb/counting.pyx":121
- * 				#Check if sites are valid as co-occurring
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
- * 					if distance >= min_distance: #Check that sites are more than min distance away             # <<<<<<<<<<<<<<
+          /* "tfcomb/counting.pyx":126
+ * 				#valid_pair = 0 #initialize as non-valid
+ * 				if (TF1_chr == TF2_chr) and (distance <= max_distance):
+ * 					if distance >= min_distance: #check that sites are within window; else we stay in finding_assoc and increment j             # <<<<<<<<<<<<<<
+ * 						valid_pair = 1
  * 
- * 						# check if they are overlapping more than the threshold
  */
           __pyx_t_10 = ((__pyx_v_distance >= __pyx_v_min_distance) != 0);
           if (__pyx_t_10) {
 
-            /* "tfcomb/counting.pyx":124
- * 
- * 						# check if they are overlapping more than the threshold
+            /* "tfcomb/counting.pyx":127
+ * 				if (TF1_chr == TF2_chr) and (distance <= max_distance):
+ * 					if distance >= min_distance: #check that sites are within window; else we stay in finding_assoc and increment j
  * 						valid_pair = 1             # <<<<<<<<<<<<<<
- * 						if distance == 0:	#distance is 0 if the sites are overlapping or book-ended
  * 
+ * 						#Check if sites overlap more than threshold
  */
             __pyx_v_valid_pair = 1;
 
-            /* "tfcomb/counting.pyx":125
- * 						# check if they are overlapping more than the threshold
- * 						valid_pair = 1
- * 						if distance == 0:	#distance is 0 if the sites are overlapping or book-ended             # <<<<<<<<<<<<<<
+            /* "tfcomb/counting.pyx":130
  * 
- * 							# Get the length of the shorter TF
+ * 						#Check if sites overlap more than threshold
+ * 						short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start]) # Get the length of the shorter TF             # <<<<<<<<<<<<<<
+ * 						overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+ * 						if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
  */
-            __pyx_t_10 = ((__pyx_v_distance == 0) != 0);
+            __pyx_t_13 = (__pyx_v_TF2_end - __pyx_v_TF2_start);
+            __pyx_t_14 = (__pyx_v_TF1_end - __pyx_v_TF1_start);
+            if (((__pyx_t_13 < __pyx_t_14) != 0)) {
+              __pyx_t_15 = __pyx_t_13;
+            } else {
+              __pyx_t_15 = __pyx_t_14;
+            }
+            __pyx_v_short_bp = __pyx_t_15;
+
+            /* "tfcomb/counting.pyx":131
+ * 						#Check if sites overlap more than threshold
+ * 						short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start]) # Get the length of the shorter TF
+ * 						overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found             # <<<<<<<<<<<<<<
+ * 						if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+ * 							overlap_bp = short_bp
+ */
+            __pyx_v_overlap_bp = (__pyx_v_TF1_end - __pyx_v_TF2_start);
+
+            /* "tfcomb/counting.pyx":132
+ * 						short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start]) # Get the length of the shorter TF
+ * 						overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+ * 						if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
+ * 							overlap_bp = short_bp
+ * 
+ */
+            __pyx_t_10 = ((__pyx_v_overlap_bp > __pyx_v_short_bp) != 0);
             if (__pyx_t_10) {
 
-              /* "tfcomb/counting.pyx":128
+              /* "tfcomb/counting.pyx":133
+ * 						overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+ * 						if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+ * 							overlap_bp = short_bp             # <<<<<<<<<<<<<<
  * 
- * 							# Get the length of the shorter TF
- * 							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])             # <<<<<<<<<<<<<<
- * 
- * 							#Calculate overlap between TF1/TF2
+ * 						#Invalid pair if overlap is higher than threshold
  */
-              __pyx_t_13 = (__pyx_v_TF2_end - __pyx_v_TF2_start);
-              __pyx_t_14 = (__pyx_v_TF1_end - __pyx_v_TF1_start);
-              if (((__pyx_t_13 < __pyx_t_14) != 0)) {
-                __pyx_t_15 = __pyx_t_13;
-              } else {
-                __pyx_t_15 = __pyx_t_14;
-              }
-              __pyx_v_short_bp = __pyx_t_15;
-
-              /* "tfcomb/counting.pyx":131
- * 
- * 							#Calculate overlap between TF1/TF2
- * 							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found             # <<<<<<<<<<<<<<
- * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
- * 								overlap_bp = short_bp
- */
-              __pyx_v_overlap_bp = (__pyx_v_TF1_end - __pyx_v_TF2_start);
+              __pyx_v_overlap_bp = __pyx_v_short_bp;
 
               /* "tfcomb/counting.pyx":132
- * 							#Calculate overlap between TF1/TF2
- * 							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
- * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
- * 								overlap_bp = short_bp
+ * 						short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start]) # Get the length of the shorter TF
+ * 						overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+ * 						if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
+ * 							overlap_bp = short_bp
  * 
  */
-              __pyx_t_10 = ((__pyx_v_overlap_bp > __pyx_v_short_bp) != 0);
-              if (__pyx_t_10) {
+            }
 
-                /* "tfcomb/counting.pyx":133
- * 							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
- * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
- * 								overlap_bp = short_bp             # <<<<<<<<<<<<<<
+            /* "tfcomb/counting.pyx":136
  * 
- * 							#Invalid pair, overlap is higher than threshold
- */
-                __pyx_v_overlap_bp = __pyx_v_short_bp;
-
-                /* "tfcomb/counting.pyx":132
- * 							#Calculate overlap between TF1/TF2
- * 							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
- * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
- * 								overlap_bp = short_bp
+ * 						#Invalid pair if overlap is higher than threshold
+ * 						if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
+ * 							valid_pair = 0
  * 
  */
-              }
+            __pyx_t_10 = (((((double)__pyx_v_overlap_bp) / (__pyx_v_short_bp * 1.0)) > __pyx_v_max_overlap) != 0);
+            if (__pyx_t_10) {
 
-              /* "tfcomb/counting.pyx":136
- * 
- * 							#Invalid pair, overlap is higher than threshold
- * 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
- * 								valid_pair = 0
- * 
- */
-              __pyx_t_10 = (((((double)__pyx_v_overlap_bp) / (__pyx_v_short_bp * 1.0)) > __pyx_v_max_overlap) != 0);
-              if (__pyx_t_10) {
-
-                /* "tfcomb/counting.pyx":137
- * 							#Invalid pair, overlap is higher than threshold
- * 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
- * 								valid_pair = 0             # <<<<<<<<<<<<<<
+              /* "tfcomb/counting.pyx":137
+ * 						#Invalid pair if overlap is higher than threshold
+ * 						if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+ * 							valid_pair = 0             # <<<<<<<<<<<<<<
  * 
  * 						#Save counts of association
  */
-                __pyx_v_valid_pair = 0;
+              __pyx_v_valid_pair = 0;
 
-                /* "tfcomb/counting.pyx":136
+              /* "tfcomb/counting.pyx":136
  * 
- * 							#Invalid pair, overlap is higher than threshold
- * 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
- * 								valid_pair = 0
+ * 						#Invalid pair if overlap is higher than threshold
+ * 						if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
+ * 							valid_pair = 0
  * 
- */
-              }
-
-              /* "tfcomb/counting.pyx":125
- * 						# check if they are overlapping more than the threshold
- * 						valid_pair = 1
- * 						if distance == 0:	#distance is 0 if the sites are overlapping or book-ended             # <<<<<<<<<<<<<<
- * 
- * 							# Get the length of the shorter TF
  */
             }
 
@@ -2820,15 +2798,15 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 
  * 						#Save counts of association
  * 						if valid_pair == 1:             # <<<<<<<<<<<<<<
- * 
  * 							TF2_counts[TF2_name] += 1
+ * 							TF2_counts_adjustment[TF2_name] += self_count
  */
             __pyx_t_10 = ((__pyx_v_valid_pair == 1) != 0);
             if (__pyx_t_10) {
 
-              /* "tfcomb/counting.pyx":142
+              /* "tfcomb/counting.pyx":141
+ * 						#Save counts of association
  * 						if valid_pair == 1:
- * 
  * 							TF2_counts[TF2_name] += 1             # <<<<<<<<<<<<<<
  * 							TF2_counts_adjustment[TF2_name] += self_count
  * 
@@ -2836,8 +2814,8 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
               __pyx_t_11 = __pyx_v_TF2_name;
               *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_TF2_counts.diminfo[0].strides) += 1;
 
-              /* "tfcomb/counting.pyx":143
- * 
+              /* "tfcomb/counting.pyx":142
+ * 						if valid_pair == 1:
  * 							TF2_counts[TF2_name] += 1
  * 							TF2_counts_adjustment[TF2_name] += self_count             # <<<<<<<<<<<<<<
  * 
@@ -2846,7 +2824,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
               __pyx_t_11 = __pyx_v_TF2_name;
               *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_TF2_counts_adjustment.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_TF2_counts_adjustment.diminfo[0].strides) += __pyx_v_self_count;
 
-              /* "tfcomb/counting.pyx":146
+              /* "tfcomb/counting.pyx":145
  * 
  * 							#Count TF1 self-counts for adjusting to binary flag
  * 							if binary == 1 and TF1_name == TF2_name:             # <<<<<<<<<<<<<<
@@ -2857,23 +2835,23 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
               if (__pyx_t_16) {
               } else {
                 __pyx_t_10 = __pyx_t_16;
-                goto __pyx_L20_bool_binop_done;
+                goto __pyx_L19_bool_binop_done;
               }
               __pyx_t_16 = ((__pyx_v_TF1_name == __pyx_v_TF2_name) != 0);
               __pyx_t_10 = __pyx_t_16;
-              __pyx_L20_bool_binop_done:;
+              __pyx_L19_bool_binop_done:;
               if (__pyx_t_10) {
 
-                /* "tfcomb/counting.pyx":147
+                /* "tfcomb/counting.pyx":146
  * 							#Count TF1 self-counts for adjusting to binary flag
  * 							if binary == 1 and TF1_name == TF2_name:
  * 								self_count += 1             # <<<<<<<<<<<<<<
  * 
- * 				elif TF1_chr != TF2_chr:
+ * 				elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away
  */
                 __pyx_v_self_count = (__pyx_v_self_count + 1);
 
-                /* "tfcomb/counting.pyx":146
+                /* "tfcomb/counting.pyx":145
  * 
  * 							#Count TF1 self-counts for adjusting to binary flag
  * 							if binary == 1 and TF1_name == TF2_name:             # <<<<<<<<<<<<<<
@@ -2886,80 +2864,59 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 
  * 						#Save counts of association
  * 						if valid_pair == 1:             # <<<<<<<<<<<<<<
- * 
  * 							TF2_counts[TF2_name] += 1
+ * 							TF2_counts_adjustment[TF2_name] += self_count
  */
             }
 
-            /* "tfcomb/counting.pyx":121
- * 				#Check if sites are valid as co-occurring
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
- * 					if distance >= min_distance: #Check that sites are more than min distance away             # <<<<<<<<<<<<<<
+            /* "tfcomb/counting.pyx":126
+ * 				#valid_pair = 0 #initialize as non-valid
+ * 				if (TF1_chr == TF2_chr) and (distance <= max_distance):
+ * 					if distance >= min_distance: #check that sites are within window; else we stay in finding_assoc and increment j             # <<<<<<<<<<<<<<
+ * 						valid_pair = 1
  * 
- * 						# check if they are overlapping more than the threshold
  */
           }
 
-          /* "tfcomb/counting.pyx":120
- * 
+          /* "tfcomb/counting.pyx":125
  * 				#Check if sites are valid as co-occurring
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window             # <<<<<<<<<<<<<<
- * 					if distance >= min_distance: #Check that sites are more than min distance away
- * 
+ * 				#valid_pair = 0 #initialize as non-valid
+ * 				if (TF1_chr == TF2_chr) and (distance <= max_distance):             # <<<<<<<<<<<<<<
+ * 					if distance >= min_distance: #check that sites are within window; else we stay in finding_assoc and increment j
+ * 						valid_pair = 1
  */
           goto __pyx_L11;
         }
 
-        /* "tfcomb/counting.pyx":149
+        /* "tfcomb/counting.pyx":148
  * 								self_count += 1
  * 
- * 				elif TF1_chr != TF2_chr:             # <<<<<<<<<<<<<<
- * 					i += 1
- * 					finding_assoc = False   #break out of finding_assoc-loop
- */
-        __pyx_t_10 = ((__pyx_v_TF1_chr != __pyx_v_TF2_chr) != 0);
-        if (__pyx_t_10) {
-
-          /* "tfcomb/counting.pyx":150
- * 
- * 				elif TF1_chr != TF2_chr:
- * 					i += 1             # <<<<<<<<<<<<<<
- * 					finding_assoc = False   #break out of finding_assoc-loop
- * 
- */
-          __pyx_v_i = (__pyx_v_i + 1);
-
-          /* "tfcomb/counting.pyx":151
- * 				elif TF1_chr != TF2_chr:
- * 					i += 1
- * 					finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
- * 
- * 				else: #This TF2 is on the same chromosome but more than max_distance away
- */
-          __pyx_v_finding_assoc = 0;
-
-          /* "tfcomb/counting.pyx":149
- * 								self_count += 1
- * 
- * 				elif TF1_chr != TF2_chr:             # <<<<<<<<<<<<<<
- * 					i += 1
- * 					finding_assoc = False   #break out of finding_assoc-loop
- */
-          goto __pyx_L11;
-        }
-
-        /* "tfcomb/counting.pyx":156
+ * 				elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away             # <<<<<<<<<<<<<<
  * 
  * 					#Establish if all valid sites were found for TF1
- * 					if anchor == 0:             # <<<<<<<<<<<<<<
+ */
+        __pyx_t_16 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
+        if (__pyx_t_16) {
+        } else {
+          __pyx_t_10 = __pyx_t_16;
+          goto __pyx_L21_bool_binop_done;
+        }
+        __pyx_t_16 = ((__pyx_v_distance > __pyx_v_max_distance) != 0);
+        __pyx_t_10 = __pyx_t_16;
+        __pyx_L21_bool_binop_done:;
+        if (__pyx_t_10) {
+
+          /* "tfcomb/counting.pyx":151
+ * 
+ * 					#Establish if all valid sites were found for TF1
+ * 					if anchor == 0: #inner distance             # <<<<<<<<<<<<<<
  * 
  * 						#The next site is out of inner window range; increment to next i
  */
-        /*else*/ {
           __pyx_t_10 = ((__pyx_v_anchor == 0) != 0);
           if (__pyx_t_10) {
 
-            /* "tfcomb/counting.pyx":159
+            /* "tfcomb/counting.pyx":154
  * 
  * 						#The next site is out of inner window range; increment to next i
  * 						i += 1             # <<<<<<<<<<<<<<
@@ -2968,7 +2925,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
             __pyx_v_i = (__pyx_v_i + 1);
 
-            /* "tfcomb/counting.pyx":160
+            /* "tfcomb/counting.pyx":155
  * 						#The next site is out of inner window range; increment to next i
  * 						i += 1
  * 						finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
@@ -2977,17 +2934,17 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
             __pyx_v_finding_assoc = 0;
 
-            /* "tfcomb/counting.pyx":156
+            /* "tfcomb/counting.pyx":151
  * 
  * 					#Establish if all valid sites were found for TF1
- * 					if anchor == 0:             # <<<<<<<<<<<<<<
+ * 					if anchor == 0: #inner distance             # <<<<<<<<<<<<<<
  * 
  * 						#The next site is out of inner window range; increment to next i
  */
-            goto __pyx_L22;
+            goto __pyx_L23;
           }
 
-          /* "tfcomb/counting.pyx":165
+          /* "tfcomb/counting.pyx":160
  * 
  * 						#Check if it will be possible to find valid pairs in next sites
  * 						if TF2_start > TF1_start + max_distance:             # <<<<<<<<<<<<<<
@@ -2998,7 +2955,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
             __pyx_t_10 = ((__pyx_v_TF2_start > (__pyx_v_TF1_start + __pyx_v_max_distance)) != 0);
             if (__pyx_t_10) {
 
-              /* "tfcomb/counting.pyx":167
+              /* "tfcomb/counting.pyx":162
  * 						if TF2_start > TF1_start + max_distance:
  * 							#no longer possible to find valid pairs for TF1; increment to next i
  * 							i += 1             # <<<<<<<<<<<<<<
@@ -3007,16 +2964,16 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
               __pyx_v_i = (__pyx_v_i + 1);
 
-              /* "tfcomb/counting.pyx":168
+              /* "tfcomb/counting.pyx":163
  * 							#no longer possible to find valid pairs for TF1; increment to next i
  * 							i += 1
  * 							finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
  * 
- * 		## Done finding TF2's for current TF1
+ * 				elif TF1_chr != TF2_chr: #TF2 is on another chromosome
  */
               __pyx_v_finding_assoc = 0;
 
-              /* "tfcomb/counting.pyx":165
+              /* "tfcomb/counting.pyx":160
  * 
  * 						#Check if it will be possible to find valid pairs in next sites
  * 						if TF2_start > TF1_start + max_distance:             # <<<<<<<<<<<<<<
@@ -3025,7 +2982,53 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  */
             }
           }
-          __pyx_L22:;
+          __pyx_L23:;
+
+          /* "tfcomb/counting.pyx":148
+ * 								self_count += 1
+ * 
+ * 				elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away             # <<<<<<<<<<<<<<
+ * 
+ * 					#Establish if all valid sites were found for TF1
+ */
+          goto __pyx_L11;
+        }
+
+        /* "tfcomb/counting.pyx":165
+ * 							finding_assoc = False   #break out of finding_assoc-loop
+ * 
+ * 				elif TF1_chr != TF2_chr: #TF2 is on another chromosome             # <<<<<<<<<<<<<<
+ * 					i += 1
+ * 					finding_assoc = False   #break out of finding_assoc-loop
+ */
+        __pyx_t_10 = ((__pyx_v_TF1_chr != __pyx_v_TF2_chr) != 0);
+        if (__pyx_t_10) {
+
+          /* "tfcomb/counting.pyx":166
+ * 
+ * 				elif TF1_chr != TF2_chr: #TF2 is on another chromosome
+ * 					i += 1             # <<<<<<<<<<<<<<
+ * 					finding_assoc = False   #break out of finding_assoc-loop
+ * 
+ */
+          __pyx_v_i = (__pyx_v_i + 1);
+
+          /* "tfcomb/counting.pyx":167
+ * 				elif TF1_chr != TF2_chr: #TF2 is on another chromosome
+ * 					i += 1
+ * 					finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+          __pyx_v_finding_assoc = 0;
+
+          /* "tfcomb/counting.pyx":165
+ * 							finding_assoc = False   #break out of finding_assoc-loop
+ * 
+ * 				elif TF1_chr != TF2_chr: #TF2 is on another chromosome             # <<<<<<<<<<<<<<
+ * 					i += 1
+ * 					finding_assoc = False   #break out of finding_assoc-loop
+ */
         }
         __pyx_L11:;
       }
@@ -3166,7 +3169,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
  * 
  * 	return((single_count_arr, pair_count_mat))             # <<<<<<<<<<<<<<
  * 
- * 
+ * @cython.cdivision(True)		#no check for zero division
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 190, __pyx_L1_error)
@@ -3224,9 +3227,9 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
   return __pyx_r;
 }
 
-/* "tfcomb/counting.pyx":193
- * 
- * 
+/* "tfcomb/counting.pyx":196
+ * @cython.wraparound(False) 	#dont deal with negative indices
+ * @cython.nonecheck(False)
  * def count_distances(np.ndarray[np.int_t, ndim=2] sites,             # <<<<<<<<<<<<<<
  * 					dict rules,
  * 					int min_distance = 0,
@@ -3234,7 +3237,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_count_co_occurrence(CYTHON_UNUSED Py
 
 /* Python wrapper */
 static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6tfcomb_8counting_2count_distances[] = "\n\tSuperfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction \n\t\n\tParameters:\n\t------------\n\tsites : np.ndarray\n\t\tList of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)\n\t\n\trules :dict\n\t\tdict of pairs (tf1 name, tf2 name):index with tf1 name, tf2 name encoded as int\n\n\tmin_distance : int\n\t\tMinimum allowed distance between two TFs. Default: 0\n\n\tmax_distance : int\n\t\tMaximum allowed distance between two TFs. Default: 100\n\t\n\tmax_overlap (float): \n\t\tmaximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.\n\n\tanchor_mode : short\n\t\tanchor mode to calculate distance with. One of [0,1,2]. \n\t\t0 = inner, 1 = outer, 2 = center. Default: 0\n\n\tReturns:\n\t-----------\n\tdist_count_mat: np.ndarray\n\t\tn x (distance range) matrix. \n\n\n\t";
+static char __pyx_doc_6tfcomb_8counting_2count_distances[] = "\n\tSuperfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction \n\t\n\tParameters:\n\t------------\n\tsites : np.ndarray\n\t\tList of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start)\n\trules :dict\n\t\tdict of pairs (tf1 name, tf2 name): index with tf1 name, tf2 name encoded as int\n\tmin_distance : int\n\t\tMinimum allowed distance between two TFs. Default: 0\n\tmax_distance : int\n\t\tMaximum allowed distance between two TFs. Default: 100\n\tmax_overlap (float): \n\t\tmaximum overlap fraction allowed e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.\n\tanchor_mode : short\n\t\tanchor mode to calculate distance with. One of [0,1,2]. \n\t\t0 = inner, 1 = outer, 2 = center. Default: 0\n\tdirectional : bool\n\t\tWhether to count TF1-TF2 exclusively, or count TF2-TF1 counts for the TF1-TF2 pair. Setting 'False' means TF1-TF2 counts == TF2-TF1 counts, and\n\t\t'True' means distances are only counted in the TF1-TF2 direction. Default: False.\n\n\tReturns:\n\t-----------\n\tdist_count_mat: np.ndarray\n\t\tn x (distance range) matrix. \n\n\n\t";
 static PyMethodDef __pyx_mdef_6tfcomb_8counting_3count_distances = {"count_distances", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6tfcomb_8counting_3count_distances, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6tfcomb_8counting_2count_distances};
 static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_sites = 0;
@@ -3243,6 +3246,7 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_sel
   int __pyx_v_max_distance;
   float __pyx_v_max_overlap;
   short __pyx_v_anchor_mode;
+  int __pyx_v_directional;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3250,12 +3254,14 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_sel
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("count_distances (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_sites,&__pyx_n_s_rules,&__pyx_n_s_min_distance,&__pyx_n_s_max_distance,&__pyx_n_s_max_overlap,&__pyx_n_s_anchor_mode,0};
-    PyObject* values[6] = {0,0,0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_sites,&__pyx_n_s_rules,&__pyx_n_s_min_distance,&__pyx_n_s_max_distance,&__pyx_n_s_max_overlap,&__pyx_n_s_anchor_mode,&__pyx_n_s_directional,0};
+    PyObject* values[7] = {0,0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        CYTHON_FALLTHROUGH;
         case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
         CYTHON_FALLTHROUGH;
         case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
@@ -3280,7 +3286,7 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_sel
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_rules)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("count_distances", 0, 2, 6, 1); __PYX_ERR(0, 193, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("count_distances", 0, 2, 7, 1); __PYX_ERR(0, 196, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
@@ -3306,12 +3312,20 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_sel
           PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_anchor_mode);
           if (value) { values[5] = value; kw_args--; }
         }
+        CYTHON_FALLTHROUGH;
+        case  6:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_directional);
+          if (value) { values[6] = value; kw_args--; }
+        }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "count_distances") < 0)) __PYX_ERR(0, 193, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "count_distances") < 0)) __PYX_ERR(0, 196, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        CYTHON_FALLTHROUGH;
         case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
         CYTHON_FALLTHROUGH;
         case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
@@ -3329,37 +3343,58 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_sel
     __pyx_v_sites = ((PyArrayObject *)values[0]);
     __pyx_v_rules = ((PyObject*)values[1]);
     if (values[2]) {
-      __pyx_v_min_distance = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_min_distance == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 195, __pyx_L3_error)
+      __pyx_v_min_distance = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_min_distance == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 198, __pyx_L3_error)
     } else {
       __pyx_v_min_distance = ((int)0);
     }
     if (values[3]) {
-      __pyx_v_max_distance = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_max_distance == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 196, __pyx_L3_error)
+      __pyx_v_max_distance = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_max_distance == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 199, __pyx_L3_error)
     } else {
       __pyx_v_max_distance = ((int)0x64);
     }
     if (values[4]) {
-      __pyx_v_max_overlap = __pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_max_overlap == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 197, __pyx_L3_error)
+      __pyx_v_max_overlap = __pyx_PyFloat_AsFloat(values[4]); if (unlikely((__pyx_v_max_overlap == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 200, __pyx_L3_error)
     } else {
       __pyx_v_max_overlap = ((float)0.0);
     }
     if (values[5]) {
-      __pyx_v_anchor_mode = __Pyx_PyInt_As_short(values[5]); if (unlikely((__pyx_v_anchor_mode == (short)-1) && PyErr_Occurred())) __PYX_ERR(0, 198, __pyx_L3_error)
+      __pyx_v_anchor_mode = __Pyx_PyInt_As_short(values[5]); if (unlikely((__pyx_v_anchor_mode == (short)-1) && PyErr_Occurred())) __PYX_ERR(0, 201, __pyx_L3_error)
     } else {
       __pyx_v_anchor_mode = ((short)0);
+    }
+    if (values[6]) {
+      __pyx_v_directional = __Pyx_PyObject_IsTrue(values[6]); if (unlikely((__pyx_v_directional == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 202, __pyx_L3_error)
+    } else {
+
+      /* "tfcomb/counting.pyx":202
+ * 					float max_overlap = 0,
+ * 					short anchor_mode = 0,
+ * 					bint directional = False):             # <<<<<<<<<<<<<<
+ * 
+ * 	"""
+ */
+      __pyx_v_directional = ((int)0);
     }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("count_distances", 0, 2, 6, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 193, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("count_distances", 0, 2, 7, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 196, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("tfcomb.counting.count_distances", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sites), __pyx_ptype_5numpy_ndarray, 1, "sites", 0))) __PYX_ERR(0, 193, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_rules), (&PyDict_Type), 1, "rules", 1))) __PYX_ERR(0, 194, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6tfcomb_8counting_2count_distances(__pyx_self, __pyx_v_sites, __pyx_v_rules, __pyx_v_min_distance, __pyx_v_max_distance, __pyx_v_max_overlap, __pyx_v_anchor_mode);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sites), __pyx_ptype_5numpy_ndarray, 1, "sites", 0))) __PYX_ERR(0, 196, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_rules), (&PyDict_Type), 1, "rules", 1))) __PYX_ERR(0, 197, __pyx_L1_error)
+  __pyx_r = __pyx_pf_6tfcomb_8counting_2count_distances(__pyx_self, __pyx_v_sites, __pyx_v_rules, __pyx_v_min_distance, __pyx_v_max_distance, __pyx_v_max_overlap, __pyx_v_anchor_mode, __pyx_v_directional);
+
+  /* "tfcomb/counting.pyx":196
+ * @cython.wraparound(False) 	#dont deal with negative indices
+ * @cython.nonecheck(False)
+ * def count_distances(np.ndarray[np.int_t, ndim=2] sites,             # <<<<<<<<<<<<<<
+ * 					dict rules,
+ * 					int min_distance = 0,
+ */
 
   /* function exit code */
   goto __pyx_L0;
@@ -3370,11 +3405,8 @@ static PyObject *__pyx_pw_6tfcomb_8counting_3count_distances(PyObject *__pyx_sel
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, PyObject *__pyx_v_rules, int __pyx_v_min_distance, int __pyx_v_max_distance, float __pyx_v_max_overlap, short __pyx_v_anchor_mode) {
+static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_sites, PyObject *__pyx_v_rules, int __pyx_v_min_distance, int __pyx_v_max_distance, float __pyx_v_max_overlap, short __pyx_v_anchor_mode, int __pyx_v_directional) {
   int __pyx_v_n_sites;
-  CYTHON_UNUSED PyObject *__pyx_v_pairs = 0;
-  int __pyx_v_offset;
-  PyArrayObject *__pyx_v_dist_count_mat = 0;
   int __pyx_v_i;
   int __pyx_v_j;
   int __pyx_v_finding_assoc;
@@ -3382,20 +3414,23 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
   int __pyx_v_TF1_name;
   int __pyx_v_TF1_start;
   int __pyx_v_TF1_end;
-  int __pyx_v_TF1_anchor;
+  int __pyx_v_TF2_chr;
+  int __pyx_v_TF2_name;
   int __pyx_v_TF2_start;
   int __pyx_v_TF2_end;
+  int __pyx_v_TF1_anchor;
   int __pyx_v_TF2_anchor;
   int __pyx_v_valid_pair;
   int __pyx_v_overlap_bp;
   int __pyx_v_short_bp;
-  int __pyx_v_TF2_chr;
-  int __pyx_v_TF2_name;
   int __pyx_v_distance;
   int __pyx_v_pair_ind;
   int __pyx_v_ind;
+  int __pyx_v_offset;
+  PyArrayObject *__pyx_v_dist_count_mat = 0;
   PyObject *__pyx_v_tf1 = NULL;
   PyObject *__pyx_v_tf2 = NULL;
+  long __pyx_v_dist_ind;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_dist_count_mat;
   __Pyx_Buffer __pyx_pybuffer_dist_count_mat;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_sites;
@@ -3403,23 +3438,23 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   Py_ssize_t __pyx_t_1;
-  PyObject *__pyx_t_2 = NULL;
+  int __pyx_t_2;
   int __pyx_t_3;
   PyObject *__pyx_t_4 = NULL;
   PyObject *__pyx_t_5 = NULL;
   PyObject *__pyx_t_6 = NULL;
-  PyArrayObject *__pyx_t_7 = NULL;
-  Py_ssize_t __pyx_t_8;
-  int __pyx_t_9;
+  PyObject *__pyx_t_7 = NULL;
+  PyArrayObject *__pyx_t_8 = NULL;
+  Py_ssize_t __pyx_t_9;
   int __pyx_t_10;
-  PyObject *__pyx_t_11 = NULL;
-  PyObject *(*__pyx_t_12)(PyObject *);
-  __pyx_t_5numpy_int64_t __pyx_t_13;
-  Py_ssize_t __pyx_t_14;
+  int __pyx_t_11;
+  PyObject *__pyx_t_12 = NULL;
+  PyObject *(*__pyx_t_13)(PyObject *);
+  __pyx_t_5numpy_int64_t __pyx_t_14;
   Py_ssize_t __pyx_t_15;
-  int __pyx_t_16;
+  Py_ssize_t __pyx_t_16;
   int __pyx_t_17;
-  double __pyx_t_18;
+  int __pyx_t_18;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3434,154 +3469,49 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
   __pyx_pybuffernd_sites.rcbuffer = &__pyx_pybuffer_sites;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sites.rcbuffer->pybuffer, (PyObject*)__pyx_v_sites, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 193, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sites.rcbuffer->pybuffer, (PyObject*)__pyx_v_sites, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 196, __pyx_L1_error)
   }
   __pyx_pybuffernd_sites.diminfo[0].strides = __pyx_pybuffernd_sites.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_sites.diminfo[0].shape = __pyx_pybuffernd_sites.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_sites.diminfo[1].strides = __pyx_pybuffernd_sites.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_sites.diminfo[1].shape = __pyx_pybuffernd_sites.rcbuffer->pybuffer.shape[1];
 
-  /* "tfcomb/counting.pyx":232
- * 	"""
+  /* "tfcomb/counting.pyx":235
  * 
+ * 	#Intialize cython vars
  * 	cdef int n_sites = len(sites)             # <<<<<<<<<<<<<<
- * 
- * 	cdef list pairs = list()
+ * 	cdef int i = 0
+ * 	cdef int j = 0
  */
-  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_sites)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 232, __pyx_L1_error)
+  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_sites)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 235, __pyx_L1_error)
   __pyx_v_n_sites = __pyx_t_1;
 
-  /* "tfcomb/counting.pyx":234
- * 	cdef int n_sites = len(sites)
- * 
- * 	cdef list pairs = list()             # <<<<<<<<<<<<<<
- * 	cdef np.ndarray[np.int64_t, ndim=1] rule
- * 	cdef int offset = 3
- */
-  __pyx_t_2 = PyList_New(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 234, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_v_pairs = ((PyObject*)__pyx_t_2);
-  __pyx_t_2 = 0;
-
   /* "tfcomb/counting.pyx":236
- * 	cdef list pairs = list()
- * 	cdef np.ndarray[np.int64_t, ndim=1] rule
- * 	cdef int offset = 3             # <<<<<<<<<<<<<<
- * 
- * 	# include negative counting
- */
-  __pyx_v_offset = 3;
-
-  /* "tfcomb/counting.pyx":239
- * 
- * 	# include negative counting
- * 	if min_distance == 0:             # <<<<<<<<<<<<<<
- * 		offset += 1
- * 	#Create n x distance range matrix || +3 for 2 tf names + 1-off
- */
-  __pyx_t_3 = ((__pyx_v_min_distance == 0) != 0);
-  if (__pyx_t_3) {
-
-    /* "tfcomb/counting.pyx":240
- * 	# include negative counting
- * 	if min_distance == 0:
- * 		offset += 1             # <<<<<<<<<<<<<<
- * 	#Create n x distance range matrix || +3 for 2 tf names + 1-off
- * 	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset+(max_distance-min_distance)), dtype=int)
- */
-    __pyx_v_offset = (__pyx_v_offset + 1);
-
-    /* "tfcomb/counting.pyx":239
- * 
- * 	# include negative counting
- * 	if min_distance == 0:             # <<<<<<<<<<<<<<
- * 		offset += 1
- * 	#Create n x distance range matrix || +3 for 2 tf names + 1-off
- */
-  }
-
-  /* "tfcomb/counting.pyx":242
- * 		offset += 1
- * 	#Create n x distance range matrix || +3 for 2 tf names + 1-off
- * 	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset+(max_distance-min_distance)), dtype=int)             # <<<<<<<<<<<<<<
- * 
- * 	cdef int i = 0
- */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_4);
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(__pyx_v_rules == Py_None)) {
-    PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
-    __PYX_ERR(0, 242, __pyx_L1_error)
-  }
-  __pyx_t_1 = PyDict_Size(__pyx_v_rules); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 242, __pyx_L1_error)
-  __pyx_t_2 = PyInt_FromSsize_t(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_5 = __Pyx_PyInt_From_int((__pyx_v_offset + (__pyx_v_max_distance - __pyx_v_min_distance))); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_GIVEREF(__pyx_t_2);
-  PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_2);
-  __Pyx_GIVEREF(__pyx_t_5);
-  PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_5);
-  __pyx_t_2 = 0;
-  __pyx_t_5 = 0;
-  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GIVEREF(__pyx_t_6);
-  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_6);
-  __pyx_t_6 = 0;
-  __pyx_t_6 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  if (PyDict_SetItem(__pyx_t_6, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 242, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_4, __pyx_t_5, __pyx_t_6); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 242, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  if (!(likely(((__pyx_t_2) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_2, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 242, __pyx_L1_error)
-  __pyx_t_7 = ((PyArrayObject *)__pyx_t_2);
-  {
-    __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer, (PyObject*)__pyx_t_7, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack) == -1)) {
-      __pyx_v_dist_count_mat = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 242, __pyx_L1_error)
-    } else {__pyx_pybuffernd_dist_count_mat.diminfo[0].strides = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_dist_count_mat.diminfo[0].shape = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_dist_count_mat.diminfo[1].strides = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_dist_count_mat.diminfo[1].shape = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.shape[1];
-    }
-  }
-  __pyx_t_7 = 0;
-  __pyx_v_dist_count_mat = ((PyArrayObject *)__pyx_t_2);
-  __pyx_t_2 = 0;
-
-  /* "tfcomb/counting.pyx":244
- * 	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset+(max_distance-min_distance)), dtype=int)
- * 
+ * 	#Intialize cython vars
+ * 	cdef int n_sites = len(sites)
  * 	cdef int i = 0             # <<<<<<<<<<<<<<
  * 	cdef int j = 0
  * 	cdef bint finding_assoc = True
  */
   __pyx_v_i = 0;
 
-  /* "tfcomb/counting.pyx":245
- * 
+  /* "tfcomb/counting.pyx":237
+ * 	cdef int n_sites = len(sites)
  * 	cdef int i = 0
  * 	cdef int j = 0             # <<<<<<<<<<<<<<
  * 	cdef bint finding_assoc = True
- * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, TF1_anchor
+ * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end
  */
   __pyx_v_j = 0;
 
-  /* "tfcomb/counting.pyx":246
+  /* "tfcomb/counting.pyx":238
  * 	cdef int i = 0
  * 	cdef int j = 0
  * 	cdef bint finding_assoc = True             # <<<<<<<<<<<<<<
- * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end, TF1_anchor
- * 	cdef int TF2_start, TF2_end, TF2_anchor, valid_pair, overlap_bp, short_bp
+ * 	cdef int TF1_chr, TF1_name, TF1_start, TF1_end
+ * 	cdef int TF2_chr, TF2_name, TF2_start, TF2_end
  */
   __pyx_v_finding_assoc = 1;
 
-  /* "tfcomb/counting.pyx":251
- * 	cdef int TF2_chr, TF2_name
+  /* "tfcomb/counting.pyx":245
+ * 
  * 	cdef int distance
  * 	cdef int pair_ind = 0             # <<<<<<<<<<<<<<
  * 	cdef int ind = 0
@@ -3589,257 +3519,280 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
  */
   __pyx_v_pair_ind = 0;
 
-  /* "tfcomb/counting.pyx":252
+  /* "tfcomb/counting.pyx":246
  * 	cdef int distance
  * 	cdef int pair_ind = 0
  * 	cdef int ind = 0             # <<<<<<<<<<<<<<
  * 
- * 	# initialize tfnames
+ * 	#Count all negative distances as "-1"
  */
   __pyx_v_ind = 0;
 
-  /* "tfcomb/counting.pyx":255
+  /* "tfcomb/counting.pyx":249
+ * 
+ * 	#Count all negative distances as "-1"
+ * 	if min_distance == 0 and max_overlap > 0:             # <<<<<<<<<<<<<<
+ * 		min_distance = -1
+ * 
+ */
+  __pyx_t_3 = ((__pyx_v_min_distance == 0) != 0);
+  if (__pyx_t_3) {
+  } else {
+    __pyx_t_2 = __pyx_t_3;
+    goto __pyx_L4_bool_binop_done;
+  }
+  __pyx_t_3 = ((__pyx_v_max_overlap > 0.0) != 0);
+  __pyx_t_2 = __pyx_t_3;
+  __pyx_L4_bool_binop_done:;
+  if (__pyx_t_2) {
+
+    /* "tfcomb/counting.pyx":250
+ * 	#Count all negative distances as "-1"
+ * 	if min_distance == 0 and max_overlap > 0:
+ * 		min_distance = -1             # <<<<<<<<<<<<<<
+ * 
+ * 	#Create rule x distance range matrix || +3 for 2 tf names + 1-off
+ */
+    __pyx_v_min_distance = -1;
+
+    /* "tfcomb/counting.pyx":249
+ * 
+ * 	#Count all negative distances as "-1"
+ * 	if min_distance == 0 and max_overlap > 0:             # <<<<<<<<<<<<<<
+ * 		min_distance = -1
+ * 
+ */
+  }
+
+  /* "tfcomb/counting.pyx":253
+ * 
+ * 	#Create rule x distance range matrix || +3 for 2 tf names + 1-off
+ * 	cdef int offset = 3             # <<<<<<<<<<<<<<
+ * 	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset + (max_distance-min_distance)), dtype=int)
+ * 
+ */
+  __pyx_v_offset = 3;
+
+  /* "tfcomb/counting.pyx":254
+ * 	#Create rule x distance range matrix || +3 for 2 tf names + 1-off
+ * 	cdef int offset = 3
+ * 	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((len(rules), offset + (max_distance-min_distance)), dtype=int)             # <<<<<<<<<<<<<<
  * 
  * 	# initialize tfnames
- * 	for tf1,tf2 in rules:             # <<<<<<<<<<<<<<
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_zeros); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  if (unlikely(__pyx_v_rules == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
+    __PYX_ERR(0, 254, __pyx_L1_error)
+  }
+  __pyx_t_1 = PyDict_Size(__pyx_v_rules); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 254, __pyx_L1_error)
+  __pyx_t_4 = PyInt_FromSsize_t(__pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_6 = __Pyx_PyInt_From_int((__pyx_v_offset + (__pyx_v_max_distance - __pyx_v_min_distance))); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
+  __pyx_t_7 = PyTuple_New(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_7);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyTuple_SET_ITEM(__pyx_t_7, 0, __pyx_t_4);
+  __Pyx_GIVEREF(__pyx_t_6);
+  PyTuple_SET_ITEM(__pyx_t_7, 1, __pyx_t_6);
+  __pyx_t_4 = 0;
+  __pyx_t_6 = 0;
+  __pyx_t_6 = PyTuple_New(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
+  __Pyx_GIVEREF(__pyx_t_7);
+  PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_7);
+  __pyx_t_7 = 0;
+  __pyx_t_7 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_7);
+  if (PyDict_SetItem(__pyx_t_7, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 254, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_5, __pyx_t_6, __pyx_t_7); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 254, __pyx_L1_error)
+  __pyx_t_8 = ((PyArrayObject *)__pyx_t_4);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 2, 0, __pyx_stack) == -1)) {
+      __pyx_v_dist_count_mat = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 254, __pyx_L1_error)
+    } else {__pyx_pybuffernd_dist_count_mat.diminfo[0].strides = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_dist_count_mat.diminfo[0].shape = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_dist_count_mat.diminfo[1].strides = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_dist_count_mat.diminfo[1].shape = __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.shape[1];
+    }
+  }
+  __pyx_t_8 = 0;
+  __pyx_v_dist_count_mat = ((PyArrayObject *)__pyx_t_4);
+  __pyx_t_4 = 0;
+
+  /* "tfcomb/counting.pyx":257
+ * 
+ * 	# initialize tfnames
+ * 	for tf1, tf2 in rules:             # <<<<<<<<<<<<<<
  * 		dist_count_mat[ind, 0] = tf1
  * 		dist_count_mat[ind, 1] = tf2
  */
   __pyx_t_1 = 0;
   if (unlikely(__pyx_v_rules == Py_None)) {
     PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
-    __PYX_ERR(0, 255, __pyx_L1_error)
+    __PYX_ERR(0, 257, __pyx_L1_error)
   }
-  __pyx_t_6 = __Pyx_dict_iterator(__pyx_v_rules, 1, ((PyObject *)NULL), (&__pyx_t_8), (&__pyx_t_9)); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 255, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_6);
-  __Pyx_XDECREF(__pyx_t_2);
-  __pyx_t_2 = __pyx_t_6;
-  __pyx_t_6 = 0;
+  __pyx_t_7 = __Pyx_dict_iterator(__pyx_v_rules, 1, ((PyObject *)NULL), (&__pyx_t_9), (&__pyx_t_10)); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 257, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_7);
+  __Pyx_XDECREF(__pyx_t_4);
+  __pyx_t_4 = __pyx_t_7;
+  __pyx_t_7 = 0;
   while (1) {
-    __pyx_t_10 = __Pyx_dict_iter_next(__pyx_t_2, __pyx_t_8, &__pyx_t_1, &__pyx_t_6, NULL, NULL, __pyx_t_9);
-    if (unlikely(__pyx_t_10 == 0)) break;
-    if (unlikely(__pyx_t_10 == -1)) __PYX_ERR(0, 255, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_6);
-    if ((likely(PyTuple_CheckExact(__pyx_t_6))) || (PyList_CheckExact(__pyx_t_6))) {
-      PyObject* sequence = __pyx_t_6;
+    __pyx_t_11 = __Pyx_dict_iter_next(__pyx_t_4, __pyx_t_9, &__pyx_t_1, &__pyx_t_7, NULL, NULL, __pyx_t_10);
+    if (unlikely(__pyx_t_11 == 0)) break;
+    if (unlikely(__pyx_t_11 == -1)) __PYX_ERR(0, 257, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
+    if ((likely(PyTuple_CheckExact(__pyx_t_7))) || (PyList_CheckExact(__pyx_t_7))) {
+      PyObject* sequence = __pyx_t_7;
       Py_ssize_t size = __Pyx_PySequence_SIZE(sequence);
       if (unlikely(size != 2)) {
         if (size > 2) __Pyx_RaiseTooManyValuesError(2);
         else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-        __PYX_ERR(0, 255, __pyx_L1_error)
+        __PYX_ERR(0, 257, __pyx_L1_error)
       }
       #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
       if (likely(PyTuple_CheckExact(sequence))) {
-        __pyx_t_5 = PyTuple_GET_ITEM(sequence, 0); 
-        __pyx_t_4 = PyTuple_GET_ITEM(sequence, 1); 
+        __pyx_t_6 = PyTuple_GET_ITEM(sequence, 0); 
+        __pyx_t_5 = PyTuple_GET_ITEM(sequence, 1); 
       } else {
-        __pyx_t_5 = PyList_GET_ITEM(sequence, 0); 
-        __pyx_t_4 = PyList_GET_ITEM(sequence, 1); 
+        __pyx_t_6 = PyList_GET_ITEM(sequence, 0); 
+        __pyx_t_5 = PyList_GET_ITEM(sequence, 1); 
       }
+      __Pyx_INCREF(__pyx_t_6);
       __Pyx_INCREF(__pyx_t_5);
-      __Pyx_INCREF(__pyx_t_4);
       #else
-      __pyx_t_5 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 255, __pyx_L1_error)
+      __pyx_t_6 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 257, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+      __pyx_t_5 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 257, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
-      __pyx_t_4 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 255, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_4);
       #endif
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     } else {
       Py_ssize_t index = -1;
-      __pyx_t_11 = PyObject_GetIter(__pyx_t_6); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 255, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_11);
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      __pyx_t_12 = Py_TYPE(__pyx_t_11)->tp_iternext;
-      index = 0; __pyx_t_5 = __pyx_t_12(__pyx_t_11); if (unlikely(!__pyx_t_5)) goto __pyx_L6_unpacking_failed;
+      __pyx_t_12 = PyObject_GetIter(__pyx_t_7); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 257, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_12);
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      __pyx_t_13 = Py_TYPE(__pyx_t_12)->tp_iternext;
+      index = 0; __pyx_t_6 = __pyx_t_13(__pyx_t_12); if (unlikely(!__pyx_t_6)) goto __pyx_L8_unpacking_failed;
+      __Pyx_GOTREF(__pyx_t_6);
+      index = 1; __pyx_t_5 = __pyx_t_13(__pyx_t_12); if (unlikely(!__pyx_t_5)) goto __pyx_L8_unpacking_failed;
       __Pyx_GOTREF(__pyx_t_5);
-      index = 1; __pyx_t_4 = __pyx_t_12(__pyx_t_11); if (unlikely(!__pyx_t_4)) goto __pyx_L6_unpacking_failed;
-      __Pyx_GOTREF(__pyx_t_4);
-      if (__Pyx_IternextUnpackEndCheck(__pyx_t_12(__pyx_t_11), 2) < 0) __PYX_ERR(0, 255, __pyx_L1_error)
-      __pyx_t_12 = NULL;
-      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-      goto __pyx_L7_unpacking_done;
-      __pyx_L6_unpacking_failed:;
-      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-      __pyx_t_12 = NULL;
+      if (__Pyx_IternextUnpackEndCheck(__pyx_t_13(__pyx_t_12), 2) < 0) __PYX_ERR(0, 257, __pyx_L1_error)
+      __pyx_t_13 = NULL;
+      __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
+      goto __pyx_L9_unpacking_done;
+      __pyx_L8_unpacking_failed:;
+      __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
+      __pyx_t_13 = NULL;
       if (__Pyx_IterFinish() == 0) __Pyx_RaiseNeedMoreValuesError(index);
-      __PYX_ERR(0, 255, __pyx_L1_error)
-      __pyx_L7_unpacking_done:;
+      __PYX_ERR(0, 257, __pyx_L1_error)
+      __pyx_L9_unpacking_done:;
     }
-    __Pyx_XDECREF_SET(__pyx_v_tf1, __pyx_t_5);
+    __Pyx_XDECREF_SET(__pyx_v_tf1, __pyx_t_6);
+    __pyx_t_6 = 0;
+    __Pyx_XDECREF_SET(__pyx_v_tf2, __pyx_t_5);
     __pyx_t_5 = 0;
-    __Pyx_XDECREF_SET(__pyx_v_tf2, __pyx_t_4);
-    __pyx_t_4 = 0;
 
-    /* "tfcomb/counting.pyx":256
+    /* "tfcomb/counting.pyx":258
  * 	# initialize tfnames
- * 	for tf1,tf2 in rules:
+ * 	for tf1, tf2 in rules:
  * 		dist_count_mat[ind, 0] = tf1             # <<<<<<<<<<<<<<
  * 		dist_count_mat[ind, 1] = tf2
  * 		ind += 1
  */
-    __pyx_t_13 = __Pyx_PyInt_As_npy_int64(__pyx_v_tf1); if (unlikely((__pyx_t_13 == ((npy_int64)-1)) && PyErr_Occurred())) __PYX_ERR(0, 256, __pyx_L1_error)
-    __pyx_t_14 = __pyx_v_ind;
-    __pyx_t_15 = 0;
-    __pyx_t_10 = -1;
-    if (__pyx_t_14 < 0) {
-      __pyx_t_14 += __pyx_pybuffernd_dist_count_mat.diminfo[0].shape;
-      if (unlikely(__pyx_t_14 < 0)) __pyx_t_10 = 0;
-    } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_dist_count_mat.diminfo[0].shape)) __pyx_t_10 = 0;
-    if (__pyx_t_15 < 0) {
-      __pyx_t_15 += __pyx_pybuffernd_dist_count_mat.diminfo[1].shape;
-      if (unlikely(__pyx_t_15 < 0)) __pyx_t_10 = 1;
-    } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_dist_count_mat.diminfo[1].shape)) __pyx_t_10 = 1;
-    if (unlikely(__pyx_t_10 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_10);
-      __PYX_ERR(0, 256, __pyx_L1_error)
-    }
-    *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) = __pyx_t_13;
+    __pyx_t_14 = __Pyx_PyInt_As_npy_int64(__pyx_v_tf1); if (unlikely((__pyx_t_14 == ((npy_int64)-1)) && PyErr_Occurred())) __PYX_ERR(0, 258, __pyx_L1_error)
+    __pyx_t_15 = __pyx_v_ind;
+    __pyx_t_16 = 0;
+    *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) = __pyx_t_14;
 
-    /* "tfcomb/counting.pyx":257
- * 	for tf1,tf2 in rules:
+    /* "tfcomb/counting.pyx":259
+ * 	for tf1, tf2 in rules:
  * 		dist_count_mat[ind, 0] = tf1
  * 		dist_count_mat[ind, 1] = tf2             # <<<<<<<<<<<<<<
  * 		ind += 1
- * 	#Loop over all sites
+ * 
  */
-    __pyx_t_13 = __Pyx_PyInt_As_npy_int64(__pyx_v_tf2); if (unlikely((__pyx_t_13 == ((npy_int64)-1)) && PyErr_Occurred())) __PYX_ERR(0, 257, __pyx_L1_error)
-    __pyx_t_15 = __pyx_v_ind;
-    __pyx_t_14 = 1;
-    __pyx_t_10 = -1;
-    if (__pyx_t_15 < 0) {
-      __pyx_t_15 += __pyx_pybuffernd_dist_count_mat.diminfo[0].shape;
-      if (unlikely(__pyx_t_15 < 0)) __pyx_t_10 = 0;
-    } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_dist_count_mat.diminfo[0].shape)) __pyx_t_10 = 0;
-    if (__pyx_t_14 < 0) {
-      __pyx_t_14 += __pyx_pybuffernd_dist_count_mat.diminfo[1].shape;
-      if (unlikely(__pyx_t_14 < 0)) __pyx_t_10 = 1;
-    } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_dist_count_mat.diminfo[1].shape)) __pyx_t_10 = 1;
-    if (unlikely(__pyx_t_10 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_10);
-      __PYX_ERR(0, 257, __pyx_L1_error)
-    }
-    *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) = __pyx_t_13;
+    __pyx_t_14 = __Pyx_PyInt_As_npy_int64(__pyx_v_tf2); if (unlikely((__pyx_t_14 == ((npy_int64)-1)) && PyErr_Occurred())) __PYX_ERR(0, 259, __pyx_L1_error)
+    __pyx_t_16 = __pyx_v_ind;
+    __pyx_t_15 = 1;
+    *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) = __pyx_t_14;
 
-    /* "tfcomb/counting.pyx":258
+    /* "tfcomb/counting.pyx":260
  * 		dist_count_mat[ind, 0] = tf1
  * 		dist_count_mat[ind, 1] = tf2
  * 		ind += 1             # <<<<<<<<<<<<<<
+ * 
  * 	#Loop over all sites
- * 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
  */
     __pyx_v_ind = (__pyx_v_ind + 1);
   }
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "tfcomb/counting.pyx":260
- * 		ind += 1
+  /* "tfcomb/counting.pyx":263
+ * 
  * 	#Loop over all sites
  * 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites             # <<<<<<<<<<<<<<
  * 		#Get current TF information
  * 		TF1_chr = sites[i,0]
  */
   while (1) {
-    __pyx_t_3 = ((__pyx_v_i < __pyx_v_n_sites) != 0);
-    if (!__pyx_t_3) break;
+    __pyx_t_2 = ((__pyx_v_i < __pyx_v_n_sites) != 0);
+    if (!__pyx_t_2) break;
 
-    /* "tfcomb/counting.pyx":262
+    /* "tfcomb/counting.pyx":265
  * 	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
  * 		#Get current TF information
  * 		TF1_chr = sites[i,0]             # <<<<<<<<<<<<<<
  * 		TF1_start = sites[i,1]
  * 		TF1_end = sites[i,2]
  */
-    __pyx_t_14 = __pyx_v_i;
-    __pyx_t_15 = 0;
-    __pyx_t_9 = -1;
-    if (__pyx_t_14 < 0) {
-      __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[0].shape;
-      if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 0;
-    } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-    if (__pyx_t_15 < 0) {
-      __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[1].shape;
-      if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 1;
-    } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-    if (unlikely(__pyx_t_9 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_9);
-      __PYX_ERR(0, 262, __pyx_L1_error)
-    }
-    __pyx_v_TF1_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_15 = __pyx_v_i;
+    __pyx_t_16 = 0;
+    __pyx_v_TF1_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":263
+    /* "tfcomb/counting.pyx":266
  * 		#Get current TF information
  * 		TF1_chr = sites[i,0]
  * 		TF1_start = sites[i,1]             # <<<<<<<<<<<<<<
  * 		TF1_end = sites[i,2]
  * 		TF1_name = sites[i,3]
  */
-    __pyx_t_15 = __pyx_v_i;
-    __pyx_t_14 = 1;
-    __pyx_t_9 = -1;
-    if (__pyx_t_15 < 0) {
-      __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[0].shape;
-      if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 0;
-    } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-    if (__pyx_t_14 < 0) {
-      __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[1].shape;
-      if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 1;
-    } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-    if (unlikely(__pyx_t_9 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_9);
-      __PYX_ERR(0, 263, __pyx_L1_error)
-    }
-    __pyx_v_TF1_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_16 = __pyx_v_i;
+    __pyx_t_15 = 1;
+    __pyx_v_TF1_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":264
+    /* "tfcomb/counting.pyx":267
  * 		TF1_chr = sites[i,0]
  * 		TF1_start = sites[i,1]
  * 		TF1_end = sites[i,2]             # <<<<<<<<<<<<<<
  * 		TF1_name = sites[i,3]
  * 
  */
-    __pyx_t_14 = __pyx_v_i;
-    __pyx_t_15 = 2;
-    __pyx_t_9 = -1;
-    if (__pyx_t_14 < 0) {
-      __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[0].shape;
-      if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 0;
-    } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-    if (__pyx_t_15 < 0) {
-      __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[1].shape;
-      if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 1;
-    } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-    if (unlikely(__pyx_t_9 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_9);
-      __PYX_ERR(0, 264, __pyx_L1_error)
-    }
-    __pyx_v_TF1_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_15 = __pyx_v_i;
+    __pyx_t_16 = 2;
+    __pyx_v_TF1_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":265
+    /* "tfcomb/counting.pyx":268
  * 		TF1_start = sites[i,1]
  * 		TF1_end = sites[i,2]
  * 		TF1_name = sites[i,3]             # <<<<<<<<<<<<<<
  * 
  * 		#Find possible associations with TF1 within window
  */
-    __pyx_t_15 = __pyx_v_i;
-    __pyx_t_14 = 3;
-    __pyx_t_9 = -1;
-    if (__pyx_t_15 < 0) {
-      __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[0].shape;
-      if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 0;
-    } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-    if (__pyx_t_14 < 0) {
-      __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[1].shape;
-      if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 1;
-    } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-    if (unlikely(__pyx_t_9 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_9);
-      __PYX_ERR(0, 265, __pyx_L1_error)
-    }
-    __pyx_v_TF1_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[1].strides));
+    __pyx_t_16 = __pyx_v_i;
+    __pyx_t_15 = 3;
+    __pyx_v_TF1_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-    /* "tfcomb/counting.pyx":268
+    /* "tfcomb/counting.pyx":271
  * 
  * 		#Find possible associations with TF1 within window
  * 		finding_assoc = True             # <<<<<<<<<<<<<<
@@ -3848,28 +3801,28 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
  */
     __pyx_v_finding_assoc = 1;
 
-    /* "tfcomb/counting.pyx":269
+    /* "tfcomb/counting.pyx":272
  * 		#Find possible associations with TF1 within window
  * 		finding_assoc = True
  * 		j = 0             # <<<<<<<<<<<<<<
  * 		while finding_assoc == True:
- * 			#Next site relative to TF1
+ * 
  */
     __pyx_v_j = 0;
 
-    /* "tfcomb/counting.pyx":270
+    /* "tfcomb/counting.pyx":273
  * 		finding_assoc = True
  * 		j = 0
  * 		while finding_assoc == True:             # <<<<<<<<<<<<<<
+ * 
  * 			#Next site relative to TF1
- * 			j += 1
  */
     while (1) {
-      __pyx_t_3 = ((__pyx_v_finding_assoc == 1) != 0);
-      if (!__pyx_t_3) break;
+      __pyx_t_2 = ((__pyx_v_finding_assoc == 1) != 0);
+      if (!__pyx_t_2) break;
 
-      /* "tfcomb/counting.pyx":272
- * 		while finding_assoc == True:
+      /* "tfcomb/counting.pyx":276
+ * 
  * 			#Next site relative to TF1
  * 			j += 1             # <<<<<<<<<<<<<<
  * 			if j+i >= n_sites: #j+i index site is beyond end of list, increment i
@@ -3877,17 +3830,17 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
  */
       __pyx_v_j = (__pyx_v_j + 1);
 
-      /* "tfcomb/counting.pyx":273
+      /* "tfcomb/counting.pyx":277
  * 			#Next site relative to TF1
  * 			j += 1
  * 			if j+i >= n_sites: #j+i index site is beyond end of list, increment i             # <<<<<<<<<<<<<<
  * 				i += 1
  * 				finding_assoc = False #break out of finding_assoc
  */
-      __pyx_t_3 = (((__pyx_v_j + __pyx_v_i) >= __pyx_v_n_sites) != 0);
-      if (__pyx_t_3) {
+      __pyx_t_2 = (((__pyx_v_j + __pyx_v_i) >= __pyx_v_n_sites) != 0);
+      if (__pyx_t_2) {
 
-        /* "tfcomb/counting.pyx":274
+        /* "tfcomb/counting.pyx":278
  * 			j += 1
  * 			if j+i >= n_sites: #j+i index site is beyond end of list, increment i
  * 				i += 1             # <<<<<<<<<<<<<<
@@ -3896,7 +3849,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
  */
         __pyx_v_i = (__pyx_v_i + 1);
 
-        /* "tfcomb/counting.pyx":275
+        /* "tfcomb/counting.pyx":279
  * 			if j+i >= n_sites: #j+i index site is beyond end of list, increment i
  * 				i += 1
  * 				finding_assoc = False #break out of finding_assoc             # <<<<<<<<<<<<<<
@@ -3905,17 +3858,17 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
  */
         __pyx_v_finding_assoc = 0;
 
-        /* "tfcomb/counting.pyx":273
+        /* "tfcomb/counting.pyx":277
  * 			#Next site relative to TF1
  * 			j += 1
  * 			if j+i >= n_sites: #j+i index site is beyond end of list, increment i             # <<<<<<<<<<<<<<
  * 				i += 1
  * 				finding_assoc = False #break out of finding_assoc
  */
-        goto __pyx_L12;
+        goto __pyx_L14;
       }
 
-      /* "tfcomb/counting.pyx":280
+      /* "tfcomb/counting.pyx":284
  * 
  * 				#Fetch information on TF2-site
  * 				TF2_chr = sites[i+j,0]             # <<<<<<<<<<<<<<
@@ -3923,655 +3876,719 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
  * 				TF2_end = sites[i+j,2]
  */
       /*else*/ {
-        __pyx_t_14 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_15 = 0;
-        __pyx_t_9 = -1;
-        if (__pyx_t_14 < 0) {
-          __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[0].shape;
-          if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 0;
-        } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-        if (__pyx_t_15 < 0) {
-          __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[1].shape;
-          if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 1;
-        } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-        if (unlikely(__pyx_t_9 != -1)) {
-          __Pyx_RaiseBufferIndexError(__pyx_t_9);
-          __PYX_ERR(0, 280, __pyx_L1_error)
-        }
-        __pyx_v_TF2_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_15 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_16 = 0;
+        __pyx_v_TF2_chr = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":281
+        /* "tfcomb/counting.pyx":285
  * 				#Fetch information on TF2-site
  * 				TF2_chr = sites[i+j,0]
  * 				TF2_start = sites[i+j,1]             # <<<<<<<<<<<<<<
  * 				TF2_end = sites[i+j,2]
  * 				TF2_name = sites[i+j,3]
  */
-        __pyx_t_15 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_14 = 1;
-        __pyx_t_9 = -1;
-        if (__pyx_t_15 < 0) {
-          __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[0].shape;
-          if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 0;
-        } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-        if (__pyx_t_14 < 0) {
-          __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[1].shape;
-          if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 1;
-        } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-        if (unlikely(__pyx_t_9 != -1)) {
-          __Pyx_RaiseBufferIndexError(__pyx_t_9);
-          __PYX_ERR(0, 281, __pyx_L1_error)
-        }
-        __pyx_v_TF2_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_16 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_15 = 1;
+        __pyx_v_TF2_start = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":282
+        /* "tfcomb/counting.pyx":286
  * 				TF2_chr = sites[i+j,0]
  * 				TF2_start = sites[i+j,1]
  * 				TF2_end = sites[i+j,2]             # <<<<<<<<<<<<<<
  * 				TF2_name = sites[i+j,3]
  * 
  */
-        __pyx_t_14 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_15 = 2;
-        __pyx_t_9 = -1;
-        if (__pyx_t_14 < 0) {
-          __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[0].shape;
-          if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 0;
-        } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-        if (__pyx_t_15 < 0) {
-          __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[1].shape;
-          if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 1;
-        } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-        if (unlikely(__pyx_t_9 != -1)) {
-          __Pyx_RaiseBufferIndexError(__pyx_t_9);
-          __PYX_ERR(0, 282, __pyx_L1_error)
-        }
-        __pyx_v_TF2_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
+        __pyx_t_15 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_16 = 2;
+        __pyx_v_TF2_end = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[1].strides));
 
-        /* "tfcomb/counting.pyx":283
+        /* "tfcomb/counting.pyx":287
  * 				TF2_start = sites[i+j,1]
  * 				TF2_end = sites[i+j,2]
  * 				TF2_name = sites[i+j,3]             # <<<<<<<<<<<<<<
  * 
- * 				# Check anchor mode
+ * 				#Check if TF1_name,TF2_name is a target rule; otherwise, do not count
  */
-        __pyx_t_15 = (__pyx_v_i + __pyx_v_j);
-        __pyx_t_14 = 3;
-        __pyx_t_9 = -1;
-        if (__pyx_t_15 < 0) {
-          __pyx_t_15 += __pyx_pybuffernd_sites.diminfo[0].shape;
-          if (unlikely(__pyx_t_15 < 0)) __pyx_t_9 = 0;
-        } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_sites.diminfo[0].shape)) __pyx_t_9 = 0;
-        if (__pyx_t_14 < 0) {
-          __pyx_t_14 += __pyx_pybuffernd_sites.diminfo[1].shape;
-          if (unlikely(__pyx_t_14 < 0)) __pyx_t_9 = 1;
-        } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_sites.diminfo[1].shape)) __pyx_t_9 = 1;
-        if (unlikely(__pyx_t_9 != -1)) {
-          __Pyx_RaiseBufferIndexError(__pyx_t_9);
-          __PYX_ERR(0, 283, __pyx_L1_error)
+        __pyx_t_16 = (__pyx_v_i + __pyx_v_j);
+        __pyx_t_15 = 3;
+        __pyx_v_TF2_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[1].strides));
+
+        /* "tfcomb/counting.pyx":290
+ * 
+ * 				#Check if TF1_name,TF2_name is a target rule; otherwise, do not count
+ * 				if (TF1_name, TF2_name) in rules or (TF2_name, TF1_name) in rules: #count both TF1-TF2 and TF2-TF1 directions             # <<<<<<<<<<<<<<
+ * 
+ * 					# Check anchor mode
+ */
+        __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_4);
+        __pyx_t_7 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_7);
+        __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        __Pyx_GIVEREF(__pyx_t_4);
+        PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_4);
+        __Pyx_GIVEREF(__pyx_t_7);
+        PyTuple_SET_ITEM(__pyx_t_5, 1, __pyx_t_7);
+        __pyx_t_4 = 0;
+        __pyx_t_7 = 0;
+        if (unlikely(__pyx_v_rules == Py_None)) {
+          PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
+          __PYX_ERR(0, 290, __pyx_L1_error)
         }
-        __pyx_v_TF2_name = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int_t *, __pyx_pybuffernd_sites.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_sites.diminfo[0].strides, __pyx_t_14, __pyx_pybuffernd_sites.diminfo[1].strides));
-
-        /* "tfcomb/counting.pyx":287
- * 				# Check anchor mode
- *     			# 1 = outer
- * 				if (anchor_mode == 1):             # <<<<<<<<<<<<<<
- * 					TF1_anchor = TF1_start
- * 					TF2_anchor = TF2_end
- */
-        switch (__pyx_v_anchor_mode) {
-          case 1:
-
-          /* "tfcomb/counting.pyx":288
- *     			# 1 = outer
- * 				if (anchor_mode == 1):
- * 					TF1_anchor = TF1_start             # <<<<<<<<<<<<<<
- * 					TF2_anchor = TF2_end
- * 				# 2 = center
- */
-          __pyx_v_TF1_anchor = __pyx_v_TF1_start;
-
-          /* "tfcomb/counting.pyx":289
- * 				if (anchor_mode == 1):
- * 					TF1_anchor = TF1_start
- * 					TF2_anchor = TF2_end             # <<<<<<<<<<<<<<
- * 				# 2 = center
- * 				elif (anchor_mode == 2):
- */
-          __pyx_v_TF2_anchor = __pyx_v_TF2_end;
-
-          /* "tfcomb/counting.pyx":287
- * 				# Check anchor mode
- *     			# 1 = outer
- * 				if (anchor_mode == 1):             # <<<<<<<<<<<<<<
- * 					TF1_anchor = TF1_start
- * 					TF2_anchor = TF2_end
- */
-          break;
-          case 2:
-
-          /* "tfcomb/counting.pyx":292
- * 				# 2 = center
- * 				elif (anchor_mode == 2):
- * 					TF1_anchor = int(np.ceil((TF1_end + TF1_start) / 2))             # <<<<<<<<<<<<<<
- * 					TF2_anchor = int(np.ceil((TF2_end + TF2_start) / 2))
- * 				# 0 = inner (default)
- */
-          __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_n_s_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 292, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_6);
-          __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_ceil); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 292, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_4);
-          __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-          __pyx_t_6 = PyFloat_FromDouble((((double)(__pyx_v_TF1_end + __pyx_v_TF1_start)) / 2.0)); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 292, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_6);
-          __pyx_t_5 = NULL;
-          if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_4))) {
-            __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_4);
-            if (likely(__pyx_t_5)) {
-              PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_4);
-              __Pyx_INCREF(__pyx_t_5);
-              __Pyx_INCREF(function);
-              __Pyx_DECREF_SET(__pyx_t_4, function);
-            }
-          }
-          __pyx_t_2 = (__pyx_t_5) ? __Pyx_PyObject_Call2Args(__pyx_t_4, __pyx_t_5, __pyx_t_6) : __Pyx_PyObject_CallOneArg(__pyx_t_4, __pyx_t_6);
-          __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-          __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-          if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 292, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_2);
-          __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-          __pyx_t_4 = __Pyx_PyNumber_Int(__pyx_t_2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 292, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_4);
-          __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-          __pyx_t_9 = __Pyx_PyInt_As_int(__pyx_t_4); if (unlikely((__pyx_t_9 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 292, __pyx_L1_error)
-          __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-          __pyx_v_TF1_anchor = __pyx_t_9;
+        __pyx_t_3 = (__Pyx_PyDict_ContainsTF(__pyx_t_5, __pyx_v_rules, Py_EQ)); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+        __pyx_t_17 = (__pyx_t_3 != 0);
+        if (!__pyx_t_17) {
+        } else {
+          __pyx_t_2 = __pyx_t_17;
+          goto __pyx_L16_bool_binop_done;
+        }
+        __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        __pyx_t_7 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_7);
+        __pyx_t_4 = PyTuple_New(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_4);
+        __Pyx_GIVEREF(__pyx_t_5);
+        PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_5);
+        __Pyx_GIVEREF(__pyx_t_7);
+        PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_7);
+        __pyx_t_5 = 0;
+        __pyx_t_7 = 0;
+        if (unlikely(__pyx_v_rules == Py_None)) {
+          PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
+          __PYX_ERR(0, 290, __pyx_L1_error)
+        }
+        __pyx_t_17 = (__Pyx_PyDict_ContainsTF(__pyx_t_4, __pyx_v_rules, Py_EQ)); if (unlikely(__pyx_t_17 < 0)) __PYX_ERR(0, 290, __pyx_L1_error)
+        __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+        __pyx_t_3 = (__pyx_t_17 != 0);
+        __pyx_t_2 = __pyx_t_3;
+        __pyx_L16_bool_binop_done:;
+        if (__pyx_t_2) {
 
           /* "tfcomb/counting.pyx":293
- * 				elif (anchor_mode == 2):
- * 					TF1_anchor = int(np.ceil((TF1_end + TF1_start) / 2))
- * 					TF2_anchor = int(np.ceil((TF2_end + TF2_start) / 2))             # <<<<<<<<<<<<<<
- * 				# 0 = inner (default)
- * 				else:
+ * 
+ * 					# Check anchor mode
+ * 					if (anchor_mode == 1): # 1 = outer             # <<<<<<<<<<<<<<
+ * 						TF1_anchor = TF1_start
+ * 						TF2_anchor = TF2_end
  */
-          __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 293, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_2);
-          __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_ceil); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 293, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_6);
-          __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-          __pyx_t_2 = PyFloat_FromDouble((((double)(__pyx_v_TF2_end + __pyx_v_TF2_start)) / 2.0)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 293, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_2);
-          __pyx_t_5 = NULL;
-          if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_6))) {
-            __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_6);
-            if (likely(__pyx_t_5)) {
-              PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_6);
-              __Pyx_INCREF(__pyx_t_5);
-              __Pyx_INCREF(function);
-              __Pyx_DECREF_SET(__pyx_t_6, function);
-            }
+          switch (__pyx_v_anchor_mode) {
+            case 1:
+
+            /* "tfcomb/counting.pyx":294
+ * 					# Check anchor mode
+ * 					if (anchor_mode == 1): # 1 = outer
+ * 						TF1_anchor = TF1_start             # <<<<<<<<<<<<<<
+ * 						TF2_anchor = TF2_end
+ * 					elif (anchor_mode == 2): # 2 = center
+ */
+            __pyx_v_TF1_anchor = __pyx_v_TF1_start;
+
+            /* "tfcomb/counting.pyx":295
+ * 					if (anchor_mode == 1): # 1 = outer
+ * 						TF1_anchor = TF1_start
+ * 						TF2_anchor = TF2_end             # <<<<<<<<<<<<<<
+ * 					elif (anchor_mode == 2): # 2 = center
+ * 						TF1_anchor = (TF1_start + TF1_end) / 2
+ */
+            __pyx_v_TF2_anchor = __pyx_v_TF2_end;
+
+            /* "tfcomb/counting.pyx":293
+ * 
+ * 					# Check anchor mode
+ * 					if (anchor_mode == 1): # 1 = outer             # <<<<<<<<<<<<<<
+ * 						TF1_anchor = TF1_start
+ * 						TF2_anchor = TF2_end
+ */
+            break;
+            case 2:
+
+            /* "tfcomb/counting.pyx":297
+ * 						TF2_anchor = TF2_end
+ * 					elif (anchor_mode == 2): # 2 = center
+ * 						TF1_anchor = (TF1_start + TF1_end) / 2             # <<<<<<<<<<<<<<
+ * 						TF2_anchor = (TF2_start + TF2_end) / 2
+ * 					else: # 0 = inner (default)
+ */
+            __pyx_v_TF1_anchor = (((long)(__pyx_v_TF1_start + __pyx_v_TF1_end)) / 2);
+
+            /* "tfcomb/counting.pyx":298
+ * 					elif (anchor_mode == 2): # 2 = center
+ * 						TF1_anchor = (TF1_start + TF1_end) / 2
+ * 						TF2_anchor = (TF2_start + TF2_end) / 2             # <<<<<<<<<<<<<<
+ * 					else: # 0 = inner (default)
+ * 						TF1_anchor = TF1_end
+ */
+            __pyx_v_TF2_anchor = (((long)(__pyx_v_TF2_start + __pyx_v_TF2_end)) / 2);
+
+            /* "tfcomb/counting.pyx":296
+ * 						TF1_anchor = TF1_start
+ * 						TF2_anchor = TF2_end
+ * 					elif (anchor_mode == 2): # 2 = center             # <<<<<<<<<<<<<<
+ * 						TF1_anchor = (TF1_start + TF1_end) / 2
+ * 						TF2_anchor = (TF2_start + TF2_end) / 2
+ */
+            break;
+            default:
+
+            /* "tfcomb/counting.pyx":300
+ * 						TF2_anchor = (TF2_start + TF2_end) / 2
+ * 					else: # 0 = inner (default)
+ * 						TF1_anchor = TF1_end             # <<<<<<<<<<<<<<
+ * 						TF2_anchor = TF2_start
+ * 
+ */
+            __pyx_v_TF1_anchor = __pyx_v_TF1_end;
+
+            /* "tfcomb/counting.pyx":301
+ * 					else: # 0 = inner (default)
+ * 						TF1_anchor = TF1_end
+ * 						TF2_anchor = TF2_start             # <<<<<<<<<<<<<<
+ * 
+ * 					#Calculate distance between the two sites
+ */
+            __pyx_v_TF2_anchor = __pyx_v_TF2_start;
+            break;
           }
-          __pyx_t_4 = (__pyx_t_5) ? __Pyx_PyObject_Call2Args(__pyx_t_6, __pyx_t_5, __pyx_t_2) : __Pyx_PyObject_CallOneArg(__pyx_t_6, __pyx_t_2);
-          __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-          __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-          if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 293, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_4);
-          __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-          __pyx_t_6 = __Pyx_PyNumber_Int(__pyx_t_4); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 293, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_6);
-          __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-          __pyx_t_9 = __Pyx_PyInt_As_int(__pyx_t_6); if (unlikely((__pyx_t_9 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 293, __pyx_L1_error)
-          __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-          __pyx_v_TF2_anchor = __pyx_t_9;
 
-          /* "tfcomb/counting.pyx":291
- * 					TF2_anchor = TF2_end
- * 				# 2 = center
- * 				elif (anchor_mode == 2):             # <<<<<<<<<<<<<<
- * 					TF1_anchor = int(np.ceil((TF1_end + TF1_start) / 2))
- * 					TF2_anchor = int(np.ceil((TF2_end + TF2_start) / 2))
- */
-          break;
-          default:
-
-          /* "tfcomb/counting.pyx":296
- * 				# 0 = inner (default)
- * 				else:
- * 					TF1_anchor = TF1_end             # <<<<<<<<<<<<<<
- * 					TF2_anchor = TF2_start
+          /* "tfcomb/counting.pyx":304
  * 
+ * 					#Calculate distance between the two sites
+ * 					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping             # <<<<<<<<<<<<<<
+ * 					if distance < 0:
+ * 						distance = -1 #cap any negative distances to -1
  */
-          __pyx_v_TF1_anchor = __pyx_v_TF1_end;
-
-          /* "tfcomb/counting.pyx":297
- * 				else:
- * 					TF1_anchor = TF1_end
- * 					TF2_anchor = TF2_start             # <<<<<<<<<<<<<<
- * 
- * 				#Calculate distance between the two sites
- */
-          __pyx_v_TF2_anchor = __pyx_v_TF2_start;
-          break;
-        }
-
-        /* "tfcomb/counting.pyx":300
- * 
- * 				#Calculate distance between the two sites
- * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping             # <<<<<<<<<<<<<<
- * 				if distance < 0:
- * 					distance = 0
- */
-        __pyx_v_distance = (__pyx_v_TF2_anchor - __pyx_v_TF1_anchor);
-
-        /* "tfcomb/counting.pyx":301
- * 				#Calculate distance between the two sites
- * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 				if distance < 0:             # <<<<<<<<<<<<<<
- * 					distance = 0
- * 
- */
-        __pyx_t_3 = ((__pyx_v_distance < 0) != 0);
-        if (__pyx_t_3) {
-
-          /* "tfcomb/counting.pyx":302
- * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 				if distance < 0:
- * 					distance = 0             # <<<<<<<<<<<<<<
- * 
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
- */
-          __pyx_v_distance = 0;
-
-          /* "tfcomb/counting.pyx":301
- * 				#Calculate distance between the two sites
- * 				distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
- * 				if distance < 0:             # <<<<<<<<<<<<<<
- * 					distance = 0
- * 
- */
-        }
-
-        /* "tfcomb/counting.pyx":304
- * 					distance = 0
- * 
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window             # <<<<<<<<<<<<<<
- * 					if distance >= min_distance: #Check that sites are more than min distance away
- * 						valid_pair = 0
- */
-        __pyx_t_16 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
-        if (__pyx_t_16) {
-        } else {
-          __pyx_t_3 = __pyx_t_16;
-          goto __pyx_L15_bool_binop_done;
-        }
-        __pyx_t_16 = ((__pyx_v_distance <= __pyx_v_max_distance) != 0);
-        __pyx_t_3 = __pyx_t_16;
-        __pyx_L15_bool_binop_done:;
-        if (__pyx_t_3) {
+          __pyx_v_distance = (__pyx_v_TF2_anchor - __pyx_v_TF1_anchor);
 
           /* "tfcomb/counting.pyx":305
+ * 					#Calculate distance between the two sites
+ * 					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+ * 					if distance < 0:             # <<<<<<<<<<<<<<
+ * 						distance = -1 #cap any negative distances to -1
  * 
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
- * 					if distance >= min_distance: #Check that sites are more than min distance away             # <<<<<<<<<<<<<<
- * 						valid_pair = 0
- * 						pair_ind = -1
  */
-          __pyx_t_3 = ((__pyx_v_distance >= __pyx_v_min_distance) != 0);
-          if (__pyx_t_3) {
+          __pyx_t_2 = ((__pyx_v_distance < 0) != 0);
+          if (__pyx_t_2) {
 
             /* "tfcomb/counting.pyx":306
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
- * 					if distance >= min_distance: #Check that sites are more than min distance away
- * 						valid_pair = 0             # <<<<<<<<<<<<<<
- * 						pair_ind = -1
+ * 					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+ * 					if distance < 0:
+ * 						distance = -1 #cap any negative distances to -1             # <<<<<<<<<<<<<<
  * 
+ * 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
  */
-            __pyx_v_valid_pair = 0;
+            __pyx_v_distance = -1;
 
-            /* "tfcomb/counting.pyx":307
- * 					if distance >= min_distance: #Check that sites are more than min distance away
- * 						valid_pair = 0
- * 						pair_ind = -1             # <<<<<<<<<<<<<<
+            /* "tfcomb/counting.pyx":305
+ * 					#Calculate distance between the two sites
+ * 					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+ * 					if distance < 0:             # <<<<<<<<<<<<<<
+ * 						distance = -1 #cap any negative distances to -1
  * 
- * 						if (TF1_name,TF2_name) in rules:
  */
-            __pyx_v_pair_ind = -1;
+          }
+
+          /* "tfcomb/counting.pyx":308
+ * 						distance = -1 #cap any negative distances to -1
+ * 
+ * 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window             # <<<<<<<<<<<<<<
+ * 						if distance >= min_distance: #Check that sites are more than min distance away; else stay in finding_assoc
+ * 							valid_pair = 1 #so-far, the pair is valid
+ */
+          __pyx_t_3 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
+          if (__pyx_t_3) {
+          } else {
+            __pyx_t_2 = __pyx_t_3;
+            goto __pyx_L20_bool_binop_done;
+          }
+          __pyx_t_3 = ((__pyx_v_distance <= __pyx_v_max_distance) != 0);
+          __pyx_t_2 = __pyx_t_3;
+          __pyx_L20_bool_binop_done:;
+          if (__pyx_t_2) {
 
             /* "tfcomb/counting.pyx":309
- * 						pair_ind = -1
  * 
- * 						if (TF1_name,TF2_name) in rules:             # <<<<<<<<<<<<<<
- * 							valid_pair = 1
- * 							pair_ind = rules[(TF1_name,TF2_name)]
+ * 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
+ * 						if distance >= min_distance: #Check that sites are more than min distance away; else stay in finding_assoc             # <<<<<<<<<<<<<<
+ * 							valid_pair = 1 #so-far, the pair is valid
+ * 
  */
-            __pyx_t_6 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 309, __pyx_L1_error)
-            __Pyx_GOTREF(__pyx_t_6);
-            __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 309, __pyx_L1_error)
-            __Pyx_GOTREF(__pyx_t_4);
-            __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 309, __pyx_L1_error)
-            __Pyx_GOTREF(__pyx_t_2);
-            __Pyx_GIVEREF(__pyx_t_6);
-            PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_6);
-            __Pyx_GIVEREF(__pyx_t_4);
-            PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_t_4);
-            __pyx_t_6 = 0;
-            __pyx_t_4 = 0;
-            if (unlikely(__pyx_v_rules == Py_None)) {
-              PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
-              __PYX_ERR(0, 309, __pyx_L1_error)
-            }
-            __pyx_t_3 = (__Pyx_PyDict_ContainsTF(__pyx_t_2, __pyx_v_rules, Py_EQ)); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 309, __pyx_L1_error)
-            __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-            __pyx_t_16 = (__pyx_t_3 != 0);
-            if (__pyx_t_16) {
+            __pyx_t_2 = ((__pyx_v_distance >= __pyx_v_min_distance) != 0);
+            if (__pyx_t_2) {
 
               /* "tfcomb/counting.pyx":310
+ * 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
+ * 						if distance >= min_distance: #Check that sites are more than min distance away; else stay in finding_assoc
+ * 							valid_pair = 1 #so-far, the pair is valid             # <<<<<<<<<<<<<<
  * 
- * 						if (TF1_name,TF2_name) in rules:
- * 							valid_pair = 1             # <<<<<<<<<<<<<<
- * 							pair_ind = rules[(TF1_name,TF2_name)]
- * 
+ * 							#Calculate potential overlap between TF1/TF2
  */
               __pyx_v_valid_pair = 1;
 
-              /* "tfcomb/counting.pyx":311
- * 						if (TF1_name,TF2_name) in rules:
- * 							valid_pair = 1
- * 							pair_ind = rules[(TF1_name,TF2_name)]             # <<<<<<<<<<<<<<
- * 
- * 							if distance == 0:	#distance is 0 if the sites are overlapping or book-ended
- */
-              if (unlikely(__pyx_v_rules == Py_None)) {
-                PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-                __PYX_ERR(0, 311, __pyx_L1_error)
-              }
-              __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 311, __pyx_L1_error)
-              __Pyx_GOTREF(__pyx_t_2);
-              __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 311, __pyx_L1_error)
-              __Pyx_GOTREF(__pyx_t_4);
-              __pyx_t_6 = PyTuple_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 311, __pyx_L1_error)
-              __Pyx_GOTREF(__pyx_t_6);
-              __Pyx_GIVEREF(__pyx_t_2);
-              PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_t_2);
-              __Pyx_GIVEREF(__pyx_t_4);
-              PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_t_4);
-              __pyx_t_2 = 0;
-              __pyx_t_4 = 0;
-              __pyx_t_4 = __Pyx_PyDict_GetItem(__pyx_v_rules, __pyx_t_6); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 311, __pyx_L1_error)
-              __Pyx_GOTREF(__pyx_t_4);
-              __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-              __pyx_t_9 = __Pyx_PyInt_As_int(__pyx_t_4); if (unlikely((__pyx_t_9 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 311, __pyx_L1_error)
-              __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-              __pyx_v_pair_ind = __pyx_t_9;
-
               /* "tfcomb/counting.pyx":313
- * 							pair_ind = rules[(TF1_name,TF2_name)]
  * 
- * 							if distance == 0:	#distance is 0 if the sites are overlapping or book-ended             # <<<<<<<<<<<<<<
+ * 							#Calculate potential overlap between TF1/TF2
+ * 							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])             # <<<<<<<<<<<<<<
  * 
- * 								# Get the length of the shorter TF
+ * 							#Calculate overlap between TF1/TF2
  */
-              __pyx_t_16 = ((__pyx_v_distance == 0) != 0);
-              if (__pyx_t_16) {
+              __pyx_t_10 = (__pyx_v_TF2_end - __pyx_v_TF2_start);
+              __pyx_t_11 = (__pyx_v_TF1_end - __pyx_v_TF1_start);
+              if (((__pyx_t_10 < __pyx_t_11) != 0)) {
+                __pyx_t_18 = __pyx_t_10;
+              } else {
+                __pyx_t_18 = __pyx_t_11;
+              }
+              __pyx_v_short_bp = __pyx_t_18;
 
-                /* "tfcomb/counting.pyx":316
+              /* "tfcomb/counting.pyx":316
  * 
- * 								# Get the length of the shorter TF
- * 								short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])             # <<<<<<<<<<<<<<
- * 
- * 								#Calculate overlap between TF1/TF2
+ * 							#Calculate overlap between TF1/TF2
+ * 							overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found             # <<<<<<<<<<<<<<
+ * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+ * 								overlap_bp = short_bp
  */
-                __pyx_t_9 = (__pyx_v_TF2_end - __pyx_v_TF2_start);
-                __pyx_t_10 = (__pyx_v_TF1_end - __pyx_v_TF1_start);
-                if (((__pyx_t_9 < __pyx_t_10) != 0)) {
-                  __pyx_t_17 = __pyx_t_9;
-                } else {
-                  __pyx_t_17 = __pyx_t_10;
-                }
-                __pyx_v_short_bp = __pyx_t_17;
+              __pyx_v_overlap_bp = (__pyx_v_TF1_anchor - __pyx_v_TF2_anchor);
 
-                /* "tfcomb/counting.pyx":319
+              /* "tfcomb/counting.pyx":317
+ * 							#Calculate overlap between TF1/TF2
+ * 							overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
+ * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
+ * 								overlap_bp = short_bp
  * 
- * 								#Calculate overlap between TF1/TF2
- * 								overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found             # <<<<<<<<<<<<<<
- * 								if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
- * 									overlap_bp = short_bp
  */
-                __pyx_v_overlap_bp = (__pyx_v_TF1_anchor - __pyx_v_TF2_anchor);
+              __pyx_t_2 = ((__pyx_v_overlap_bp > __pyx_v_short_bp) != 0);
+              if (__pyx_t_2) {
 
-                /* "tfcomb/counting.pyx":320
- * 								#Calculate overlap between TF1/TF2
- * 								overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
- * 								if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
- * 									overlap_bp = short_bp
+                /* "tfcomb/counting.pyx":318
+ * 							overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
+ * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+ * 								overlap_bp = short_bp             # <<<<<<<<<<<<<<
  * 
+ * 							#Invalid pair, overlap is higher than threshold
  */
-                __pyx_t_16 = ((__pyx_v_overlap_bp > __pyx_v_short_bp) != 0);
-                if (__pyx_t_16) {
+                __pyx_v_overlap_bp = __pyx_v_short_bp;
 
-                  /* "tfcomb/counting.pyx":321
- * 								overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
- * 								if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
- * 									overlap_bp = short_bp             # <<<<<<<<<<<<<<
+                /* "tfcomb/counting.pyx":317
+ * 							#Calculate overlap between TF1/TF2
+ * 							overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
+ * 							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
+ * 								overlap_bp = short_bp
  * 
- * 								#Invalid pair, overlap is higher than threshold
  */
-                  __pyx_v_overlap_bp = __pyx_v_short_bp;
+              }
 
-                  /* "tfcomb/counting.pyx":320
- * 								#Calculate overlap between TF1/TF2
- * 								overlap_bp = TF1_anchor - TF2_anchor #will be negative if no overlap is found
- * 								if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)             # <<<<<<<<<<<<<<
- * 									overlap_bp = short_bp
+              /* "tfcomb/counting.pyx":321
+ * 
+ * 							#Invalid pair, overlap is higher than threshold
+ * 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
+ * 								valid_pair = 0
  * 
  */
-                }
+              __pyx_t_2 = (((((double)__pyx_v_overlap_bp) / (__pyx_v_short_bp * 1.0)) > __pyx_v_max_overlap) != 0);
+              if (__pyx_t_2) {
 
-                /* "tfcomb/counting.pyx":324
+                /* "tfcomb/counting.pyx":322
+ * 							#Invalid pair, overlap is higher than threshold
+ * 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+ * 								valid_pair = 0             # <<<<<<<<<<<<<<
  * 
- * 								#Invalid pair, overlap is higher than threshold
- * 								if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
- * 
- * 									valid_pair = 0
+ * 							#Save counts of association
  */
-                __pyx_t_18 = (__pyx_v_short_bp * 1.0);
-                if (unlikely(__pyx_t_18 == 0)) {
-                  PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-                  __PYX_ERR(0, 324, __pyx_L1_error)
-                }
-                __pyx_t_16 = (((((double)__pyx_v_overlap_bp) / __pyx_t_18) > __pyx_v_max_overlap) != 0);
-                if (__pyx_t_16) {
+                __pyx_v_valid_pair = 0;
 
-                  /* "tfcomb/counting.pyx":326
- * 								if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+                /* "tfcomb/counting.pyx":321
  * 
- * 									valid_pair = 0             # <<<<<<<<<<<<<<
+ * 							#Invalid pair, overlap is higher than threshold
+ * 							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
+ * 								valid_pair = 0
  * 
- * 								if TF2_anchor - TF1_anchor <= -1:
  */
-                  __pyx_v_valid_pair = 0;
+              }
 
-                  /* "tfcomb/counting.pyx":324
+              /* "tfcomb/counting.pyx":325
  * 
- * 								#Invalid pair, overlap is higher than threshold
- * 								if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False             # <<<<<<<<<<<<<<
+ * 							#Save counts of association
+ * 							if valid_pair == 1:             # <<<<<<<<<<<<<<
  * 
- * 									valid_pair = 0
+ * 								#Add counts for the observed TF1-TF2
  */
-                }
+              __pyx_t_2 = ((__pyx_v_valid_pair == 1) != 0);
+              if (__pyx_t_2) {
 
                 /* "tfcomb/counting.pyx":328
- * 									valid_pair = 0
  * 
- * 								if TF2_anchor - TF1_anchor <= -1:             # <<<<<<<<<<<<<<
- * 									distance = -1
- * 
+ * 								#Add counts for the observed TF1-TF2
+ * 								if (TF1_name, TF2_name) in rules:             # <<<<<<<<<<<<<<
+ * 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat
+ * 									dist_ind = offset + distance - min_distance - 1
  */
-                __pyx_t_16 = (((__pyx_v_TF2_anchor - __pyx_v_TF1_anchor) <= -1L) != 0);
-                if (__pyx_t_16) {
+                __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 328, __pyx_L1_error)
+                __Pyx_GOTREF(__pyx_t_4);
+                __pyx_t_7 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 328, __pyx_L1_error)
+                __Pyx_GOTREF(__pyx_t_7);
+                __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 328, __pyx_L1_error)
+                __Pyx_GOTREF(__pyx_t_5);
+                __Pyx_GIVEREF(__pyx_t_4);
+                PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_4);
+                __Pyx_GIVEREF(__pyx_t_7);
+                PyTuple_SET_ITEM(__pyx_t_5, 1, __pyx_t_7);
+                __pyx_t_4 = 0;
+                __pyx_t_7 = 0;
+                if (unlikely(__pyx_v_rules == Py_None)) {
+                  PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
+                  __PYX_ERR(0, 328, __pyx_L1_error)
+                }
+                __pyx_t_2 = (__Pyx_PyDict_ContainsTF(__pyx_t_5, __pyx_v_rules, Py_EQ)); if (unlikely(__pyx_t_2 < 0)) __PYX_ERR(0, 328, __pyx_L1_error)
+                __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+                __pyx_t_3 = (__pyx_t_2 != 0);
+                if (__pyx_t_3) {
 
                   /* "tfcomb/counting.pyx":329
- * 
- * 								if TF2_anchor - TF1_anchor <= -1:
- * 									distance = -1             # <<<<<<<<<<<<<<
- * 
+ * 								#Add counts for the observed TF1-TF2
+ * 								if (TF1_name, TF2_name) in rules:
+ * 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat             # <<<<<<<<<<<<<<
+ * 									dist_ind = offset + distance - min_distance - 1
+ * 									dist_count_mat[pair_ind, dist_ind] += 1
+ */
+                  if (unlikely(__pyx_v_rules == Py_None)) {
+                    PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+                    __PYX_ERR(0, 329, __pyx_L1_error)
+                  }
+                  __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 329, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_5);
+                  __pyx_t_7 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 329, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_7);
+                  __pyx_t_4 = PyTuple_New(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 329, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_4);
+                  __Pyx_GIVEREF(__pyx_t_5);
+                  PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_5);
+                  __Pyx_GIVEREF(__pyx_t_7);
+                  PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_7);
+                  __pyx_t_5 = 0;
+                  __pyx_t_7 = 0;
+                  __pyx_t_7 = __Pyx_PyDict_GetItem(__pyx_v_rules, __pyx_t_4); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 329, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_7);
+                  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+                  __pyx_t_18 = __Pyx_PyInt_As_int(__pyx_t_7); if (unlikely((__pyx_t_18 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 329, __pyx_L1_error)
+                  __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+                  __pyx_v_pair_ind = __pyx_t_18;
+
+                  /* "tfcomb/counting.pyx":330
+ * 								if (TF1_name, TF2_name) in rules:
+ * 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat
+ * 									dist_ind = offset + distance - min_distance - 1             # <<<<<<<<<<<<<<
+ * 									dist_count_mat[pair_ind, dist_ind] += 1
  * 
  */
-                  __pyx_v_distance = -1;
+                  __pyx_v_dist_ind = (((__pyx_v_offset + __pyx_v_distance) - __pyx_v_min_distance) - 1);
+
+                  /* "tfcomb/counting.pyx":331
+ * 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat
+ * 									dist_ind = offset + distance - min_distance - 1
+ * 									dist_count_mat[pair_ind, dist_ind] += 1             # <<<<<<<<<<<<<<
+ * 
+ * 								#Also add counts to TF2-TF1 if not directional
+ */
+                  __pyx_t_15 = __pyx_v_pair_ind;
+                  __pyx_t_16 = __pyx_v_dist_ind;
+                  *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_16, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) += 1;
 
                   /* "tfcomb/counting.pyx":328
- * 									valid_pair = 0
  * 
- * 								if TF2_anchor - TF1_anchor <= -1:             # <<<<<<<<<<<<<<
- * 									distance = -1
+ * 								#Add counts for the observed TF1-TF2
+ * 								if (TF1_name, TF2_name) in rules:             # <<<<<<<<<<<<<<
+ * 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat
+ * 									dist_ind = offset + distance - min_distance - 1
+ */
+                }
+
+                /* "tfcomb/counting.pyx":334
+ * 
+ * 								#Also add counts to TF2-TF1 if not directional
+ * 								if directional == False and TF1_name != TF2_name: #do not add extra counts for TF-self-pairs             # <<<<<<<<<<<<<<
+ * 									if (TF2_name, TF1_name) in rules:
+ * 
+ */
+                __pyx_t_2 = ((__pyx_v_directional == 0) != 0);
+                if (__pyx_t_2) {
+                } else {
+                  __pyx_t_3 = __pyx_t_2;
+                  goto __pyx_L28_bool_binop_done;
+                }
+                __pyx_t_2 = ((__pyx_v_TF1_name != __pyx_v_TF2_name) != 0);
+                __pyx_t_3 = __pyx_t_2;
+                __pyx_L28_bool_binop_done:;
+                if (__pyx_t_3) {
+
+                  /* "tfcomb/counting.pyx":335
+ * 								#Also add counts to TF2-TF1 if not directional
+ * 								if directional == False and TF1_name != TF2_name: #do not add extra counts for TF-self-pairs
+ * 									if (TF2_name, TF1_name) in rules:             # <<<<<<<<<<<<<<
+ * 
+ * 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat
+ */
+                  __pyx_t_7 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 335, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_7);
+                  __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 335, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_4);
+                  __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 335, __pyx_L1_error)
+                  __Pyx_GOTREF(__pyx_t_5);
+                  __Pyx_GIVEREF(__pyx_t_7);
+                  PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_7);
+                  __Pyx_GIVEREF(__pyx_t_4);
+                  PyTuple_SET_ITEM(__pyx_t_5, 1, __pyx_t_4);
+                  __pyx_t_7 = 0;
+                  __pyx_t_4 = 0;
+                  if (unlikely(__pyx_v_rules == Py_None)) {
+                    PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
+                    __PYX_ERR(0, 335, __pyx_L1_error)
+                  }
+                  __pyx_t_3 = (__Pyx_PyDict_ContainsTF(__pyx_t_5, __pyx_v_rules, Py_EQ)); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 335, __pyx_L1_error)
+                  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+                  __pyx_t_2 = (__pyx_t_3 != 0);
+                  if (__pyx_t_2) {
+
+                    /* "tfcomb/counting.pyx":337
+ * 									if (TF2_name, TF1_name) in rules:
+ * 
+ * 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat             # <<<<<<<<<<<<<<
+ * 										dist_ind = offset + distance - min_distance - 1
+ * 										dist_count_mat[pair_ind, dist_ind] += 1
+ */
+                    if (unlikely(__pyx_v_rules == Py_None)) {
+                      PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+                      __PYX_ERR(0, 337, __pyx_L1_error)
+                    }
+                    __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_TF2_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 337, __pyx_L1_error)
+                    __Pyx_GOTREF(__pyx_t_5);
+                    __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_TF1_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 337, __pyx_L1_error)
+                    __Pyx_GOTREF(__pyx_t_4);
+                    __pyx_t_7 = PyTuple_New(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 337, __pyx_L1_error)
+                    __Pyx_GOTREF(__pyx_t_7);
+                    __Pyx_GIVEREF(__pyx_t_5);
+                    PyTuple_SET_ITEM(__pyx_t_7, 0, __pyx_t_5);
+                    __Pyx_GIVEREF(__pyx_t_4);
+                    PyTuple_SET_ITEM(__pyx_t_7, 1, __pyx_t_4);
+                    __pyx_t_5 = 0;
+                    __pyx_t_4 = 0;
+                    __pyx_t_4 = __Pyx_PyDict_GetItem(__pyx_v_rules, __pyx_t_7); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 337, __pyx_L1_error)
+                    __Pyx_GOTREF(__pyx_t_4);
+                    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+                    __pyx_t_18 = __Pyx_PyInt_As_int(__pyx_t_4); if (unlikely((__pyx_t_18 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 337, __pyx_L1_error)
+                    __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+                    __pyx_v_pair_ind = __pyx_t_18;
+
+                    /* "tfcomb/counting.pyx":338
+ * 
+ * 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat
+ * 										dist_ind = offset + distance - min_distance - 1             # <<<<<<<<<<<<<<
+ * 										dist_count_mat[pair_ind, dist_ind] += 1
+ * 
+ */
+                    __pyx_v_dist_ind = (((__pyx_v_offset + __pyx_v_distance) - __pyx_v_min_distance) - 1);
+
+                    /* "tfcomb/counting.pyx":339
+ * 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat
+ * 										dist_ind = offset + distance - min_distance - 1
+ * 										dist_count_mat[pair_ind, dist_ind] += 1             # <<<<<<<<<<<<<<
+ * 
+ * 					elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away
+ */
+                    __pyx_t_16 = __pyx_v_pair_ind;
+                    __pyx_t_15 = __pyx_v_dist_ind;
+                    *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) += 1;
+
+                    /* "tfcomb/counting.pyx":335
+ * 								#Also add counts to TF2-TF1 if not directional
+ * 								if directional == False and TF1_name != TF2_name: #do not add extra counts for TF-self-pairs
+ * 									if (TF2_name, TF1_name) in rules:             # <<<<<<<<<<<<<<
+ * 
+ * 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat
+ */
+                  }
+
+                  /* "tfcomb/counting.pyx":334
+ * 
+ * 								#Also add counts to TF2-TF1 if not directional
+ * 								if directional == False and TF1_name != TF2_name: #do not add extra counts for TF-self-pairs             # <<<<<<<<<<<<<<
+ * 									if (TF2_name, TF1_name) in rules:
  * 
  */
                 }
 
-                /* "tfcomb/counting.pyx":313
- * 							pair_ind = rules[(TF1_name,TF2_name)]
+                /* "tfcomb/counting.pyx":325
  * 
- * 							if distance == 0:	#distance is 0 if the sites are overlapping or book-ended             # <<<<<<<<<<<<<<
+ * 							#Save counts of association
+ * 							if valid_pair == 1:             # <<<<<<<<<<<<<<
  * 
- * 								# Get the length of the shorter TF
+ * 								#Add counts for the observed TF1-TF2
  */
               }
 
               /* "tfcomb/counting.pyx":309
- * 						pair_ind = -1
  * 
- * 						if (TF1_name,TF2_name) in rules:             # <<<<<<<<<<<<<<
- * 							valid_pair = 1
- * 							pair_ind = rules[(TF1_name,TF2_name)]
+ * 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
+ * 						if distance >= min_distance: #Check that sites are more than min distance away; else stay in finding_assoc             # <<<<<<<<<<<<<<
+ * 							valid_pair = 1 #so-far, the pair is valid
+ * 
  */
             }
 
-            /* "tfcomb/counting.pyx":333
+            /* "tfcomb/counting.pyx":308
+ * 						distance = -1 #cap any negative distances to -1
  * 
- * 						#Save counts of association
- * 						if valid_pair == 1:             # <<<<<<<<<<<<<<
- * 							offset = 2
- * 							# if min_distance is 0, overlapping is true, so we need to include distance -1
+ * 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window             # <<<<<<<<<<<<<<
+ * 						if distance >= min_distance: #Check that sites are more than min distance away; else stay in finding_assoc
+ * 							valid_pair = 1 #so-far, the pair is valid
  */
-            __pyx_t_16 = ((__pyx_v_valid_pair == 1) != 0);
-            if (__pyx_t_16) {
-
-              /* "tfcomb/counting.pyx":334
- * 						#Save counts of association
- * 						if valid_pair == 1:
- * 							offset = 2             # <<<<<<<<<<<<<<
- * 							# if min_distance is 0, overlapping is true, so we need to include distance -1
- * 							if min_distance == 0:
- */
-              __pyx_v_offset = 2;
-
-              /* "tfcomb/counting.pyx":336
- * 							offset = 2
- * 							# if min_distance is 0, overlapping is true, so we need to include distance -1
- * 							if min_distance == 0:             # <<<<<<<<<<<<<<
- * 								offset += 1
- * 							# min_distance is offset ( positive decrease the index) || +2 for TF names [+1 if min_dist == 0, meaning overlapps are counted (-1 == overlapping)]
- */
-              __pyx_t_16 = ((__pyx_v_min_distance == 0) != 0);
-              if (__pyx_t_16) {
-
-                /* "tfcomb/counting.pyx":337
- * 							# if min_distance is 0, overlapping is true, so we need to include distance -1
- * 							if min_distance == 0:
- * 								offset += 1             # <<<<<<<<<<<<<<
- * 							# min_distance is offset ( positive decrease the index) || +2 for TF names [+1 if min_dist == 0, meaning overlapps are counted (-1 == overlapping)]
- * 							dist_count_mat[pair_ind, (distance - min_distance)+offset] += 1
- */
-                __pyx_v_offset = (__pyx_v_offset + 1);
-
-                /* "tfcomb/counting.pyx":336
- * 							offset = 2
- * 							# if min_distance is 0, overlapping is true, so we need to include distance -1
- * 							if min_distance == 0:             # <<<<<<<<<<<<<<
- * 								offset += 1
- * 							# min_distance is offset ( positive decrease the index) || +2 for TF names [+1 if min_dist == 0, meaning overlapps are counted (-1 == overlapping)]
- */
-              }
-
-              /* "tfcomb/counting.pyx":339
- * 								offset += 1
- * 							# min_distance is offset ( positive decrease the index) || +2 for TF names [+1 if min_dist == 0, meaning overlapps are counted (-1 == overlapping)]
- * 							dist_count_mat[pair_ind, (distance - min_distance)+offset] += 1             # <<<<<<<<<<<<<<
- * 
- * 				else:
- */
-              __pyx_t_14 = __pyx_v_pair_ind;
-              __pyx_t_15 = ((__pyx_v_distance - __pyx_v_min_distance) + __pyx_v_offset);
-              __pyx_t_17 = -1;
-              if (__pyx_t_14 < 0) {
-                __pyx_t_14 += __pyx_pybuffernd_dist_count_mat.diminfo[0].shape;
-                if (unlikely(__pyx_t_14 < 0)) __pyx_t_17 = 0;
-              } else if (unlikely(__pyx_t_14 >= __pyx_pybuffernd_dist_count_mat.diminfo[0].shape)) __pyx_t_17 = 0;
-              if (__pyx_t_15 < 0) {
-                __pyx_t_15 += __pyx_pybuffernd_dist_count_mat.diminfo[1].shape;
-                if (unlikely(__pyx_t_15 < 0)) __pyx_t_17 = 1;
-              } else if (unlikely(__pyx_t_15 >= __pyx_pybuffernd_dist_count_mat.diminfo[1].shape)) __pyx_t_17 = 1;
-              if (unlikely(__pyx_t_17 != -1)) {
-                __Pyx_RaiseBufferIndexError(__pyx_t_17);
-                __PYX_ERR(0, 339, __pyx_L1_error)
-              }
-              *__Pyx_BufPtrStrided2d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_dist_count_mat.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_dist_count_mat.diminfo[1].strides) += 1;
-
-              /* "tfcomb/counting.pyx":333
- * 
- * 						#Save counts of association
- * 						if valid_pair == 1:             # <<<<<<<<<<<<<<
- * 							offset = 2
- * 							# if min_distance is 0, overlapping is true, so we need to include distance -1
- */
-            }
-
-            /* "tfcomb/counting.pyx":305
- * 
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
- * 					if distance >= min_distance: #Check that sites are more than min distance away             # <<<<<<<<<<<<<<
- * 						valid_pair = 0
- * 						pair_ind = -1
- */
+            goto __pyx_L19;
           }
 
-          /* "tfcomb/counting.pyx":304
- * 					distance = 0
+          /* "tfcomb/counting.pyx":341
+ * 										dist_count_mat[pair_ind, dist_ind] += 1
  * 
- * 				if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window             # <<<<<<<<<<<<<<
- * 					if distance >= min_distance: #Check that sites are more than min distance away
- * 						valid_pair = 0
+ * 					elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away             # <<<<<<<<<<<<<<
+ * 
+ * 						#Establish if all valid sites were found for TF1
  */
-          goto __pyx_L14;
-        }
+          __pyx_t_3 = ((__pyx_v_TF1_chr == __pyx_v_TF2_chr) != 0);
+          if (__pyx_t_3) {
+          } else {
+            __pyx_t_2 = __pyx_t_3;
+            goto __pyx_L31_bool_binop_done;
+          }
+          __pyx_t_3 = ((__pyx_v_distance > __pyx_v_max_distance) != 0);
+          __pyx_t_2 = __pyx_t_3;
+          __pyx_L31_bool_binop_done:;
+          if (__pyx_t_2) {
 
-        /* "tfcomb/counting.pyx":343
- * 				else:
- * 					#The next site is out of window range; increment to next i
- * 					i += 1             # <<<<<<<<<<<<<<
- * 					finding_assoc = False   #break out of finding_assoc-loop
+            /* "tfcomb/counting.pyx":344
  * 
+ * 						#Establish if all valid sites were found for TF1
+ * 						if anchor_mode == 0: #inner distance             # <<<<<<<<<<<<<<
+ * 
+ * 							#The next site is out of inner window range; increment to next i
  */
-        /*else*/ {
-          __pyx_v_i = (__pyx_v_i + 1);
+            __pyx_t_2 = ((__pyx_v_anchor_mode == 0) != 0);
+            if (__pyx_t_2) {
 
-          /* "tfcomb/counting.pyx":344
- * 					#The next site is out of window range; increment to next i
- * 					i += 1
- * 					finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
+              /* "tfcomb/counting.pyx":347
  * 
- * 		## Done finding TF2's for current TF1
+ * 							#The next site is out of inner window range; increment to next i
+ * 							i += 1             # <<<<<<<<<<<<<<
+ * 							finding_assoc = False   #break out of finding_assoc-loop
+ * 
  */
-          __pyx_v_finding_assoc = 0;
+              __pyx_v_i = (__pyx_v_i + 1);
+
+              /* "tfcomb/counting.pyx":348
+ * 							#The next site is out of inner window range; increment to next i
+ * 							i += 1
+ * 							finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
+ * 
+ * 						else: #If anchor is outer or center, there might still be valid pairs for future TF2's
+ */
+              __pyx_v_finding_assoc = 0;
+
+              /* "tfcomb/counting.pyx":344
+ * 
+ * 						#Establish if all valid sites were found for TF1
+ * 						if anchor_mode == 0: #inner distance             # <<<<<<<<<<<<<<
+ * 
+ * 							#The next site is out of inner window range; increment to next i
+ */
+              goto __pyx_L33;
+            }
+
+            /* "tfcomb/counting.pyx":353
+ * 
+ * 							#Check if it will be possible to find valid pairs in next sites
+ * 							if TF2_start > TF1_start + max_distance:             # <<<<<<<<<<<<<<
+ * 								#no longer possible to find valid pairs for TF1; increment to next i
+ * 								i += 1
+ */
+            /*else*/ {
+              __pyx_t_2 = ((__pyx_v_TF2_start > (__pyx_v_TF1_start + __pyx_v_max_distance)) != 0);
+              if (__pyx_t_2) {
+
+                /* "tfcomb/counting.pyx":355
+ * 							if TF2_start > TF1_start + max_distance:
+ * 								#no longer possible to find valid pairs for TF1; increment to next i
+ * 								i += 1             # <<<<<<<<<<<<<<
+ * 								finding_assoc = False   #break out of finding_assoc-loop
+ * 
+ */
+                __pyx_v_i = (__pyx_v_i + 1);
+
+                /* "tfcomb/counting.pyx":356
+ * 								#no longer possible to find valid pairs for TF1; increment to next i
+ * 								i += 1
+ * 								finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
+ * 
+ * 					else:
+ */
+                __pyx_v_finding_assoc = 0;
+
+                /* "tfcomb/counting.pyx":353
+ * 
+ * 							#Check if it will be possible to find valid pairs in next sites
+ * 							if TF2_start > TF1_start + max_distance:             # <<<<<<<<<<<<<<
+ * 								#no longer possible to find valid pairs for TF1; increment to next i
+ * 								i += 1
+ */
+              }
+            }
+            __pyx_L33:;
+
+            /* "tfcomb/counting.pyx":341
+ * 										dist_count_mat[pair_ind, dist_ind] += 1
+ * 
+ * 					elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away             # <<<<<<<<<<<<<<
+ * 
+ * 						#Establish if all valid sites were found for TF1
+ */
+            goto __pyx_L19;
+          }
+
+          /* "tfcomb/counting.pyx":360
+ * 					else:
+ * 						#The next site is out of window range; increment to next i
+ * 						i += 1             # <<<<<<<<<<<<<<
+ * 						finding_assoc = False   #break out of finding_assoc-loop
+ * 
+ */
+          /*else*/ {
+            __pyx_v_i = (__pyx_v_i + 1);
+
+            /* "tfcomb/counting.pyx":361
+ * 						#The next site is out of window range; increment to next i
+ * 						i += 1
+ * 						finding_assoc = False   #break out of finding_assoc-loop             # <<<<<<<<<<<<<<
+ * 
+ * 		## Done finding TF2's for current TF1; i has been incremented
+ */
+            __pyx_v_finding_assoc = 0;
+          }
+          __pyx_L19:;
+
+          /* "tfcomb/counting.pyx":290
+ * 
+ * 				#Check if TF1_name,TF2_name is a target rule; otherwise, do not count
+ * 				if (TF1_name, TF2_name) in rules or (TF2_name, TF1_name) in rules: #count both TF1-TF2 and TF2-TF1 directions             # <<<<<<<<<<<<<<
+ * 
+ * 					# Check anchor mode
+ */
         }
-        __pyx_L14:;
       }
-      __pyx_L12:;
+      __pyx_L14:;
     }
   }
 
-  /* "tfcomb/counting.pyx":349
- * 
+  /* "tfcomb/counting.pyx":365
+ * 		## Done finding TF2's for current TF1; i has been incremented
  * 
  * 	return (dist_count_mat)             # <<<<<<<<<<<<<<
  */
@@ -4580,9 +4597,9 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
   __pyx_r = ((PyObject *)__pyx_v_dist_count_mat);
   goto __pyx_L0;
 
-  /* "tfcomb/counting.pyx":193
- * 
- * 
+  /* "tfcomb/counting.pyx":196
+ * @cython.wraparound(False) 	#dont deal with negative indices
+ * @cython.nonecheck(False)
  * def count_distances(np.ndarray[np.int_t, ndim=2] sites,             # <<<<<<<<<<<<<<
  * 					dict rules,
  * 					int min_distance = 0,
@@ -4590,11 +4607,11 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
 
   /* function exit code */
   __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
   __Pyx_XDECREF(__pyx_t_6);
-  __Pyx_XDECREF(__pyx_t_11);
+  __Pyx_XDECREF(__pyx_t_7);
+  __Pyx_XDECREF(__pyx_t_12);
   { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
     __Pyx_PyThreadState_declare
     __Pyx_PyThreadState_assign
@@ -4609,7 +4626,6 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_dist_count_mat.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_sites.rcbuffer->pybuffer);
   __pyx_L2:;
-  __Pyx_XDECREF(__pyx_v_pairs);
   __Pyx_XDECREF((PyObject *)__pyx_v_dist_count_mat);
   __Pyx_XDECREF(__pyx_v_tf1);
   __Pyx_XDECREF(__pyx_v_tf2);
@@ -4618,7 +4634,7 @@ static PyObject *__pyx_pf_6tfcomb_8counting_2count_distances(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":735
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":735
  * ctypedef npy_cdouble     complex_t
  * 
  * cdef inline object PyArray_MultiIterNew1(a):             # <<<<<<<<<<<<<<
@@ -4635,7 +4651,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew1", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":736
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":736
  * 
  * cdef inline object PyArray_MultiIterNew1(a):
  *     return PyArray_MultiIterNew(1, <void*>a)             # <<<<<<<<<<<<<<
@@ -4649,7 +4665,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":735
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":735
  * ctypedef npy_cdouble     complex_t
  * 
  * cdef inline object PyArray_MultiIterNew1(a):             # <<<<<<<<<<<<<<
@@ -4668,7 +4684,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":738
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":738
  *     return PyArray_MultiIterNew(1, <void*>a)
  * 
  * cdef inline object PyArray_MultiIterNew2(a, b):             # <<<<<<<<<<<<<<
@@ -4685,7 +4701,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew2", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":739
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":739
  * 
  * cdef inline object PyArray_MultiIterNew2(a, b):
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)             # <<<<<<<<<<<<<<
@@ -4699,7 +4715,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":738
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":738
  *     return PyArray_MultiIterNew(1, <void*>a)
  * 
  * cdef inline object PyArray_MultiIterNew2(a, b):             # <<<<<<<<<<<<<<
@@ -4718,7 +4734,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":741
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":741
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
  * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):             # <<<<<<<<<<<<<<
@@ -4735,7 +4751,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew3", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":742
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":742
  * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)             # <<<<<<<<<<<<<<
@@ -4749,7 +4765,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":741
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":741
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
  * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):             # <<<<<<<<<<<<<<
@@ -4768,7 +4784,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":744
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":744
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
  * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):             # <<<<<<<<<<<<<<
@@ -4785,7 +4801,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew4", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":745
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":745
  * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)             # <<<<<<<<<<<<<<
@@ -4799,7 +4815,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":744
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":744
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
  * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):             # <<<<<<<<<<<<<<
@@ -4818,7 +4834,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":747
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":747
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
  * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):             # <<<<<<<<<<<<<<
@@ -4835,7 +4851,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew5", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":748
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":748
  * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)             # <<<<<<<<<<<<<<
@@ -4849,7 +4865,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":747
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":747
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
  * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):             # <<<<<<<<<<<<<<
@@ -4868,7 +4884,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":750
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":750
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):             # <<<<<<<<<<<<<<
@@ -4882,7 +4898,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   int __pyx_t_1;
   __Pyx_RefNannySetupContext("PyDataType_SHAPE", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":751
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":751
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):             # <<<<<<<<<<<<<<
@@ -4892,7 +4908,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   __pyx_t_1 = (PyDataType_HASSUBARRAY(__pyx_v_d) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":752
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":752
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):
  *         return <tuple>d.subarray.shape             # <<<<<<<<<<<<<<
@@ -4904,7 +4920,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
     __pyx_r = ((PyObject*)__pyx_v_d->subarray->shape);
     goto __pyx_L0;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":751
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":751
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):             # <<<<<<<<<<<<<<
@@ -4913,7 +4929,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
  */
   }
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":754
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":754
  *         return <tuple>d.subarray.shape
  *     else:
  *         return ()             # <<<<<<<<<<<<<<
@@ -4927,7 +4943,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
     goto __pyx_L0;
   }
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":750
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":750
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):             # <<<<<<<<<<<<<<
@@ -4942,7 +4958,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":931
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":929
  *     int _import_umath() except -1
  * 
  * cdef inline void set_array_base(ndarray arr, object base):             # <<<<<<<<<<<<<<
@@ -4954,7 +4970,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("set_array_base", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":932
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":930
  * 
  * cdef inline void set_array_base(ndarray arr, object base):
  *     Py_INCREF(base) # important to do this before stealing the reference below!             # <<<<<<<<<<<<<<
@@ -4963,7 +4979,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
  */
   Py_INCREF(__pyx_v_base);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":933
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":931
  * cdef inline void set_array_base(ndarray arr, object base):
  *     Py_INCREF(base) # important to do this before stealing the reference below!
  *     PyArray_SetBaseObject(arr, base)             # <<<<<<<<<<<<<<
@@ -4972,7 +4988,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
  */
   (void)(PyArray_SetBaseObject(__pyx_v_arr, __pyx_v_base));
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":931
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":929
  *     int _import_umath() except -1
  * 
  * cdef inline void set_array_base(ndarray arr, object base):             # <<<<<<<<<<<<<<
@@ -4984,7 +5000,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   __Pyx_RefNannyFinishContext();
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":935
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":933
  *     PyArray_SetBaseObject(arr, base)
  * 
  * cdef inline object get_array_base(ndarray arr):             # <<<<<<<<<<<<<<
@@ -4999,7 +5015,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   int __pyx_t_1;
   __Pyx_RefNannySetupContext("get_array_base", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":936
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":934
  * 
  * cdef inline object get_array_base(ndarray arr):
  *     base = PyArray_BASE(arr)             # <<<<<<<<<<<<<<
@@ -5008,7 +5024,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
  */
   __pyx_v_base = PyArray_BASE(__pyx_v_arr);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":937
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":935
  * cdef inline object get_array_base(ndarray arr):
  *     base = PyArray_BASE(arr)
  *     if base is NULL:             # <<<<<<<<<<<<<<
@@ -5018,7 +5034,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   __pyx_t_1 = ((__pyx_v_base == NULL) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":938
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":936
  *     base = PyArray_BASE(arr)
  *     if base is NULL:
  *         return None             # <<<<<<<<<<<<<<
@@ -5029,7 +5045,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":937
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":935
  * cdef inline object get_array_base(ndarray arr):
  *     base = PyArray_BASE(arr)
  *     if base is NULL:             # <<<<<<<<<<<<<<
@@ -5038,7 +5054,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
  */
   }
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":939
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":937
  *     if base is NULL:
  *         return None
  *     return <object>base             # <<<<<<<<<<<<<<
@@ -5050,7 +5066,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   __pyx_r = ((PyObject *)__pyx_v_base);
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":935
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":933
  *     PyArray_SetBaseObject(arr, base)
  * 
  * cdef inline object get_array_base(ndarray arr):             # <<<<<<<<<<<<<<
@@ -5065,7 +5081,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":943
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":941
  * # Versions of the import_* functions which are more suitable for
  * # Cython code.
  * cdef inline int import_array() except -1:             # <<<<<<<<<<<<<<
@@ -5089,7 +5105,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("import_array", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":944
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":942
  * # Cython code.
  * cdef inline int import_array() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5105,16 +5121,16 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     __Pyx_XGOTREF(__pyx_t_3);
     /*try:*/ {
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":945
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":943
  * cdef inline int import_array() except -1:
  *     try:
  *         __pyx_import_array()             # <<<<<<<<<<<<<<
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")
  */
-      __pyx_t_4 = _import_array(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 945, __pyx_L3_error)
+      __pyx_t_4 = _import_array(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 943, __pyx_L3_error)
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":944
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":942
  * # Cython code.
  * cdef inline int import_array() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5128,7 +5144,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     goto __pyx_L8_try_end;
     __pyx_L3_error:;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":946
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":944
  *     try:
  *         __pyx_import_array()
  *     except Exception:             # <<<<<<<<<<<<<<
@@ -5138,28 +5154,28 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     __pyx_t_4 = __Pyx_PyErr_ExceptionMatches(((PyObject *)(&((PyTypeObject*)PyExc_Exception)[0])));
     if (__pyx_t_4) {
       __Pyx_AddTraceback("numpy.import_array", __pyx_clineno, __pyx_lineno, __pyx_filename);
-      if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_6, &__pyx_t_7) < 0) __PYX_ERR(1, 946, __pyx_L5_except_error)
+      if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_6, &__pyx_t_7) < 0) __PYX_ERR(1, 944, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_GOTREF(__pyx_t_6);
       __Pyx_GOTREF(__pyx_t_7);
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":947
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":945
  *         __pyx_import_array()
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")             # <<<<<<<<<<<<<<
  * 
  * cdef inline int import_umath() except -1:
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 947, __pyx_L5_except_error)
+      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 945, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_Raise(__pyx_t_8, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-      __PYX_ERR(1, 947, __pyx_L5_except_error)
+      __PYX_ERR(1, 945, __pyx_L5_except_error)
     }
     goto __pyx_L5_except_error;
     __pyx_L5_except_error:;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":944
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":942
  * # Cython code.
  * cdef inline int import_array() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5174,7 +5190,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     __pyx_L8_try_end:;
   }
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":943
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":941
  * # Versions of the import_* functions which are more suitable for
  * # Cython code.
  * cdef inline int import_array() except -1:             # <<<<<<<<<<<<<<
@@ -5197,7 +5213,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":949
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":947
  *         raise ImportError("numpy.core.multiarray failed to import")
  * 
  * cdef inline int import_umath() except -1:             # <<<<<<<<<<<<<<
@@ -5221,7 +5237,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("import_umath", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":950
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":948
  * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5237,16 +5253,16 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     __Pyx_XGOTREF(__pyx_t_3);
     /*try:*/ {
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":951
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":949
  * cdef inline int import_umath() except -1:
  *     try:
  *         _import_umath()             # <<<<<<<<<<<<<<
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")
  */
-      __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 951, __pyx_L3_error)
+      __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 949, __pyx_L3_error)
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":950
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":948
  * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5260,7 +5276,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     goto __pyx_L8_try_end;
     __pyx_L3_error:;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":952
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":950
  *     try:
  *         _import_umath()
  *     except Exception:             # <<<<<<<<<<<<<<
@@ -5270,28 +5286,28 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     __pyx_t_4 = __Pyx_PyErr_ExceptionMatches(((PyObject *)(&((PyTypeObject*)PyExc_Exception)[0])));
     if (__pyx_t_4) {
       __Pyx_AddTraceback("numpy.import_umath", __pyx_clineno, __pyx_lineno, __pyx_filename);
-      if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_6, &__pyx_t_7) < 0) __PYX_ERR(1, 952, __pyx_L5_except_error)
+      if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_6, &__pyx_t_7) < 0) __PYX_ERR(1, 950, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_GOTREF(__pyx_t_6);
       __Pyx_GOTREF(__pyx_t_7);
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":953
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":951
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
  * 
  * cdef inline int import_ufunc() except -1:
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 953, __pyx_L5_except_error)
+      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 951, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_Raise(__pyx_t_8, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-      __PYX_ERR(1, 953, __pyx_L5_except_error)
+      __PYX_ERR(1, 951, __pyx_L5_except_error)
     }
     goto __pyx_L5_except_error;
     __pyx_L5_except_error:;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":950
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":948
  * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5306,7 +5322,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     __pyx_L8_try_end:;
   }
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":949
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":947
  *         raise ImportError("numpy.core.multiarray failed to import")
  * 
  * cdef inline int import_umath() except -1:             # <<<<<<<<<<<<<<
@@ -5329,7 +5345,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":955
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":953
  *         raise ImportError("numpy.core.umath failed to import")
  * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
@@ -5353,7 +5369,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("import_ufunc", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":956
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":954
  * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5369,16 +5385,16 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     __Pyx_XGOTREF(__pyx_t_3);
     /*try:*/ {
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":957
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":955
  * cdef inline int import_ufunc() except -1:
  *     try:
  *         _import_umath()             # <<<<<<<<<<<<<<
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")
  */
-      __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 957, __pyx_L3_error)
+      __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 955, __pyx_L3_error)
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":956
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":954
  * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5392,7 +5408,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     goto __pyx_L8_try_end;
     __pyx_L3_error:;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":958
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":956
  *     try:
  *         _import_umath()
  *     except Exception:             # <<<<<<<<<<<<<<
@@ -5402,28 +5418,28 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     __pyx_t_4 = __Pyx_PyErr_ExceptionMatches(((PyObject *)(&((PyTypeObject*)PyExc_Exception)[0])));
     if (__pyx_t_4) {
       __Pyx_AddTraceback("numpy.import_ufunc", __pyx_clineno, __pyx_lineno, __pyx_filename);
-      if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_6, &__pyx_t_7) < 0) __PYX_ERR(1, 958, __pyx_L5_except_error)
+      if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_6, &__pyx_t_7) < 0) __PYX_ERR(1, 956, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_GOTREF(__pyx_t_6);
       __Pyx_GOTREF(__pyx_t_7);
 
-      /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":959
+      /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":957
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
  * 
  * cdef extern from *:
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 959, __pyx_L5_except_error)
+      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 957, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_Raise(__pyx_t_8, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-      __PYX_ERR(1, 959, __pyx_L5_except_error)
+      __PYX_ERR(1, 957, __pyx_L5_except_error)
     }
     goto __pyx_L5_except_error;
     __pyx_L5_except_error:;
 
-    /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":956
+    /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":954
  * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5438,7 +5454,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     __pyx_L8_try_end:;
   }
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":955
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":953
  *         raise ImportError("numpy.core.umath failed to import")
  * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
@@ -5461,7 +5477,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":969
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":967
  * 
  * 
  * cdef inline bint is_timedelta64_object(object obj):             # <<<<<<<<<<<<<<
@@ -5474,7 +5490,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_timedelta64_object(PyObject *__pyx_v_
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("is_timedelta64_object", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":981
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":979
  *     bool
  *     """
  *     return PyObject_TypeCheck(obj, &PyTimedeltaArrType_Type)             # <<<<<<<<<<<<<<
@@ -5484,7 +5500,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_timedelta64_object(PyObject *__pyx_v_
   __pyx_r = PyObject_TypeCheck(__pyx_v_obj, (&PyTimedeltaArrType_Type));
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":969
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":967
  * 
  * 
  * cdef inline bint is_timedelta64_object(object obj):             # <<<<<<<<<<<<<<
@@ -5498,7 +5514,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_timedelta64_object(PyObject *__pyx_v_
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":984
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":982
  * 
  * 
  * cdef inline bint is_datetime64_object(object obj):             # <<<<<<<<<<<<<<
@@ -5511,7 +5527,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_datetime64_object(PyObject *__pyx_v_o
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("is_datetime64_object", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":996
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":994
  *     bool
  *     """
  *     return PyObject_TypeCheck(obj, &PyDatetimeArrType_Type)             # <<<<<<<<<<<<<<
@@ -5521,7 +5537,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_datetime64_object(PyObject *__pyx_v_o
   __pyx_r = PyObject_TypeCheck(__pyx_v_obj, (&PyDatetimeArrType_Type));
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":984
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":982
  * 
  * 
  * cdef inline bint is_datetime64_object(object obj):             # <<<<<<<<<<<<<<
@@ -5535,7 +5551,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_datetime64_object(PyObject *__pyx_v_o
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":999
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":997
  * 
  * 
  * cdef inline npy_datetime get_datetime64_value(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -5546,7 +5562,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_datetime64_object(PyObject *__pyx_v_o
 static CYTHON_INLINE npy_datetime __pyx_f_5numpy_get_datetime64_value(PyObject *__pyx_v_obj) {
   npy_datetime __pyx_r;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1006
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1004
  *     also needed.  That can be found using `get_datetime64_unit`.
  *     """
  *     return (<PyDatetimeScalarObject*>obj).obval             # <<<<<<<<<<<<<<
@@ -5556,7 +5572,7 @@ static CYTHON_INLINE npy_datetime __pyx_f_5numpy_get_datetime64_value(PyObject *
   __pyx_r = ((PyDatetimeScalarObject *)__pyx_v_obj)->obval;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":999
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":997
  * 
  * 
  * cdef inline npy_datetime get_datetime64_value(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -5569,7 +5585,7 @@ static CYTHON_INLINE npy_datetime __pyx_f_5numpy_get_datetime64_value(PyObject *
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1009
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1007
  * 
  * 
  * cdef inline npy_timedelta get_timedelta64_value(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -5580,7 +5596,7 @@ static CYTHON_INLINE npy_datetime __pyx_f_5numpy_get_datetime64_value(PyObject *
 static CYTHON_INLINE npy_timedelta __pyx_f_5numpy_get_timedelta64_value(PyObject *__pyx_v_obj) {
   npy_timedelta __pyx_r;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1013
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1011
  *     returns the int64 value underlying scalar numpy timedelta64 object
  *     """
  *     return (<PyTimedeltaScalarObject*>obj).obval             # <<<<<<<<<<<<<<
@@ -5590,7 +5606,7 @@ static CYTHON_INLINE npy_timedelta __pyx_f_5numpy_get_timedelta64_value(PyObject
   __pyx_r = ((PyTimedeltaScalarObject *)__pyx_v_obj)->obval;
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1009
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1007
  * 
  * 
  * cdef inline npy_timedelta get_timedelta64_value(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -5603,7 +5619,7 @@ static CYTHON_INLINE npy_timedelta __pyx_f_5numpy_get_timedelta64_value(PyObject
   return __pyx_r;
 }
 
-/* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1016
+/* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1014
  * 
  * 
  * cdef inline NPY_DATETIMEUNIT get_datetime64_unit(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -5614,7 +5630,7 @@ static CYTHON_INLINE npy_timedelta __pyx_f_5numpy_get_timedelta64_value(PyObject
 static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObject *__pyx_v_obj) {
   NPY_DATETIMEUNIT __pyx_r;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1020
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1018
  *     returns the unit part of the dtype for a numpy datetime64 object.
  *     """
  *     return <NPY_DATETIMEUNIT>(<PyDatetimeScalarObject*>obj).obmeta.base             # <<<<<<<<<<<<<<
@@ -5622,7 +5638,7 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
   __pyx_r = ((NPY_DATETIMEUNIT)((PyDatetimeScalarObject *)__pyx_v_obj)->obmeta.base);
   goto __pyx_L0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1016
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1014
  * 
  * 
  * cdef inline NPY_DATETIMEUNIT get_datetime64_unit(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -5685,7 +5701,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_TF1_anchor, __pyx_k_TF1_anchor, sizeof(__pyx_k_TF1_anchor), 0, 0, 1, 1},
   {&__pyx_n_s_TF1_chr, __pyx_k_TF1_chr, sizeof(__pyx_k_TF1_chr), 0, 0, 1, 1},
   {&__pyx_n_s_TF1_end, __pyx_k_TF1_end, sizeof(__pyx_k_TF1_end), 0, 0, 1, 1},
-  {&__pyx_n_s_TF1_mid, __pyx_k_TF1_mid, sizeof(__pyx_k_TF1_mid), 0, 0, 1, 1},
   {&__pyx_n_s_TF1_name, __pyx_k_TF1_name, sizeof(__pyx_k_TF1_name), 0, 0, 1, 1},
   {&__pyx_n_s_TF1_start, __pyx_k_TF1_start, sizeof(__pyx_k_TF1_start), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_anchor, __pyx_k_TF2_anchor, sizeof(__pyx_k_TF2_anchor), 0, 0, 1, 1},
@@ -5693,17 +5708,17 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_TF2_counts, __pyx_k_TF2_counts, sizeof(__pyx_k_TF2_counts), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_counts_adjustment, __pyx_k_TF2_counts_adjustment, sizeof(__pyx_k_TF2_counts_adjustment), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_end, __pyx_k_TF2_end, sizeof(__pyx_k_TF2_end), 0, 0, 1, 1},
-  {&__pyx_n_s_TF2_mid, __pyx_k_TF2_mid, sizeof(__pyx_k_TF2_mid), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_name, __pyx_k_TF2_name, sizeof(__pyx_k_TF2_name), 0, 0, 1, 1},
   {&__pyx_n_s_TF2_start, __pyx_k_TF2_start, sizeof(__pyx_k_TF2_start), 0, 0, 1, 1},
   {&__pyx_n_s_anchor, __pyx_k_anchor, sizeof(__pyx_k_anchor), 0, 0, 1, 1},
   {&__pyx_n_s_anchor_mode, __pyx_k_anchor_mode, sizeof(__pyx_k_anchor_mode), 0, 0, 1, 1},
   {&__pyx_n_s_binary, __pyx_k_binary, sizeof(__pyx_k_binary), 0, 0, 1, 1},
-  {&__pyx_n_s_ceil, __pyx_k_ceil, sizeof(__pyx_k_ceil), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
   {&__pyx_n_s_count_co_occurrence, __pyx_k_count_co_occurrence, sizeof(__pyx_k_count_co_occurrence), 0, 0, 1, 1},
   {&__pyx_n_s_count_distances, __pyx_k_count_distances, sizeof(__pyx_k_count_distances), 0, 0, 1, 1},
+  {&__pyx_n_s_directional, __pyx_k_directional, sizeof(__pyx_k_directional), 0, 0, 1, 1},
   {&__pyx_n_s_dist_count_mat, __pyx_k_dist_count_mat, sizeof(__pyx_k_dist_count_mat), 0, 0, 1, 1},
+  {&__pyx_n_s_dist_ind, __pyx_k_dist_ind, sizeof(__pyx_k_dist_ind), 0, 0, 1, 1},
   {&__pyx_n_s_distance, __pyx_k_distance, sizeof(__pyx_k_distance), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
   {&__pyx_n_s_finding_assoc, __pyx_k_finding_assoc, sizeof(__pyx_k_finding_assoc), 0, 0, 1, 1},
@@ -5727,9 +5742,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_overlap_bp, __pyx_k_overlap_bp, sizeof(__pyx_k_overlap_bp), 0, 0, 1, 1},
   {&__pyx_n_s_pair_count_mat, __pyx_k_pair_count_mat, sizeof(__pyx_k_pair_count_mat), 0, 0, 1, 1},
   {&__pyx_n_s_pair_ind, __pyx_k_pair_ind, sizeof(__pyx_k_pair_ind), 0, 0, 1, 1},
-  {&__pyx_n_s_pairs, __pyx_k_pairs, sizeof(__pyx_k_pairs), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
-  {&__pyx_n_s_rule, __pyx_k_rule, sizeof(__pyx_k_rule), 0, 0, 1, 1},
   {&__pyx_n_s_rules, __pyx_k_rules, sizeof(__pyx_k_rules), 0, 0, 1, 1},
   {&__pyx_n_s_self_count, __pyx_k_self_count, sizeof(__pyx_k_self_count), 0, 0, 1, 1},
   {&__pyx_n_s_short_bp, __pyx_k_short_bp, sizeof(__pyx_k_short_bp), 0, 0, 1, 1},
@@ -5746,7 +5759,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
   __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 82, __pyx_L1_error)
-  __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 947, __pyx_L1_error)
+  __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 945, __pyx_L1_error)
   return 0;
   __pyx_L1_error:;
   return -1;
@@ -5756,25 +5769,25 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":947
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":945
  *         __pyx_import_array()
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")             # <<<<<<<<<<<<<<
  * 
  * cdef inline int import_umath() except -1:
  */
-  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_u_numpy_core_multiarray_failed_to); if (unlikely(!__pyx_tuple_)) __PYX_ERR(1, 947, __pyx_L1_error)
+  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_u_numpy_core_multiarray_failed_to); if (unlikely(!__pyx_tuple_)) __PYX_ERR(1, 945, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":953
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":951
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
  * 
  * cdef inline int import_ufunc() except -1:
  */
-  __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_umath_failed_to_impor); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(1, 953, __pyx_L1_error)
+  __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_umath_failed_to_impor); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(1, 951, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
 
@@ -5785,22 +5798,22 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 						int min_distance = 0,
  * 						int max_distance = 100,
  */
-  __pyx_tuple__3 = PyTuple_Pack(31, __pyx_n_s_sites, __pyx_n_s_min_distance, __pyx_n_s_max_distance, __pyx_n_s_max_overlap, __pyx_n_s_binary, __pyx_n_s_anchor, __pyx_n_s_n_names, __pyx_n_s_n_sites, __pyx_n_s_TF2_counts, __pyx_n_s_TF2_counts_adjustment, __pyx_n_s_single_count_arr, __pyx_n_s_pair_count_mat, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k, __pyx_n_s_finding_assoc, __pyx_n_s_TF1_chr, __pyx_n_s_TF1_name, __pyx_n_s_TF1_start, __pyx_n_s_TF1_end, __pyx_n_s_TF2_start, __pyx_n_s_TF2_end, __pyx_n_s_overlap_bp, __pyx_n_s_short_bp, __pyx_n_s_valid_pair, __pyx_n_s_TF2_chr, __pyx_n_s_TF2_name, __pyx_n_s_TF1_mid, __pyx_n_s_TF2_mid, __pyx_n_s_distance, __pyx_n_s_self_count); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 13, __pyx_L1_error)
+  __pyx_tuple__3 = PyTuple_Pack(31, __pyx_n_s_sites, __pyx_n_s_min_distance, __pyx_n_s_max_distance, __pyx_n_s_max_overlap, __pyx_n_s_binary, __pyx_n_s_anchor, __pyx_n_s_n_names, __pyx_n_s_n_sites, __pyx_n_s_TF2_counts, __pyx_n_s_TF2_counts_adjustment, __pyx_n_s_single_count_arr, __pyx_n_s_pair_count_mat, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k, __pyx_n_s_finding_assoc, __pyx_n_s_TF1_chr, __pyx_n_s_TF1_name, __pyx_n_s_TF1_start, __pyx_n_s_TF1_end, __pyx_n_s_TF2_chr, __pyx_n_s_TF2_name, __pyx_n_s_TF2_start, __pyx_n_s_TF2_end, __pyx_n_s_overlap_bp, __pyx_n_s_short_bp, __pyx_n_s_valid_pair, __pyx_n_s_TF1_anchor, __pyx_n_s_TF2_anchor, __pyx_n_s_distance, __pyx_n_s_self_count); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__3);
   __Pyx_GIVEREF(__pyx_tuple__3);
   __pyx_codeobj__4 = (PyObject*)__Pyx_PyCode_New(7, 0, 31, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__3, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_count_co_occurrence, 13, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 13, __pyx_L1_error)
 
-  /* "tfcomb/counting.pyx":193
- * 
- * 
+  /* "tfcomb/counting.pyx":196
+ * @cython.wraparound(False) 	#dont deal with negative indices
+ * @cython.nonecheck(False)
  * def count_distances(np.ndarray[np.int_t, ndim=2] sites,             # <<<<<<<<<<<<<<
  * 					dict rules,
  * 					int min_distance = 0,
  */
-  __pyx_tuple__5 = PyTuple_Pack(32, __pyx_n_s_sites, __pyx_n_s_rules, __pyx_n_s_min_distance, __pyx_n_s_max_distance, __pyx_n_s_max_overlap, __pyx_n_s_anchor_mode, __pyx_n_s_n_sites, __pyx_n_s_pairs, __pyx_n_s_rule, __pyx_n_s_offset, __pyx_n_s_dist_count_mat, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_finding_assoc, __pyx_n_s_TF1_chr, __pyx_n_s_TF1_name, __pyx_n_s_TF1_start, __pyx_n_s_TF1_end, __pyx_n_s_TF1_anchor, __pyx_n_s_TF2_start, __pyx_n_s_TF2_end, __pyx_n_s_TF2_anchor, __pyx_n_s_valid_pair, __pyx_n_s_overlap_bp, __pyx_n_s_short_bp, __pyx_n_s_TF2_chr, __pyx_n_s_TF2_name, __pyx_n_s_distance, __pyx_n_s_pair_ind, __pyx_n_s_ind, __pyx_n_s_tf1, __pyx_n_s_tf2); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __pyx_tuple__5 = PyTuple_Pack(32, __pyx_n_s_sites, __pyx_n_s_rules, __pyx_n_s_min_distance, __pyx_n_s_max_distance, __pyx_n_s_max_overlap, __pyx_n_s_anchor_mode, __pyx_n_s_directional, __pyx_n_s_n_sites, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_finding_assoc, __pyx_n_s_TF1_chr, __pyx_n_s_TF1_name, __pyx_n_s_TF1_start, __pyx_n_s_TF1_end, __pyx_n_s_TF2_chr, __pyx_n_s_TF2_name, __pyx_n_s_TF2_start, __pyx_n_s_TF2_end, __pyx_n_s_TF1_anchor, __pyx_n_s_TF2_anchor, __pyx_n_s_valid_pair, __pyx_n_s_overlap_bp, __pyx_n_s_short_bp, __pyx_n_s_distance, __pyx_n_s_pair_ind, __pyx_n_s_ind, __pyx_n_s_offset, __pyx_n_s_dist_count_mat, __pyx_n_s_tf1, __pyx_n_s_tf2, __pyx_n_s_dist_ind); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 196, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__5);
   __Pyx_GIVEREF(__pyx_tuple__5);
-  __pyx_codeobj__6 = (PyObject*)__Pyx_PyCode_New(6, 0, 32, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__5, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_count_distances, 193, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__6)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __pyx_codeobj__6 = (PyObject*)__Pyx_PyCode_New(7, 0, 32, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__5, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_tfcomb_counting_pyx, __pyx_n_s_count_distances, 196, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__6)) __PYX_ERR(0, 196, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -6157,16 +6170,16 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_co_occurrence, __pyx_t_1) < 0) __PYX_ERR(0, 13, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "tfcomb/counting.pyx":193
- * 
- * 
+  /* "tfcomb/counting.pyx":196
+ * @cython.wraparound(False) 	#dont deal with negative indices
+ * @cython.nonecheck(False)
  * def count_distances(np.ndarray[np.int_t, ndim=2] sites,             # <<<<<<<<<<<<<<
  * 					dict rules,
  * 					int min_distance = 0,
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6tfcomb_8counting_3count_distances, NULL, __pyx_n_s_tfcomb_counting); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 193, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6tfcomb_8counting_3count_distances, NULL, __pyx_n_s_tfcomb_counting); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 196, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_distances, __pyx_t_1) < 0) __PYX_ERR(0, 193, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_distances, __pyx_t_1) < 0) __PYX_ERR(0, 196, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "tfcomb/counting.pyx":1
@@ -6179,7 +6192,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_test, __pyx_t_1) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "../../../../../../home/mbentse/.local/lib/python3.7/site-packages/numpy/__init__.pxd":1016
+  /* "../../../../../../home/mbentse/.conda/envs/py3/lib/python3.7/site-packages/numpy/__init__.pxd":1014
  * 
  * 
  * cdef inline NPY_DATETIMEUNIT get_datetime64_unit(object obj) nogil:             # <<<<<<<<<<<<<<
@@ -7673,41 +7686,6 @@ static CYTHON_INLINE int __Pyx_dict_iter_next(
         *pvalue = next_item;
     }
     return 1;
-}
-
-/* BufferIndexError */
-  static void __Pyx_RaiseBufferIndexError(int axis) {
-  PyErr_Format(PyExc_IndexError,
-     "Out of bounds on buffer access (axis %d)", axis);
-}
-
-/* PyObjectCall2Args */
-  static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2) {
-    PyObject *args, *result = NULL;
-    #if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(function)) {
-        PyObject *args[2] = {arg1, arg2};
-        return __Pyx_PyFunction_FastCall(function, args, 2);
-    }
-    #endif
-    #if CYTHON_FAST_PYCCALL
-    if (__Pyx_PyFastCFunction_Check(function)) {
-        PyObject *args[2] = {arg1, arg2};
-        return __Pyx_PyCFunction_FastCall(function, args, 2);
-    }
-    #endif
-    args = PyTuple_New(2);
-    if (unlikely(!args)) goto done;
-    Py_INCREF(arg1);
-    PyTuple_SET_ITEM(args, 0, arg1);
-    Py_INCREF(arg2);
-    PyTuple_SET_ITEM(args, 1, arg2);
-    Py_INCREF(function);
-    result = __Pyx_PyObject_Call(function, args, NULL);
-    Py_DECREF(args);
-    Py_DECREF(function);
-done:
-    return result;
 }
 
 /* DictGetItem */
