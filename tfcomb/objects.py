@@ -2554,6 +2554,10 @@ class DistObj():
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
 		self._raw_to_human_readable(normalize)
 
+		#Save whether "neg" is included in the columns
+		self._distance_columns = list(self.distances.columns[2:])
+		self._negative = True if "neg" in self._distance_columns else False
+
 		self.logger.info("Done finding distances! Results are found in .distances")
 		self.logger.info("Run .linregress_all() to fit linear regression")
 	
@@ -2852,6 +2856,7 @@ class DistObj():
 		self.check_pair(pair)
 
 		tf1, tf2 = pair
+		key = "-".join(pair)
 
 		# signal.find_peaks() will not find peaks on first and last position without having 
 		# an other number left and right. 
@@ -2864,9 +2869,30 @@ class DistObj():
 		# subtract the position added above (first zero) 
 		peaks_idx = peaks_idx - 1 
 
+		#Get distances from columns
+		all_distances = self.corrected.columns[2:].tolist()
+		peak_distances = [all_distances[idx] for idx in peaks_idx]
+
 		# compensate the "neg" position
 		if self.min_dist == 0: 
 			peaks_idx = peaks_idx - 1 
+
+		#Collect peaks for TF pair
+		peak_info = pd.DataFrame().from_dict(properties)
+		peak_info["distance"] = peak_distances
+		peak_info["TF1"] = tf1
+		peak_info["TF2"] = tf2
+
+		#Add additional peak-information per pair
+		peak_info["threshold"] = threshold
+		peak_info["TF1_TF2_count"] = self.get_pair_count(pair)
+		peak_info["distance_count"] = [self._raw.loc[key, dist] for dist in peak_info["distance"]] #count of TF1-TF2 for this specific distance
+		
+		#Format order of columns
+		columns = ["TF1", "TF2", "TF1_TF2_count", "distance", "peak_heights", "prominences", "threshold", "distance_count"]
+		peak_info = peak_info[columns]
+		peak_info.rename(columns= {"distance": "Distance", "peak_heights":"Peak Heights",
+									"prominences": "Prominences", "threshold": "Threshold"}, inplace=True)
 
 		#Save peaks to file??
 		peaks = []
@@ -2889,7 +2915,7 @@ class DistObj():
 		if (save is not None):
 			outfile.close()
 
-		return peaks, threshold
+		return(peak_info)
 
 	def analyze_signal_all(self, smooth_window=3, prominence="zscore", stringency=2,  save=None):
 		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
@@ -2943,6 +2969,7 @@ class DistObj():
 		#Smooth signals with window
 		if smooth_window > 1:
 			self.smooth(smooth_window)
+		self.smooth_window = smooth_window
 		
 		#Shift signal above 0
 		self.shift_signal()
@@ -2990,16 +3017,26 @@ class DistObj():
 																			save=None), axis=1)
 			method = "flat"
 
-		#Collect peaks from analyzed signals
+		#Merge peaks across pairs
+		tables = res.values
+		self.peaks = pd.concat(tables)
+		self.peaks["Distance"] = self.peaks["Distance"].astype(int)
+
+		"""
 		if save is not None:
 			outfile = open(save, 'w')
 			outfile.write(self._PEAK_HEADER)
+		"""
 
-		thresholds = {}
-		all_peaks = []
-		peaking_count = 0
+		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
+
+		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
+		self.thresh["method"] = method
+
+		"""
 		for index, value in res.items():
 			tf1, tf2 = index
+
 			peaks, thresh = value
 			thresholds[tf1,tf2] = [tf1, tf2, thresh, method]
 			
@@ -3016,10 +3053,11 @@ class DistObj():
 
 		self.thresh = pd.DataFrame.from_dict(thresholds, orient="index",
 											 columns=['TF1', 'TF2', 'Threshold', "method"]).reset_index(drop=True) 
-
+		"""
+		"""
 		if save is not None:
 			outfile.close()
-		
+		"""
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
 	def analyze_hubs(self):
@@ -3137,7 +3175,7 @@ class DistObj():
 			if n_bins is None:
 				n_bins = np.max(distances) - np.min(distances) #as many bins as 'bp' between min/max distance
 
-			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', ec=None, label="counts") #ec needed to plot thin bars
+			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', ec='tab:blue', label="counts") #ec needed to plot thin bars
 			ax.set_ylabel('Count per distance')
 
 		elif style == "kde":
@@ -3271,7 +3309,7 @@ class DistObj():
 
 		"""
 
-		tfcomb.utils.check_type(pair, tuple, "pair")
+		tfcomb.utils.check_type(pair, [tuple, list], "pair")
 		tfcomb.utils.check_value(bwadjust, vmin=0)
 		
 		if save is not None:
@@ -3482,16 +3520,17 @@ class DistObj():
 
 		ind = tf1 + "-" + tf2
 		peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-		                        (self.peaks["TF2"] == tf2))].Distance.to_numpy()
+								(self.peaks["TF2"] == tf2))].Distance.to_numpy(dtype=int)
 		thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-		                        (self.thresh["TF2"] == tf2))].iloc[0,2]
+								(self.thresh["TF2"] == tf2))].iloc[0,2]
 		method = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-		                        (self.thresh["TF2"] == tf2))].iloc[0,3]
+								(self.thresh["TF2"] == tf2))].iloc[0,3]
 
 
 		datasource = self._get_datasource()
 		
-		x = datasource.loc[ind].iloc[2:].to_numpy()
+		distances = datasource.columns[2:].to_numpy()
+		x = datasource.loc[ind].iloc[2:].to_numpy() #y-values in plot
 		
 		negative = False
 		neg = x[0]
@@ -3513,13 +3552,18 @@ class DistObj():
 			return
 
 		fig, ax = plt.subplots(1, 1)
-		plt.plot(x)
+		plt.plot(distances, x)
 		if self.min_dist == 0 :
 			crosses = peaks + 1 
 		else:
 			crosses = peaks
+
 		if(len(peaks) > 0):
-			plt.plot(crosses, x[(crosses)], "x")
+			x_crosses = peaks
+			peak_idx = [list(distances).index(peak) for peak in peaks]
+			y_crosses = x[peak_idx] #y-values for peaks
+			plt.plot(x_crosses, y_crosses, "x")
+
 		plt.plot([thresh] * len(x), "--", color="gray")
 		plt.xlabel('Distance in bp')
 		plt.ylabel('Corrected count per distance')
