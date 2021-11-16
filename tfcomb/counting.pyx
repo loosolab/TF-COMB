@@ -324,10 +324,12 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 							#Save counts of association
 							if valid_pair == 1:
 								
+								#dist_ind calculation remains the same regardless directionality
+								dist_ind = offset + distance - min_distance - 1 
+								
 								#Add counts for the observed TF1-TF2
 								if (TF1_name, TF2_name) in rules:
 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat
-									dist_ind = offset + distance - min_distance - 1
 									dist_count_mat[pair_ind, dist_ind] += 1
 								
 								#Also add counts to TF2-TF1 if not directional
@@ -335,7 +337,6 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 									if (TF2_name, TF1_name) in rules:
 										
 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat
-										dist_ind = offset + distance - min_distance - 1
 										dist_count_mat[pair_ind, dist_ind] += 1
 
 					elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away
