@@ -67,21 +67,22 @@ def directionality(rules):
 	"""
 	
 	#TODO: Test input format
+	tfcomb.utils.check_type(rules, pd.DataFrame, "rules")
 
 	rules = rules.copy() #ensures that rules-table is not changed
 	
 	#Split TF names from strands
 	try:
 		rules[["TF1_name", "TF1_strand"]] = rules["TF1"].str.split("(", expand=True)
-	except:
-		raise InputError("Failed to split TF name from strand. Please ensure that .count_within() was run with '--directionality=True' and '--stranded=True'.")
+	except Exception as e:
+		raise InputError("Failed to split TF name from strand. Please ensure that .count_within() was run with '--directionality=True' and '--stranded=True'. Exception was: {0}".format(e.message))
 	rules["TF1_strand"] = rules["TF1_strand"].str.replace(")", "", regex=False)
 
 	rules[["TF2_name", "TF2_strand"]] = rules["TF2"].str.split("(", expand=True)
 	rules["TF2_strand"] = rules["TF2_strand"].str.replace(")", "", regex=False)
 	
 	#Setup count dictionary
-	keys = tuples = [tuple(x) for x in rules[["TF1_name", "TF1_strand", "TF2_name", "TF2_strand"]].values]
+	keys = [tuple(x) for x in rules[["TF1_name", "TF1_strand", "TF2_name", "TF2_strand"]].values]
 	counts = rules["TF1_TF2_count"].tolist()
 	count_dict = dict(zip(keys, counts))
 	
