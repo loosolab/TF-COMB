@@ -1,6 +1,5 @@
 
 from datetime import datetime
-import graph_tool.all
 import copy
 import multiprocessing as mp
 import pandas as pd
@@ -8,10 +7,8 @@ import random
 import itertools
 import scipy
 import re
-import graph_tool as gt
 
 #Network analysis
-import graph_tool.all
 import networkx as nx
 import community as community_louvain
 
@@ -98,9 +95,12 @@ def build_gt_network(table,
 	graph_tool.Graph 
 	"""
 
+	#check if graph-tool is installed
+	if tfcomb.utils.check_graphtool() == True:
+		import graph_tool
+
 	#TODO: check given input
 	check_type(table, pd.DataFrame, "table")
-
 
 
 	#Setup logger
@@ -413,8 +413,12 @@ def partition_blockmodel(g):
 	
 	"""
 	
+	#check if graph-tool is installed
+	if tfcomb.utils.check_graphtool() == True:
+		import graph_tool
+
 	#Infer blocks
-	state = gt.inference.minimize.minimize_blockmodel_dl(g)
+	state = graph_tool.inference.minimize.minimize_blockmodel_dl(g)
 	blocks = state.get_blocks()
 
 	#Add vertex property to graph
@@ -443,19 +447,26 @@ def get_node_table(G):
 	if isinstance(G, nx.Graph):
 		nodeview = G.nodes(data=True)
 		table  = pd.DataFrame().from_dict(dict(nodeview), orient='index')
+	else:
+		#check if graph-tool is installed
+		if tfcomb.utils.check_graphtool() == True:
+			import graph_tool
 
-	elif isinstance(G, gt.Graph):
-
-		#Information about graph
-		n_nodes = G.num_vertices()
-		properties = list(G.vertex_properties.keys())
+		if isinstance(G, graph_tool.Graph):
 	
+			#Information about graph
+			n_nodes = G.num_vertices()
+			properties = list(G.vertex_properties.keys())
+		
 
-		data = {}
-		for i in range(n_nodes):
-			data[i] = {prop: G.vertex_properties[prop][i] for prop in properties}
+			data = {}
+			for i in range(n_nodes):
+				data[i] = {prop: G.vertex_properties[prop][i] for prop in properties}
 
-		table = pd.DataFrame.from_dict(data, orient="index")
+			table = pd.DataFrame.from_dict(data, orient="index")
+		
+		else:
+			raise ValueError("Unknown format of input Graph")
 
 	return(table)
 

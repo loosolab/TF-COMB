@@ -10,6 +10,7 @@ import graphviz
 from adjustText import adjust_text
 import copy
 import distutils
+from distutils import util
 
 
 from tfcomb.utils import check_columns, check_type, check_string, check_value

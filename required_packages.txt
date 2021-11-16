@@ -1,0 +1,17 @@
+python
+numpy
+pandas
+scipy
+pysam
+matplotlib>=2
+python-louvain
+graphviz
+graph-tool
+networkx>=2.4 #G.node -> G.nodes
+statsmodels
+goatools
+pybigwig
+tobias
+uropa
+qnorm
+pip
