@@ -263,8 +263,6 @@ class CombObj():
 		
 		return(self)
 
-		return(self)
-
 	#-------------------------------------------------------------------------------#
 	#-------------------------- Setting up the .TFBS list --------------------------#
 	#-------------------------------------------------------------------------------#
@@ -896,6 +894,7 @@ class CombObj():
 
 	def market_basket(self, measure="cosine", 
 							threads=1,
+							keep_zero=False,
 							_show_columns=["TF1_TF2_count", "TF1_count", "TF2_count"]):
 		"""
 		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within().
@@ -906,6 +905,8 @@ class CombObj():
 			The measure(s) to use for market basket analysis. Can be any of: ["cosine", "confidence", "lift", "jaccard"]. Default: 'cosine'.
 		threads : int, optional
 			Threads to use for multiprocessing. This is passed to .count_within() in case the <CombObj> does not contain any counts yet. Default: 1.
+		keep_zero : bool
+			Whether to keep rules with 0 occurrences in .rules table. Default: False (remove 0-rules).
 
 		Raises
 		-------
@@ -973,7 +974,8 @@ class CombObj():
 				raise InputError("Measure '{0}' is invalid. The measure must be one of: {1}".format(metric, available_measures))
 		
 		#Remove rows with TF1_TF2_count == 0
-		table = table[table["TF1_TF2_count"] != 0]
+		if keep_zero == False:
+			table = table[table["TF1_TF2_count"] != 0]
 
 		#Sort for highest measure pairs
 		table.sort_values([measure[0], "TF1"], ascending=[False, True], inplace=True) #if two pairs have equal measure, sort by TF1 name
@@ -1762,7 +1764,7 @@ class DiffCombObj():
 
 		columns = [] #collect the log2fc columns per contrast
 		for (p1, p2) in self.contrasts:
-			self.logger.info("Calculating contrast: {0} / {1}".format(p1, p2))
+			self.logger.info("Calculating foldchange for contrast: {0} / {1}".format(p1, p2))
 			log2_col = "{0}/{1}_{2}_log2fc".format(p1, p2, measure)
 			columns.append(log2_col)
 
