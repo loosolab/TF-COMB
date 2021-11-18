@@ -205,11 +205,11 @@ class CombObj():
 					raise InputError(err)
 
 	def _check_rules(self):
-		""" Internal check whether .rules were. Raises InputError when .rules are not available. """
+		""" Internal check whether .rules were filled. Raises InputError when .rules are not available. """
 
 		if self.rules is None or not isinstance(self.rules, pd.DataFrame):
 			raise InputError("No market basket rules found in .rules. The rules are found by running .market_basket().")
-
+	
 	#-------------------------------------------------------------------------------#
 	#----------------------------- Save / import object ----------------------------#
 	#-------------------------------------------------------------------------------#
@@ -2347,21 +2347,6 @@ class DistObj():
 			datasource = self.corrected
 
 		return(datasource)
-		"""
-		self.check_min_max_dist()
-		tfcomb.utils.check_value(self.max_overlap, vmin=0.0, vmax=1.0, name=".max_overlap")
-
-		text_cols = ["TF1", "TF2"]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			text_cols += ["neg"]
-			
-		base_columns =  text_cols +  [str(x) for x in range(self.max_dist + 1)]
-
-		try:	 
-			return datasource[base_columns]
-		except KeyError:
-			raise InputError(f"columns: {list(set(base_columns) - set(datasource.columns))} ")
-		"""
 
 	def _set_datasource(self, datasource):
 		""" Sets datasource
@@ -3024,42 +3009,11 @@ class DistObj():
 		self.peaks = pd.concat(tables)
 		self.peaks["Distance"] = self.peaks["Distance"].astype(int)
 
-		"""
-		if save is not None:
-			outfile = open(save, 'w')
-			outfile.write(self._PEAK_HEADER)
-		"""
-
 		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
 
 		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
 		self.thresh["method"] = method
 
-		"""
-		for index, value in res.items():
-			tf1, tf2 = index
-
-			peaks, thresh = value
-			thresholds[tf1,tf2] = [tf1, tf2, thresh, method]
-			
-			if len(peaks)>0:
-				for peak in peaks:
-					all_peaks.append(peak)
-					if save is not None:    
-						outfile.write('\t'.join(str(x) for x in peak) + '\n')
-				peaking_count += 1
-
-		self.peaks = pd.DataFrame(all_peaks, columns=self._PEAK_HEADER.strip().split("\t"))
-		self.smooth_window = smooth_window
-		self.peaking_count = peaking_count
-
-		self.thresh = pd.DataFrame.from_dict(thresholds, orient="index",
-											 columns=['TF1', 'TF2', 'Threshold', "method"]).reset_index(drop=True) 
-		"""
-		"""
-		if save is not None:
-			outfile.close()
-		"""
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
 	def analyze_hubs(self):
@@ -3078,7 +3032,7 @@ class DistObj():
 		return pd.Series(occurrences)		
 
 	def classify_rules(self):
-		""" Classify all rulesm True if at least one peak was found, False otherwise.  
+		""" Classify all rules True if at least one peak was found, False otherwise.  
 
 			Returns:
 			----------
@@ -3094,6 +3048,45 @@ class DistObj():
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
 		self._set_datasource(datasource)
+
+	def rank_rules(self, by=["Peak Heights", "Prominences", "TF1_TF2_count"], calc_mean=True):
+		""" ranks rules within each column specified. 
+
+			Params:
+			----------
+			by : list of strings
+				Columns for wich the rules should be ranked
+				Default: ["Peak Heights", "Prominences", "TF1_TF2_count"]
+			calc_mean: bool
+				True if an extra column should be calculated containing the mean rank, false otherwise
+				Default: True
+			
+			Raises
+			-------
+			InputError
+				If columns selection (parameter: by) is not valid.
+
+			Returns:
+			----------
+			None adds a rank column for each criteria given plus one for the mean if set to True
+		"""
+		# create new column names
+		rank_cols = ["rank_" + col for col in by]
+
+		# check peaks are calculated + by are only valid columns
+		self.check_peaks()
+		if (not set(by).issubset(self.peaks.columns)):
+			raise InputError(f"Column selection not valid. Possible column names to rank by: {self.peaks.columns.values}")
+
+		# rank all given columns (biggest number = rank 1) # maybe adjust this for new measurements
+		self.peaks[rank_cols] = self.peaks[by].rank(method="dense", ascending=0)
+		
+		if calc_mean:
+			# calculate mean rank (from all column ranks)
+			self.peaks["mean_rank"] = self.peaks[rank_cols].mean(axis=1)
+			# nice to have the best ranks at the top 
+			self.peaks = self.peaks.sort_values(by="mean_rank")
+		
 
 	def check_periodicity(self):
 		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
@@ -3121,7 +3114,7 @@ class DistObj():
 		----------
 		pair : tuple(str,str)
 			Pair to create plot for.
-		style : str,
+		style : str
 			Style of the plot. One of "hist" (histogram) or "kde". 
 		n_bins: int
 			Number of bins of style == "hist". Default: None (Binning is done automatically)
@@ -3232,7 +3225,7 @@ class DistObj():
 	def plot_hist(self, pair, n_bins=None, save=None):
 		""" Histograms for a list of TF-pairs
 
-		 Parameters
+		 	Parameters
 			----------
 			pair : tuple(str,str)
 				Pair to create plot for.
