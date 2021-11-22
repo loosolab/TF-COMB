@@ -2113,6 +2113,7 @@ class DistObj():
 		self.peaks = None 	         # Pandas DataFrame of size n_pairs x n_preferredDistance 
 
 		self.peaking_count = None    # Number of pairs with at least one peak 
+		self.zscores = None			 # calculated zscores 
 	
 		
 		self.n_bp = 0			     # Predicted number of baskets 
@@ -3007,6 +3008,7 @@ class DistObj():
 																	prominence=1, # for zscore threshold is given via stringency
 																	stringency=stringency,
 																	save=None), axis=1)
+			self.zscores = zsc
 			method = "zscore"
 
 		else:
