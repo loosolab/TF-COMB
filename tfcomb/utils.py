@@ -74,6 +74,37 @@ class InputError(Exception):
 		etype, msg, tb = sys.exc_info()
 		sys.stderr.write("{0}: {1}".format(etype.__name__, msg))
 
+class StopExecution(Exception):
+	""" Stop execution of a notebook cell with error message"""
+
+	def _render_traceback_(self):
+		etype, msg, _ = sys.exc_info()
+		sys.stderr.write("{1}".format(etype.__name__, msg))
+		#sys.stderr.write(f"{msg}")
+
+def check_graphtool():
+	""" Utility to check if 'graph-tool' is installed on path. Raises an exception (if notebook) or exits (if script) if the module is not installed. """
+
+	error = 0
+	try:
+		import graph_tool.all
+	except ModuleNotFoundError:
+		error = 1
+	except: 
+		raise #unexpected error loading module
+	
+	#Write out error if module was not found
+	if error == 1:
+		s = "ERROR: Could not find the 'graph-tool' module on path. This module is needed for some of the TFCOMB network analysis functions. "
+		s += "Please visit 'https://graph-tool.skewed.de/' for information about installation."
+
+		if is_notebook():
+			raise StopExecution(s) from None
+		else:
+			sys.exit(s)
+	
+	return(True)
+
 #--------------------------------- File/type checks ---------------------------------#
 
 def check_columns(df, columns):
