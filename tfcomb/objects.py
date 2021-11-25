@@ -1092,6 +1092,7 @@ class CombObj():
 
 		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
 
 		return(new_obj)
 
@@ -1124,6 +1125,7 @@ class CombObj():
 
 		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
 
 		return(new_obj)
 
@@ -1203,6 +1205,7 @@ class CombObj():
 
 		self.logger.debug("Setting TFBS in new object")
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
 
 		return(new_obj)
 
@@ -1745,13 +1748,19 @@ class DiffCombObj():
 		#Establish input/output columns
 		measure_columns = [prefix + "_" + self.measure for prefix in self.prefixes]
 		zero_bool = self.rules[measure_columns] == 0
+		nan_bool = self.rules[measure_columns].isnull()
+
+		#Fill na with 0
+		data = self.rules[measure_columns]
+		data[nan_bool] = 0
 
 		#Normalize values
-		self.rules[measure_columns] = qnorm.quantile_normalize(self.rules[measure_columns], axis=1)
+		self.rules[measure_columns] = qnorm.quantile_normalize(data, axis=1)
 		
-		#Ensure that original 0 values are kept at 0
+		#Ensure that original 0 values are kept at 0, and original nan kept at nan
 		self.rules[zero_bool] = np.nan
 		self.rules.fillna(0, inplace=True)
+		self.rules[nan_bool] = np.nan
 
 	def calculate_foldchanges(self, pseudo=None, threads=1):
 		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
@@ -1886,7 +1895,8 @@ class DiffCombObj():
 		new_obj = self.copy()
 		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
-
+		new_obj.network = None
+		
 		return(new_obj)
 
 	#-------------------------------------------------------------------------------------------#
