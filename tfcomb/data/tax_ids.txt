@@ -1,0 +1,6 @@
+hsapiens	9606
+mmusculus	10090
+drerio	7955
+dmelanogaster	7227
+scerevisiae	4932
+xtropicalis	8364
