@@ -431,10 +431,10 @@ def check_boundaries(regions, genome):
 
 	for region in regions:
 		if region.chrom not in chromosomes:
-			raise InputError("Region '{0} {1} {2} {3}' is not present in the given genome. Available chromosomes are: {4}.".format(region.chrom, chromosomes))
+			raise InputError("Region '{0} {1} {2} {3}' is not present in the given genome. Available chromosomes are: {4}.".format(region.chrom, region.start, region.end, region.name, chromosomes))
 		else:
 			if region.start < 0 or region.end > genome_bounds[region.chrom]:
-				raise InputError("Region '{0} {1} {2} {3}' is out of bounds in the given genome. The length of the chromosome is: {4}".format(region.chrom, region.start, region.end, genome_bounds[region.chrom]))
+				raise InputError("Region '{0} {1} {2} {3}' is out of bounds in the given genome. The length of the chromosome is: {4}".format(region.chrom, region.start, region.end, region.name, genome_bounds[region.chrom]))
 
 
 def unique_region_names(regions):
