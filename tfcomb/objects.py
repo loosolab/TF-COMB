@@ -3082,7 +3082,7 @@ class DistObj():
 			----------
 			by : list of strings
 				Columns for wich the rules should be ranked
-				Default: ["Peak Heights", "Prominences", "TF1_TF2_count"]
+				Default: ["Peak Heights", "noisiness"]
 			calc_mean: bool
 				True if an extra column should be calculated containing the mean rank, false otherwise
 				Default: True
@@ -3107,9 +3107,9 @@ class DistObj():
 		# rank all given columns (biggest number = rank 1) # maybe adjust this for new measurements
 		for col in rank_cols:
 			if col =="rank_noisiness":
-				self.peaks[rank_cols] = self.peaks[by].rank(method="dense", ascending=1)
+				self.peaks[col] = self.peaks[by].rank(method="dense", ascending=1)
 			else:
-				self.peaks[rank_cols] = self.peaks[by].rank(method="dense", ascending=0)
+				self.peaks[col] = self.peaks[by].rank(method="dense", ascending=0)
 		
 		if calc_mean:
 			# calculate mean rank (from all column ranks)
