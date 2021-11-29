@@ -315,7 +315,7 @@ def get_degree(G, weight=None):
 	"""
 
 	tfcomb.utils.check_type(G, [nx.Graph])
-	tfcomb.utils.check_type(G, [str, type(None)], "weight")
+	tfcomb.utils.check_type(weight, [str, type(None)], "weight")
 	
 	
 	if weight is None:

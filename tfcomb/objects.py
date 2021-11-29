@@ -1092,6 +1092,7 @@ class CombObj():
 
 		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
 
 		return(new_obj)
 
@@ -1124,6 +1125,7 @@ class CombObj():
 
 		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
 
 		return(new_obj)
 
@@ -1203,6 +1205,7 @@ class CombObj():
 
 		self.logger.debug("Setting TFBS in new object")
 		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
 
 		return(new_obj)
 
@@ -1269,6 +1272,9 @@ class CombObj():
 			check_columns(table, [TF1_col, TF2_col])
 			self.rules = self.rules.merge(table, left_on=["TF1", "TF2"], right_on=[TF1_col, TF2_col], how="left")
 		
+		#Set name of index for table
+		self.rules.index = self.rules["TF1"] + "-" + self.rules["TF2"]
+
 		#If data was integrated, .network must be recalculated	
 		self.network = None
 		
@@ -1577,7 +1583,7 @@ class CombObj():
 
 class DiffCombObj():
 
-	def __init__(self, objects=[], measure='cosine', join="inner", verbosity=1):
+	def __init__(self, objects=[], measure='cosine', join="inner", fillna=True, verbosity=1):
 		""" Initializes a DiffCombObj object for doing differential analysis between CombObj's.
 
 		Parameters
@@ -1589,6 +1595,9 @@ class DiffCombObj():
 		join : string
 			How to join the TF names of the two objects. Must be one of "inner" or "outer". If "inner", only TFs present in both objects are retained. 
 			If "outer", TFs from both objects are used, and any missing counts are set to 0. Default: "inner".
+		fillna : True
+			If "join" == "outer", there can be missing counts for individual rules. If fillna == True, these counts are set to 0. Else, the counts are NA. 
+			Default: True.
 		verbosity : int, optional
 			The verbosity of the output logging. Default: 1.
 
@@ -1609,7 +1618,7 @@ class DiffCombObj():
 
 		#Add objects one-by-one
 		for obj in objects:
-			self.add_object(obj, join=join)
+			self.add_object(obj, join=join, fillna=fillna)
 
 		#Use functions from CombObj
 		self._set_combobj_functions()
@@ -1627,7 +1636,9 @@ class DiffCombObj():
 	def __str__(self):
 		pass
 		
-	def add_object(self, obj, join="inner"):
+	def add_object(self, obj, join="inner", 
+							 fillna=True
+							  ):
 		"""
 		Add one CombObj to the DiffCombObj.
 
@@ -1638,7 +1649,10 @@ class DiffCombObj():
 		join : string
 			How to join the TF names of the two objects. Must be one of "inner" or "outer". If "inner", only TFs present in both objects are retained. 
 			If "outer", TFs from both objects are used, and any missing counts are set to 0. Default: "inner".
-		
+		fillna : True
+			If "join" == "outer", there can be missing counts for individual rules. If fillna == True, these counts are set to 0. Else, the counts are NA. 
+			Default: True.
+
 		Returns
 		--------
 		None
@@ -1676,7 +1690,7 @@ class DiffCombObj():
 		columns_to_keep = ["TF1", "TF2"] + [self.measure]
 		
 		obj_table = obj.rules[columns_to_keep] #only keep necessary columns
-		obj_table.rename(columns={self.measure: str(prefix) + "_" + self.measure}, inplace=True) #rename column to <prefix>_<measure>
+		obj_table.columns = [str(prefix) + "_" + col if col not in ["TF1", "TF2"] else col for col in obj_table.columns] #add prefix to all columns besides TF1/TF2
 
 		obj_TF_table = obj.TF_table.copy()
 		obj_TF_table.columns = [str(prefix) + "_" + col for col in obj_TF_table.columns]
@@ -1708,7 +1722,9 @@ class DiffCombObj():
 
 			else: #join is outer
 				self.rules = self.rules.merge(obj_table, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"], how="outer")
-				self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
+
+				if fillna == True:
+					self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
 
 			#Merge TF tables
 			self.TF_table = self.TF_table.merge(obj_TF_table, left_index=True, right_index=True)
@@ -1732,13 +1748,19 @@ class DiffCombObj():
 		#Establish input/output columns
 		measure_columns = [prefix + "_" + self.measure for prefix in self.prefixes]
 		zero_bool = self.rules[measure_columns] == 0
+		nan_bool = self.rules[measure_columns].isnull()
+
+		#Fill na with 0
+		data = self.rules[measure_columns]
+		data[nan_bool] = 0
 
 		#Normalize values
-		self.rules[measure_columns] = qnorm.quantile_normalize(self.rules[measure_columns], axis=1)
+		self.rules[measure_columns] = qnorm.quantile_normalize(data, axis=1)
 		
-		#Ensure that original 0 values are kept at 0
+		#Ensure that original 0 values are kept at 0, and original nan kept at nan
 		self.rules[zero_bool] = np.nan
 		self.rules.fillna(0, inplace=True)
+		self.rules[nan_bool] = np.nan
 
 	def calculate_foldchanges(self, pseudo=None, threads=1):
 		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
@@ -1873,7 +1895,8 @@ class DiffCombObj():
 		new_obj = self.copy()
 		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
-
+		new_obj.network = None
+		
 		return(new_obj)
 
 	#-------------------------------------------------------------------------------------------#
