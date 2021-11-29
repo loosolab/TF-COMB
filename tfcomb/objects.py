@@ -2296,13 +2296,8 @@ class DistObj():
 
 		self._set_datasource(datasource)
 
-	def reset_signal(self, smoothed):
+	def reset_signal(self):
 		""" Resets the signals to their original state. 
-
-		Parameters
-		----------
-		smoothed: bool 
-			True if the signal was smoothed beforehand, false otherwise
 
 		Returns:
 		----------
@@ -2374,6 +2369,7 @@ class DistObj():
 	
 	def check_linres(self):
 		""" Utility function to check if linear regressions were set. If not, InputError is raised. """
+
 		if self.linres is None:
 			raise InputError("Linear regression not fitted yet. Please run .linregress_all() first.")
 			
@@ -2587,8 +2583,13 @@ class DistObj():
 			self.logger.info("Normalizing data.")
 
 			data_columns = [col for col in columns if col not in ["TF1", "TF2"]] #with or without 'neg' column
+			""" 
+			# normalize to sum=1
 			rowsums = self.distances[data_columns].sum(axis=1)
 			self.distances[data_columns] = self.distances[data_columns].div(rowsums, axis=0) #divide by zero returns NaN
+			"""
+			# minmax normalization
+			self.distances[data_columns]  = self.distances[data_columns].apply(lambda x:(x.astype(float) - min(x))/(max(x)-min(x)), axis = 1)
 			self.distances.fillna(0, inplace=True)
 
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
@@ -3051,7 +3052,7 @@ class DistObj():
 
 		self._set_datasource(datasource)
 
-	def rank_rules(self, by=["Peak Heights", "Prominences", "TF1_TF2_count"], calc_mean=True):
+	def rank_rules(self, by=["Peak Heights", "noisiness"], calc_mean=True):
 		""" ranks rules within each column specified. 
 
 			Params:
@@ -3081,7 +3082,11 @@ class DistObj():
 			raise InputError(f"Column selection not valid. Possible column names to rank by: {self.peaks.columns.values}")
 
 		# rank all given columns (biggest number = rank 1) # maybe adjust this for new measurements
-		self.peaks[rank_cols] = self.peaks[by].rank(method="dense", ascending=0)
+		for col in rank_cols:
+			if col =="rank_noisiness":
+				self.peaks[rank_cols] = self.peaks[by].rank(method="dense", ascending=1)
+			else:
+				self.peaks[rank_cols] = self.peaks[by].rank(method="dense", ascending=0)
 		
 		if calc_mean:
 			# calculate mean rank (from all column ranks)
@@ -3089,6 +3094,90 @@ class DistObj():
 			# nice to have the best ranks at the top 
 			self.peaks = self.peaks.sort_values(by="mean_rank")
 		
+	def evaluate_noise(self, method="median"):
+		""" evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
+		"""
+		self.check_peaks()
+		self.peaks["noisiness"] = self.peaks.apply(lambda x: self._get_noise_measure((x.TF1, x.TF2), method), axis=1)
+		
+
+	def _get_noise_measure(self, pair, method, height_multiplier=0.75):
+		# check pair
+		self.check_pair(pair)
+
+		#check method input
+		tfcomb.utils.check_string(method, ["median", "min_max"], "method")
+
+		datasource = self._get_datasource()
+		# get the signal for specific pair
+		signal = datasource[(datasource.TF1 == pair[0]) & (datasource.TF2 == pair[1])][self._distance_columns]
+
+		# get the cutting points fot the signal
+		cuts = self._get_cut_points(pair, height_multiplier, signal)
+
+		# cut all peaks out of the signal
+		for cut in cuts:
+			signal.iloc[0, cut[0]:cut[1]] = np.nan
+
+		measure = None
+		if method == "median":
+			measure = signal.median(axis=1)
+		elif method == "min_max":
+			measure = signal.max(axis=1) - signal.min(axis=1)
+		
+		return float(measure)
+
+
+
+	def _get_cut_points(self, pair, height_multiplier, signal):
+		# check peaks filled
+		self.check_peaks()
+		# check pair in keys
+		self.check_pair(pair)
+		# get peaks for specific pair
+		peaks = self.peaks[(self.peaks.TF1 == pair[0]) & (self.peaks.TF2 == pair[1])]
+
+		cuts =[]
+		for idx,row in peaks.iterrows():
+			# get the peak distance
+			peak = row.Distance
+			# get the peak height 
+			peak_height = signal.iloc[0, peak]
+			# determine cutoff, in common sense this should be "going ~25% down the peak size"
+			cut_off = height_multiplier * peak_height
+			cuts.append(self._expand_peak(peak, cut_off, signal))
+		return cuts
+	
+	def _expand_peak(self, start_pos, cut_off, signal):
+		found_left = False
+		found_right = False
+		pos_left = start_pos - 1
+		pos_right = start_pos + 1
+
+		# expand the peak until both borders are found
+		while(not(found_left & found_right)):
+			# left side
+			if(not found_left):
+				# left border not found
+				if pos_left == -1: # check if position less than start of signal
+					found_left = True
+					left = 0
+				elif signal.iloc[0, pos_left] <= cut_off:
+					found_left = True
+					left = found_left  + 1 # we are one to far left
+				pos_left -= 1
+			
+			# right side
+			if(not found_right):
+				# right border not found	
+				if  pos_right == len(signal): # check if position higher than end of signal
+					found_right = True
+					right = len(signal) - 1
+				elif signal.iloc[0, pos_right] < cut_off:
+					found_right = True
+					right = pos_right - 1 # we are one to far right
+				pos_right += 1
+		return(left, right)
 
 	def check_periodicity(self):
 		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
