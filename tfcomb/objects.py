@@ -2628,6 +2628,65 @@ class DistObj():
 	#------------------------------------ Analysis steps ---------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
+	def _multiprocess_chunks(self, threads, func, datatable):
+		
+		# check function is supported
+		if not callable(func):
+			raise InputError(f"Input {func} not callable. Please provide a function")
+		check_string(func.__name__,["linress_chunks","correct_chunks"], name="function")
+
+		self.logger.debug(f"Multiprocessing chunks for {func}")
+		# open Pool for multiprocessing
+		pool = mp.Pool(threads)
+
+		# get valid distance columns
+		distances = self.distances.columns[2:].tolist()
+		
+		# list all TF pairs
+		names = list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values)))
+		
+		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
+		n_names = len(names)
+		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
+
+		jobs = []
+		# start one chunk per thread 
+		for i in range(threads):
+			# get name subset for chunk
+			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
+
+			# subset distance information for names in this chunk
+			counts = datatable.set_index(['TF1','TF2']).sort_index().loc[subset]
+
+			if func == tfcomb.utils.linress_chunks:
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, distances, ))
+
+			elif func == tfcomb.utils.correct_chunks:
+				# subset linres information for names in this chunk
+				linres = self.linres.set_index(['TF1','TF2']).sort_index().loc[subset]
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, distances, linres, ))
+
+			jobs.append(job)
+
+		# accept no new jobs
+		pool.close()
+			
+		# log_progress(jobs, self.logger) # doesn't work with chunks (TODO)
+		
+		# get results from jobs
+		results = []
+		for job in jobs:
+			results += job.get()
+		
+		# wait for all jobs to be finished and tidy up pools
+		pool.join()
+
+		# convert to numpy 
+		results = np.array(results, dtype=object) # prevent convert float to str 
+		return results
+		
 
 	def linregress_all(self, threads=1, n_bins=None, save=None):
 		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
@@ -2662,96 +2721,27 @@ class DistObj():
 
 		self.logger.info(f"Fitting linear regression. With number of threads: {threads}")
 
-		##### multiprocess linear regression
-		# open Pool for multiprocessing
-		pool = mp.Pool(threads)
+		# hand it over to multiprocess chunks 
+		results = self._multiprocess_chunks(threads, tfcomb.utils.linress_chunks, self.distances)
 
-		# get valid distance columns
-		distances = self.distances.columns[2:].tolist()
-		distances = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
-		
-		# list all TF pairs
-		names = list(zip(list(self.distances.TF1.values),list(self.distances.TF2.values)))
-		
-		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
-		n_names = len(names)
-		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
-
-		jobs = []
-		# start one chunk per thread 
-		for i in range(threads):
-			# get name subset for chunk
-			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
-			# subset distance information for names in this chunk
-			counts = self.distances.set_index(['TF1','TF2']).sort_index().loc[subset]
-			
-			job = pool.apply_async(linress_chunks, args=(subset, counts, distances, ))
-			jobs.append(job)
-
-		# accept no new jobs
-		pool.close()
-			
-		# log_progress(jobs, self.logger) # doesn't work with chunks (TODO)
-		
-		# get results from jobs
-		results = []
-		for job in jobs:
-			results += job.get()
-		
-		# wait for all jobs to be finished and tidy up pools
-		pool.join()
-
-		# convert to numpy
-		results = np.array(results)
+		# save results
 		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
+		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
 
 		if save is not None:
 			self.logger.info("Plotting all linear regressions. This may take a while")
 			self._plot_all(n_bins, save, self.plot_linres)
 
 		self.logger.info("Linear regression finished! Results can be found in .linres")
+
 	
-	def _correct_pair(self, pair, linres):
-		""" Subtracts the estimated background from the Signal for a given pair. 
-			
-			Parameters
-			----------
-			pair : tuple(str,str)
-				TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
-			linres: scipy.stats._stats_mstats_common.LinregressResult 
-				Fitted linear regression for the given pair
-
-			Returns:
-			----------
-			list 
-				Corrected values for the given pair
-		"""
-
-		self.check_distances()
-		self.check_pair(pair)
-		
-		if linres is None:
-			self.logger.error("Please fit a linear regression first. [see .linregress_all()]")
-			sys.exit(0)
-
-		self.logger.debug(f"Correcting background for pair {pair}")
-
-		ind = "-".join(pair)
-
-		distances = self.distances.columns[2:].tolist()
-		distances = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
-		counts = self.distances.loc[ind].iloc[2:].values
-
-		# subtract background from signal
-		corrected = counts - (linres.intercept + linres.slope * distances)
-		
-		return(corrected)
-	
-	def correct_all(self, n_bins=None, save=None):
+	def correct_all(self, threads=1, n_bins=None, save=None):
 		""" Subtracts the estimated background from the Signal for all rules. 
 			
 			Parameters
 			----------
+			threads: int
+				Number of threads used for fitting linear regression
 			n_bins: int 
 				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
 				Default: None
@@ -2765,25 +2755,24 @@ class DistObj():
 				Fills the object variable .corrected
 		"""
 		
+		# check input param
 		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_dir(save)
+		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 		
+		# sanity checks
 		self.check_linres()
 		self.check_min_max_dist()
 
 		self.logger.info(f"Correcting background")
 		
-		#Correct individual pairs
-		corrected = {}
-		for idx, row in self.linres.iterrows():
-			tf1, tf2, linres = row
-			res = self._correct_pair((tf1, tf2), linres)
-			corrected[tf1, tf2] = [tf1, tf2] + list(res)
-		
+		# hand it over to multiprocess chunks 
+		result = self._multiprocess_chunks(threads, tfcomb.utils.correct_chunks, self.distances)
+
 		#Create dataframe of corrected counts
-		columns = self.distances.columns
-		self.corrected = pd.DataFrame.from_dict(corrected, orient="index", columns=columns).reset_index(drop=True)
+		columns = self.distances.columns.tolist()
+		self.corrected = pd.DataFrame(result, columns=columns).reset_index(drop=True)
 		self.corrected.index = self.corrected["TF1"] + "-" + self.corrected["TF2"]
 		
 		if save is not None:
@@ -2834,7 +2823,7 @@ class DistObj():
 		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			plot_func((tf1, tf2), n_bins=n_bins, save=os.path.join(save_path,f"{tf1}_{tf2}.png"))
 
-	# TODO: Check if kwargs is better suited tham height & prominence
+	# TODO: Check if kwargs is better suited than height & prominence
 	def _analyze_signal_pair(self, pair, signal, prominence=0, stringency=2, save=None, new_file=True):
 		""" After background correction is done (see ._correct_pair() or .correct_all()), the signal is analyzed for peaks, 
 			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 

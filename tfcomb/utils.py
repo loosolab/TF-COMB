@@ -1156,7 +1156,7 @@ def set_contrast(contrast, available_contrasts):
 
 	return(contrast)
 
-
+# ------------------------- chunk operations ---------------------------------------- #
 def linress_chunks(pairs, dist_counts, distances):
 	''' Helper function to process linear regression for chunks 
 		
@@ -1178,13 +1178,15 @@ def linress_chunks(pairs, dist_counts, distances):
 	dist_counts = dist_counts.reset_index()
 	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
 	
+	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+
 	#save results as list
 	results = []
 	for pair in pairs:
 
 		# get count for specific pair
 		ind = "-".join(pair)
-		counts = dist_counts.loc[ind].iloc[2:].values #exclude TF1, TF2 columns
+		counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
 		counts = np.array(counts, dtype=float)
 		
 		# fit linear regression
@@ -1193,5 +1195,55 @@ def linress_chunks(pairs, dist_counts, distances):
 		# get TF1, TF2 names from pair
 		tf1, tf2 = pair
 		results.append([tf1, tf2, res])
+	return results
+
+def correct_chunks(pairs, dist_counts, distances, linres):
+	""" Subtracts the estimated background from the Signal for a given pair. 
+			
+	Parameters
+	-----------
+	pairs: list<tuple>
+		   A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+	dist_counts: pd.DataFrame
+		   A (sub-)Dataframe with the distance counts for the pairs
+	distances: list
+		   A list of valid column names for the distances  
+		
+	Returns
+	-----------
+	results: list 
+			A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+	"""
+
+	# make sure index is correct
+	dist_counts = dist_counts.reset_index()
+	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
+
+	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+
+	linres = linres.reset_index()
+	linres.index = linres["TF1"] + "-" + linres["TF2"]
+
+	linres_col = "Linear Regression"
+	
+	#save results as list
+	results = []
+	for pair in pairs:
+
+		# get count for specific pair
+		ind = "-".join(pair)
+		counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+		counts = np.array(counts, dtype=float)
+
+		linres_pair = linres.loc[ind].loc[linres_col] #exclude TF1, TF2 columns
+	
+		# subtract background
+		corrected = counts - (linres_pair.intercept + linres_pair.slope * np.array(distances))
+		
+		# get TF1, TF2 names from pair
+		tf1, tf2 = pair
+		corrected = [tf1, tf2] + corrected.tolist()
+
+		results.append(corrected)
 		
 	return results
