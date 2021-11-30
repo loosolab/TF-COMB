@@ -1155,3 +1155,43 @@ def set_contrast(contrast, available_contrasts):
 			raise ValueError("Contrast {0} is not valid (available contrasts are {1})".format(contrast, available_contrasts))
 
 	return(contrast)
+
+
+def linress_chunks(pairs, dist_counts, distances):
+	''' Helper function to process linear regression for chunks 
+		
+		Parameters
+		-----------
+		pairs: list<tuple>
+			   A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+		dist_counts: pd.DataFrame
+			   A (sub-)Dataframe with the distance counts for the pairs
+		distances: list
+			   A list of valid column names for the distances  
+		
+		Returns
+		-----------
+		results: list 
+				A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+	'''
+	# make sure index is correct
+	dist_counts = dist_counts.reset_index()
+	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
+	
+	#save results as list
+	results = []
+	for pair in pairs:
+
+		# get count for specific pair
+		ind = "-".join(pair)
+		counts = dist_counts.loc[ind].iloc[2:].values #exclude TF1, TF2 columns
+		counts = np.array(counts, dtype=float)
+		
+		# fit linear regression
+		res = scipy.stats.linregress(distances, counts)
+
+		# get TF1, TF2 names from pair
+		tf1, tf2 = pair
+		results.append([tf1, tf2, res])
+		
+	return results

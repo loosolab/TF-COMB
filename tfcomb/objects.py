@@ -16,6 +16,7 @@ import glob
 import fnmatch
 import pickle
 import collections
+import math
 
 #Statistics
 import qnorm #quantile normalization
@@ -1398,9 +1399,10 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via combobj.distObj")
 
-	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None, **kwargs):
+	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None, threads=4, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
+
 		"""
 		self.create_distObj()
 		self.distObj.set_verbosity(self.verbosity)
@@ -1420,7 +1422,7 @@ class CombObj():
 			subfolder_peaks = parent_directory
 		
 		
-		self.distObj.linregress_all(n_bins=n_bins, save=subfolder_linres)
+		self.distObj.linregress_all(threads=threads, n_bins=n_bins, save=subfolder_linres)
 		self.distObj.correct_all(n_bins=n_bins, save=subfolder_corrected)
 		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
 
@@ -2490,8 +2492,7 @@ class DistObj():
 		Parameters
 		----------
 		normalize : bool
-			True if data should be normalized, False otherwise. Normalization is done as followed:
-			(number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
+			True if data should be normalized, False otherwise. Normalization is done with min_max normalization
 			Default: True
 		directional : bool or None
 			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
@@ -2575,8 +2576,7 @@ class DistObj():
 			Parameters
 			-------------
 			normalize : bool
-			True if data should be normalized, False otherwise. Normalization is done as followed:
-			(number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
+			True if data should be normalized, False otherwise. Normalization method is min_max normalization:
 			Default: True
 
 		"""
@@ -2628,42 +2628,15 @@ class DistObj():
 	#------------------------------------ Analysis steps ---------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def _linregress_pair(self, pair):
-		""" Fits a linear Regression to distance count data for a given pair. The linear regression is used to 
-			estimate the background. Proceed with ._correct_pair()
-			
-			Parameters
-			----------
-			pair : tuple(str,str)
-				TF names for which the linear regression should be performed. e.g. ("NFYA","NFYB")
 
-			Returns:
-			----------
-			scipy.stats._stats_mstats_common.LinregressResult Object
-		"""
-		self.check_distances()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		self.logger.debug(f"Fitting linear regression for pair: {pair}")
-		
-		ind = "-".join(pair)
-		counts = self.distances.loc[ind].iloc[2:].values #exclude TF1, TF2 columns
-		counts = np.array(counts, dtype=float)
-
-		distances = self.distances.columns[2:].tolist()
-		distances = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
-
-		linres = linregress(distances, counts)
-
-		return(linres)
-	
-	def linregress_all(self, n_bins=None, save=None):
+	def linregress_all(self, threads=1, n_bins=None, save=None):
 		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
 			estimate the background. Proceed with .correct_all()
 			
 			Parameters
 			----------
+			threads: int
+				Number of threads used for fitting linear regression
 			n_bins: int 
 				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
 				Default: None
@@ -2677,23 +2650,61 @@ class DistObj():
 				Fills the object variable .linres
 		"""
 
+		# check input param
 		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		if save is not None:
 			tfcomb.utils.check_dir(save)
+		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 
+		# sanity checks
 		self.check_distances()
+		self.check_min_max_dist()
 
-		self.logger.info("Fitting linear regression.")
-		linres = {}
-		for tf1, tf2 in zip(self.distances.TF1, self.distances.TF2):
-			res = self._linregress_pair((tf1, tf2))
-			linres[tf1, tf2] = [tf1, tf2, res]
+		self.logger.info(f"Fitting linear regression. With number of threads: {threads}")
+
+		##### multiprocess linear regression
+		# open Pool for multiprocessing
+		pool = mp.Pool(threads)
+
+		# get valid distance columns
+		distances = self.distances.columns[2:].tolist()
+		distances = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
 		
-		#Convert all linres to table
-		self.linres = pd.DataFrame.from_dict(linres, orient="index",
-											 columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
-		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
+		# list all TF pairs
+		names = list(zip(list(self.distances.TF1.values),list(self.distances.TF2.values)))
 		
+		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
+		n_names = len(names)
+		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
+
+		jobs = []
+		# start one chunk per thread 
+		for i in range(threads):
+			# get name subset for chunk
+			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
+			# subset distance information for names in this chunk
+			counts = self.distances.set_index(['TF1','TF2']).sort_index().loc[subset]
+			
+			job = pool.apply_async(linress_chunks, args=(subset, counts, distances, ))
+			jobs.append(job)
+
+		# accept no new jobs
+		pool.close()
+			
+		# log_progress(jobs, self.logger) # doesn't work with chunks (TODO)
+		
+		# get results from jobs
+		results = []
+		for job in jobs:
+			results += job.get()
+		
+		# wait for all jobs to be finished and tidy up pools
+		pool.join()
+
+		# convert to numpy
+		results = np.array(results)
+		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
+
 		if save is not None:
 			self.logger.info("Plotting all linear regressions. This may take a while")
 			self._plot_all(n_bins, save, self.plot_linres)
@@ -2720,7 +2731,7 @@ class DistObj():
 		self.check_pair(pair)
 		
 		if linres is None:
-			self.logger.error("Please fit a linear regression first. [see ._linregress_pair()]")
+			self.logger.error("Please fit a linear regression first. [see .linregress_all()]")
 			sys.exit(0)
 
 		self.logger.debug(f"Correcting background for pair {pair}")
@@ -3096,21 +3107,25 @@ class DistObj():
 			----------
 			None adds a rank column for each criteria given plus one for the mean if set to True
 		"""
-		# create new column names
-		rank_cols = ["rank_" + col for col in by]
 
 		# check peaks are calculated + by are only valid columns
 		self.check_peaks()
 		if (not set(by).issubset(self.peaks.columns)):
 			raise InputError(f"Column selection not valid. Possible column names to rank by: {self.peaks.columns.values}")
 
-		# rank all given columns (biggest number = rank 1) # maybe adjust this for new measurements
-		for col in rank_cols:
-			if col =="rank_noisiness":
-				self.peaks[col] = self.peaks[by].rank(method="dense", ascending=1)
+		# save col names for mean_rank
+		rank_cols = []
+		# rank all given columns
+		for col in by:
+			# new column name
+			rank_col = "rank_" + col
+			# decide if biggest number = rank 1 or rank n
+			if col =="noisiness":
+				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=1) 
 			else:
-				self.peaks[col] = self.peaks[by].rank(method="dense", ascending=0)
-		
+				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=0)
+			rank_cols.append(rank_col)
+
 		if calc_mean:
 			# calculate mean rank (from all column ranks)
 			self.peaks["mean_rank"] = self.peaks[rank_cols].mean(axis=1)
