@@ -7,6 +7,7 @@ objects.py: Contains CombObj, DiffCombObj and DistObj classes
 """
 
 import os 
+import re
 import pandas as pd
 import itertools
 import multiprocessing as mp
@@ -504,8 +505,15 @@ class CombObj():
 		if len(files) == 0:
 			raise InputError("No '_bound'-files were found in path. Please ensure that the given path is the output of TOBIAS BINDetect.")
 		
+		#Get all conditions from filenames
+		available_conditions = {}
+		for f in files:
+			TF_name = re.search(".+/(.+)?/beds", f).group(1)
+			condition_name = os.path.basename(f).replace(TF_name +  "_", "").replace("_bound.bed", "")
+			available_conditions[condition_name] = ""
+		self.logger.debug("Available conditions are: {0}".format(available_conditions.keys()))
+
 		#Check if condition given is within available_conditions
-		available_conditions = set([os.path.basename(f).split("_")[-2] for f in files])
 		if condition not in available_conditions:
 			raise InputError("Condition must be one of: {0}".format(list(available_conditions)))
 
@@ -1896,7 +1904,7 @@ class DiffCombObj():
 		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
 		new_obj.network = None
-		
+
 		return(new_obj)
 
 	#-------------------------------------------------------------------------------------------#
