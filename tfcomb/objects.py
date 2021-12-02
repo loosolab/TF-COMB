@@ -1828,7 +1828,8 @@ class DiffCombObj():
 						   measure="cosine", 
 						   measure_threshold=None,
 						   pvalue_threshold=0.05,
-						   plot = True, 
+						   plot = True,
+						   pseudocount = 10**-10, 
 						   **kwargs):
 		"""
 		Select differentially regulated rules on the basis of measure and pvalue.
@@ -1845,6 +1846,8 @@ class DiffCombObj():
 			The p-value threshold for selecting rules. Default: 0.05.
 		plot : boolean, optional
 			Whether to plot the volcano plot. Default: True.
+		pseudocount : float
+			Pseudocount to add to p-values before transforming. Default: 10^-10.
 
 		Returns
 		----------
@@ -1883,7 +1886,8 @@ class DiffCombObj():
 		if plot == True:
 			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
 			log_col = "-log10({0})".format(pvalue_col)
-			cp[log_col] = -np.log10(self.rules[pvalue_col])
+
+			cp[log_col] = -np.log10(self.rules[pvalue_col] + pseudocount)
 			log_threshold = -np.log10(pvalue_threshold)
 			
 			tfcomb.plotting.scatter(cp, 

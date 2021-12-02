@@ -58,7 +58,6 @@ class OneTFBS():
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
-#NOTE: not applied at the moment, but kept here for future uses
 def is_notebook():
 	""" Utility to check if function is being run from a notebook or a script """
 	try:
@@ -1077,24 +1076,28 @@ def _pvalues_for_chunks(TF_int_combinations, bg_dist_dict, alternative="greater"
 def _calculate_pvalue(mu, std, obs, alternative="greater"):
 	""" Calculate p-value of seeing value within the normal distribution with mu/std parameters"""
 	
-	z = (obs - mu)/std
-	p_oneside = scipy.stats.norm.sf(np.abs(z)) #one-sided pvalue
+	if std == 0: #not possible to calculate p-value using zscore
+		p = 0
 
-	#Calculate pvalue based on alternative hypothesis
-	if alternative == "two-sided":
-		p = p_oneside * 2
+	else:
+		z = (obs - mu)/std
+		p_oneside = scipy.stats.norm.sf(np.abs(z)) #one-sided pvalue
 
-	elif alternative == "greater":
-		if z > 0: #observed is larger than mean
-			p = p_oneside
-		else:
-			p = 1.0 - p_oneside
-	
-	elif alternative == "less":
-		if z < 0: #observed is smaller than mean
-			p = p_oneside
-		else:
-			p = 1.0 - p_oneside
+		#Calculate pvalue based on alternative hypothesis
+		if alternative == "two-sided":
+			p = p_oneside * 2
+
+		elif alternative == "greater":
+			if z > 0: #observed is larger than mean
+				p = p_oneside
+			else:
+				p = 1.0 - p_oneside
+		
+		elif alternative == "less":
+			if z < 0: #observed is smaller than mean
+				p = p_oneside
+			else:
+				p = 1.0 - p_oneside
 
 	return(p)
 
@@ -1105,21 +1108,31 @@ def remove_val_from_dist(value, mu, std, n):
 	Parameters
 	-----------
 	value : float
-		Value to remove. 
-		
+		The value to remove from distribution. 
+	mu : float
+		Mean of the distribution.
+	std : float
+		Standard deviation of the distribution.
 	n : int
-		The number of elements in the distribution (including value)
+		The number of elements in the distribution (including value).
 	
-	returns()
+	Returns
+	-----------
+		A tuple of (mean, std, n) for the new distribution
 	"""
+
+	zero_tol = 10**-10 #tolerance for zero due to decimal point rounding errors
 
 	#Calculate new mean
 	bg_mean = (mu*n - value)/(n-1)
 
 	#Calculate new std
-	var = std**2
-	bg_var = n/(n-1) * (var - (mu - value)**2/(n-1))
-	bg_std = np.sqrt(bg_var)
+	if bg_mean < zero_tol: #No other values left
+		bg_std = 0
+	else:
+		var = std**2
+		bg_var = (var*(n-1) - (value - bg_mean) * (value - mu))/(n-2)
+		bg_std = np.sqrt(bg_var)
 
 	bg_n = n - 1
 
