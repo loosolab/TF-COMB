@@ -15,4 +15,3 @@ tobias
 uropa
 qnorm
 pip
-pandoc
