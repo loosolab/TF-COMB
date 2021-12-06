@@ -10,3 +10,4 @@ API reference
    tfcomb.annotation
    tfcomb.distances
    tfcomb.plotting
+   tfcomb.utils
