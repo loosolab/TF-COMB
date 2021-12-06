@@ -24,6 +24,7 @@ import pathlib
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
 class OneTFBS():
+	""" Collects location information about one single TFBS """
 
 	def __init__(self, **kwargs):
 
@@ -55,10 +56,39 @@ class OneTFBS():
 
 		return(self)
 
+class TFBSPair():
+	""" Collects information about a co-occurring pair of TFBS """
+
+	def __init__(self, TFBS1, TFBS2, distance, directional=False):
+
+		self.site1 = TFBS1 #OneTFBS object
+		self.site2 = TFBS2 #OneTFBS object
+		self.distance = distance
+
+		#Calculate orientation scenario
+		if directional == True:
+			self.orientation = ""
+
+		else:
+
+			if self.site1.strand == self.site2.strand:
+				self.orientation = "same"
+			else:
+				self.orientation = "opposite"
+
+	def __str__(self):
+		TFBS1 = ",".join([str(getattr(self.site1, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
+		TFBS2 = ",".join([str(getattr(self.site2, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
+
+		s = f"<TFBSPair | TFBS1: ({TFBS1}) | TFBS2: ({TFBS2}) | distance: {self.distance} >"
+		return(s)
+
+	def __repr__(self):
+		return(self.__str__())
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
-def is_notebook():
+def _is_notebook():
 	""" Utility to check if function is being run from a notebook or a script """
 	try:
 		ipython_shell = get_ipython()
@@ -97,7 +127,7 @@ def check_graphtool():
 		s = "ERROR: Could not find the 'graph-tool' module on path. This module is needed for some of the TFCOMB network analysis functions. "
 		s += "Please visit 'https://graph-tool.skewed.de/' for information about installation."
 
-		if is_notebook():
+		if _is_notebook():
 			raise StopExecution(s) from None
 		else:
 			sys.exit(s)
@@ -534,55 +564,60 @@ def resolve_overlaps(sites, how="merge", per_name=True):
 	n_sites = len(sites)
 	tracking = {} # dictionary for tracking positions of TFBS per name (or across all)
 	
-	for site_i in range(n_sites):
+	for current_site_i in range(n_sites):
 		
-		site = sites[site_i]
-		site_name = site.name if per_name == True else "." #control which site to fetch as 'previous'
+		current_site = sites[current_site_i]
+		site_name = current_site.name if per_name == True else "." #control which site to fetch as 'previous'
 		
 		if site_name in tracking: #if not in tracking, site is the first site of this name
 			
-			previous_site = tracking[site_name]["site"]
-			previous_i = tracking[site_name]["i"]
+			#previous_site = tracking[site_name]["site"]
+			previous_i = tracking[site_name]
+			previous_site = sites[previous_i]
 
-			if (site.chrom == previous_site.chrom) and (site.start < previous_site.end): #overlapping
+			if (current_site.chrom == previous_site.chrom) and (current_site.start < previous_site.end): #overlapping
 								
 				#How to deal with overlap:
 				if how == "highest_score":
 					
-					if site.score >= previous_site.score: #keep current site
+					if current_site.score >= previous_site.score: #keep current site
 						sites[previous_i] = None
-						tracking[site_name] = {"i": site_i, "site": site} #new tracking
+						tracking[site_name] = current_site_i #new tracking
 						
 					else: #keep previous site
-						sites[site_i] = None
+						sites[current_site_i] = None
 						#tracking stays the same
 						
 				elif how == "merge":
 					
-					merged_end = max([previous_site.end, site.end])
+					merged_end = max([previous_site.end, current_site.end])
 					
-					#merge site into the previous
-					merged = OneTFBS(**{"chrom": site.chrom, 
+					#merge site into the previous; keep previous score/strand
+					merged = OneTFBS(**{"chrom": current_site.chrom, 
 									  "start": previous_site.start, 
 									  "end": merged_end, 
-									  "name": site.name, 
+									  "name": previous_site.name, 
 									  "score": previous_site.score,
 									  "strand": previous_site.strand})
 					
 					sites[previous_i] = merged
-					sites[site_i] = None
-					#tracking stays the same
+					sites[current_site_i] = None
+					#tracking i stays the same
+
+					#tracking[site_name] = previous_i, "site": merged} , but site is updated to merged
 					
 			else: #no overlaps with previous; save this site to tracking
-				tracking[site_name] = {"i": site_i, "site": site}
+				tracking[site_name] = current_site_i
 				
 		else: #Save first site to tracking
-			tracking[site_name] = {"i": site_i, "site": site}
+			tracking[site_name] = current_site_i
 	
-
 	resolved = [site for site in sites if site is not None]
 	
 	return(resolved)
+
+
+#----------------------------- Analysis on pairs of TFBS ------------------------#
 
 def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 										   TF2_strand = None,
@@ -620,8 +655,8 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 
 	Returns
 	-------
-	List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-		Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
+	List of TFBSPair objects
+		Each entry in the list is a TFBSPair object, which contains .site1, .site2, .distance and .orientation variables
 
 	See also
 	---------
@@ -721,10 +756,10 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 								if valid_pair == 1:
 
 									#Save location
-									reg1 = OneTFBS(chrom=TF1_chr, start=TF1_start, end=TF1_end, name=TF1_name, strand=TF1_strand_i)
-									reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
-									location = (reg1, reg2, distance)
-									locations.append(location)
+									reg1 = sites[i] 
+									reg2 = sites[i+j]
+									pair = TFBSPair(reg1, reg2, distance, directional=directional)
+									locations.append(pair)
 						elif TF1_chr != TF2_chr: 
 							i += 1
 							finding_assoc = False   #break out of finding_assoc-loop
@@ -758,7 +793,7 @@ def locations_to_bed(locations, outfile, fmt="bed"):
 	Parameters
 	------------
 	locations : list
-		The output of get_pair_locations()
+		The output of get_pair_locations().
 	outfile : str
 		The path which the pair locations should be written to.
 	fmt : str, optional
@@ -775,12 +810,12 @@ def locations_to_bed(locations, outfile, fmt="bed"):
 	
 	#Write locations to file in format 'fmt'
 	if fmt == "bed":
-		s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[1].end), loc[0].name + "-" + loc[1].name, str(loc[-1]), "."]) for loc in locations]) + "\n"
+		s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site2.end), l.site1.name + "-" + l.site2.name, str(l.distance), "."]) for l in locations]) + "\n"
 
 	elif fmt == "bedpe":
-		s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[0].end),
-									loc[1].chrom, str(loc[1].start), str(loc[1].end), 
-									loc[0].name + "-" + loc[1].name, str(loc[-1]), loc[0].strand, loc[1].strand]) for loc in locations]) + "\n"
+		s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site1.end),
+									l.site2.chrom, str(l.site2.start), str(l.site2.end), 
+									l.site1.name + "-" + l.site2.name, str(l.distance), l.site1.strand, l.site2.strand]) for l in locations]) + "\n"
 	f.write(s)
 	f.close()
 

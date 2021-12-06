@@ -866,8 +866,9 @@ class CombObj():
 
 		Returns
 		-------
-		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
+		List of TFBSPair objects
+			Each entry in the list is a TFBSPair object, which contains .site1, .site2, .distance and .orientation variables
+
 
 		See also
 		---------
