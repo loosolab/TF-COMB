@@ -865,8 +865,7 @@ class CombObj():
 		See also
 		---------
 		tfcomb.utils.get_pair_results
-		tfcomb.CombObj.count_within
-
+		tfcomb.CombObj.count_withinmo
 		"""
 		
 		#Check input parameters
@@ -1423,7 +1422,7 @@ class CombObj():
 		
 		
 		self.distObj.linregress_all(threads=threads, n_bins=n_bins, save=subfolder_linres)
-		self.distObj.correct_all(n_bins=n_bins, save=subfolder_corrected)
+		self.distObj.correct_all(threads=threads, n_bins=n_bins, save=subfolder_corrected)
 		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
 
 		if parent_directory is not None:
@@ -2765,7 +2764,7 @@ class DistObj():
 		self.check_linres()
 		self.check_min_max_dist()
 
-		self.logger.info(f"Correcting background")
+		self.logger.info(f"Correcting background with {threads} threads.")
 		
 		# hand it over to multiprocess chunks 
 		result = self._multiprocess_chunks(threads, tfcomb.utils.correct_chunks, self.distances)

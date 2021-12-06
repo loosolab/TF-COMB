@@ -763,7 +763,7 @@ def locations_to_bed(locations, outfile, fmt="bed"):
 	outfile : str
 		The path which the pair locations should be written to.
 	fmt : str, optional
-		The format of the output file. Bust be pne of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
+		The format of the output file. Must be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
 	"""
 	
 	tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
