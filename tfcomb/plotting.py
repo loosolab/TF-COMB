@@ -62,6 +62,7 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	# Tweak the figure to finalize
 	labels = list(rules_table.index)
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
+	ax.set_xticks(range(len(labels))) #explicitly set xticks to prevent matplotlib error
 	ax.set_xticklabels(labels, rotation=45, ha="right")
 
 	if save is not None:
