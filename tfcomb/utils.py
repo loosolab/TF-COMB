@@ -7,6 +7,7 @@ from copy import deepcopy
 import time
 import datetime
 import scipy.stats
+from scipy.signal import find_peaks
 import random
 import string
 import multiprocessing as mp
@@ -1245,5 +1246,86 @@ def correct_chunks(pairs, dist_counts, distances, linres):
 		corrected = [tf1, tf2] + corrected.tolist()
 
 		results.append(corrected)
+		
+	return results
+
+def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
+	""" After background correction is done (see ._correct_pair() or .correct_all()), the signal is analyzed for peaks, 
+		indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
+		Signal. Peaks are called with scipy.signal.find_peaks().
+		
+		Parameters
+		----------
+		pairs : list<tuple(str,str)>
+			TF names for which the preferred binding distance(s) should be found. e.g. ("NFYA","NFYB")
+		datasource : pd.DataFrame 
+			A (sub-)Dataframe with the (corrected) distance counts for the pairs
+		distances: list
+			A list of valid column names for the distances  
+		stringency: number
+			stringency the prominence threshold should be multiplied with.
+		prominence: number or ndarray or sequence
+			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
+			Default: 0
+
+		Returns:
+		----------
+		list 
+			list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
+	"""
+
+	# make sure index is correct
+	datasource = datasource.reset_index()
+	datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+
+	# get data column
+	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+
+	results = []
+	for pair in pairs:
+		# get pair
+		tf1, tf2 = pair
+		ind = "-".join(pair)
+
+		# signal.find_peaks() will not find peaks on first and last position without having 
+		# an other number left and right. 
+		signal = datasource.loc[ind].loc[distance_cols].values
+		x = [0] + list(signal) + [0]
+
+		# determine prominence
+		if prominence =="zscore":
+			prom = 1
+		elif prominence =="median":
+			prom = datasource.loc[ind].loc["median"].values
+		else:
+			prom = prominence
+		
+		# calc threshold 
+		threshold = prom * stringency
+
+		#Find positions of peaks
+		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
+
+		# subtract the position added above (first zero) 
+		peaks_idx = peaks_idx - 1 
+
+		#Get distances from columns
+		peak_distances = [distance_cols[idx] for idx in peaks_idx]
+
+		#Collect peaks for TF pair
+		peak_info = pd.DataFrame().from_dict(properties)
+		peak_info["Distance"] = peak_distances
+		peak_info["TF1"] = tf1
+		peak_info["TF2"] = tf2
+
+		#Add additional peak-information per pair
+		peak_info["Threshold"] = threshold
+		
+		#Format order of columns
+		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
+		peak_info = peak_info[columns]
+		peak_info.rename(columns= { "peak_heights":"Peak Heights",
+									"prominences": "Prominences"}, inplace=True)
+		results.append(peak_info)
 		
 	return results

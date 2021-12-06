@@ -21,7 +21,6 @@ import math
 #Statistics
 import qnorm #quantile normalization
 from scipy.stats import linregress
-from scipy.signal import find_peaks
 from kneed import KneeLocator
 
 #Modules for plotting
@@ -1423,7 +1422,7 @@ class CombObj():
 		
 		self.distObj.linregress_all(threads=threads, n_bins=n_bins, save=subfolder_linres)
 		self.distObj.correct_all(threads=threads, n_bins=n_bins, save=subfolder_corrected)
-		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
+		self.distObj.analyze_signal_all(threads=threads, save=subfolder_peaks, **kwargs)
 
 		if parent_directory is not None:
 			for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
@@ -2139,7 +2138,9 @@ class DistObj():
 		self.peaks = None 	         # Pandas DataFrame of size n_pairs x n_preferredDistance 
 
 		self.peaking_count = None    # Number of pairs with at least one peak 
-		self.zscores = None			 # calculated zscores 
+		self.zscores = None			 # calculated zscores
+		self.stringency = None       # stringency param
+		self.prominence = None       # zscore, median or array of flat values
 	
 		
 		self.n_bp = 0			     # Predicted number of baskets 
@@ -2158,7 +2159,7 @@ class DistObj():
 		self.directional = None      # True if direction is taken into account, false otherwise 
    
 		# private constants
-		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\tCount\n"
+		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tThreshold\tCount\n"
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
 		self._XLBL_FONTSIZE = 10    # label fontsize adjustment for plotting x labels
 
@@ -2247,17 +2248,17 @@ class DistObj():
 	def smooth(self, window_size=3):
 		""" Helper function for smoothing all rules with a given window size. The function .correct_all() is required to be run beforehand.
 			
-			Parameters
-			----------
-			window_size: int 
-				window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-				(see tobias.utils.signals.fast_rolling_math) 
-				Default: 3
+		Parameters
+		----------
+		window_size: int 
+			window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
+			(see tobias.utils.signals.fast_rolling_math) 
+			Default: 3
 
-			Returns:
-			----------
-			None 
-				Fills the object variable .smoothed
+		Returns:
+		----------
+		None 
+			Fills the object variable .smoothed
 		"""
 		
 		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
@@ -2471,13 +2472,6 @@ class DistObj():
 		
 		if len(self.rules.loc[((self.rules["TF1"] == tf1) & (self.rules["TF2"] == tf2))]) == 0:
 			raise InputError(f"No rules for pair {tf1} - {tf2} found.")
-	
-	def get_pair_count(self, pair):
-		
-		self.check_pair(pair)
-		tf1, tf2 = pair
-
-		return self._raw.loc[[f"{tf1}-{tf2}"]].iloc[0,2:].sum()
 
 		
 	#-------------------------------------------------------------------------------------------#
@@ -2632,7 +2626,7 @@ class DistObj():
 		# check function is supported
 		if not callable(func):
 			raise InputError(f"Input {func} not callable. Please provide a function")
-		check_string(func.__name__,["linress_chunks","correct_chunks"], name="function")
+		check_string(func.__name__,["linress_chunks", "correct_chunks", "analyze_signal_chunks"], name="function")
 
 		self.logger.debug(f"Multiprocessing chunks for {func}")
 		# open Pool for multiprocessing
@@ -2666,6 +2660,10 @@ class DistObj():
 				linres = self.linres.set_index(['TF1','TF2']).sort_index().loc[subset]
 				# apply function with params
 				job = pool.apply_async(func, args=(subset, counts, distances, linres, ))
+			
+			elif func == tfcomb.utils.analyze_signal_chunks:
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, distances, self.stringency, self.prominence, ))
 
 			jobs.append(job)
 
@@ -2702,9 +2700,9 @@ class DistObj():
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
 
-			Returns:
+			Returns
 			----------
-			None
+			None:
 				Fills the object variable .linres
 		"""
 
@@ -2822,127 +2820,21 @@ class DistObj():
 		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			plot_func((tf1, tf2), n_bins=n_bins, save=os.path.join(save_path,f"{tf1}_{tf2}.png"))
 
-	# TODO: Check if kwargs is better suited than height & prominence
-	def _analyze_signal_pair(self, pair, signal, prominence=0, stringency=2, save=None, new_file=True):
-		""" After background correction is done (see ._correct_pair() or .correct_all()), the signal is analyzed for peaks, 
-			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
-			Signal. Peaks are called with scipy.signal.find_peaks().
-			
-			Parameters
-			----------
-			pair : tuple(str,str)
-				TF names for which the preferred binding distance(s) should be found. e.g. ("NFYA","NFYB")
-			signal : list 
-				corrected value for the given pair
-			height: number or ndarray or sequence
-				height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-				Zero means only positive peaks are called.
-				Default: 0
-			prominence: number or ndarray or sequence
-				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
-				Default: 0
-			stringency: number
-				stringency the prominence threshold should be multiplied with. Default: 2
-			save: str
-				Path to save the plots to. If save is None plots won't be plotted. 
-				Default: None
-			new_file: boolean
-				True means results are written to a new file (overwrites already existing results), False means results are appended if 
-				file already exists.
-				Default: True
 
-			Returns:
-			----------
-			list 
-				list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
-		"""
-		self.logger.debug("Running _analyze_signal_pair for pair: {0}".format(pair))
-
-		#Check input parameters
-		tfcomb.utils.check_type(signal, [list, pd.core.series.Series], "corrected")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-		
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-		key = "-".join(pair)
-
-		# signal.find_peaks() will not find peaks on first and last position without having 
-		# an other number left and right. 
-		x = [0] + list(signal) + [0]
-		threshold = prominence * stringency
-
-		#Find positions of peaks
-		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
-
-		# subtract the position added above (first zero) 
-		peaks_idx = peaks_idx - 1 
-
-		#Get distances from columns
-		all_distances = self.corrected.columns[2:].tolist()
-		peak_distances = [all_distances[idx] for idx in peaks_idx]
-
-		# compensate the "neg" position
-		if self.min_dist == 0: 
-			peaks_idx = peaks_idx - 1 
-
-		#Collect peaks for TF pair
-		peak_info = pd.DataFrame().from_dict(properties)
-		peak_info["distance"] = peak_distances
-		peak_info["TF1"] = tf1
-		peak_info["TF2"] = tf2
-
-		#Add additional peak-information per pair
-		peak_info["threshold"] = threshold
-		peak_info["TF1_TF2_count"] = self.get_pair_count(pair)
-		peak_info["distance_count"] = [self._raw.loc[key, dist] for dist in peak_info["distance"]] #count of TF1-TF2 for this specific distance
-		
-		#Format order of columns
-		columns = ["TF1", "TF2", "TF1_TF2_count", "distance", "peak_heights", "prominences", "threshold", "distance_count"]
-		peak_info = peak_info[columns]
-		peak_info.rename(columns= {"distance": "Distance", "peak_heights":"Peak Heights",
-									"prominences": "Prominences", "threshold": "Threshold"}, inplace=True)
-
-		#Save peaks to file??
-		peaks = []
-		self.logger.debug(f"{len(peaks_idx)} Peaks found")
-		if (save is not None):
-			if new_file:
-				outfile = open(save,'w') 
-				outfile.write(self._PEAK_HEADER)
-			else:
-				outfile = open(save,'a') 
-
-		for i in range(len(peaks_idx)):
-			peak = [tf1, tf2, peaks_idx[i], round(properties["peak_heights"][i], 4),
-					round(properties["prominences"][i], 4), round(threshold, 4),
-					self.get_pair_count((tf1,tf2))]
-			peaks.append(peak)
-			if (save is not None):
-				outfile.write('\t'.join(str(x) for x in peak) + '\n')
-		
-		if (save is not None):
-			outfile.close()
-
-		return(peak_info)
-
-	def analyze_signal_all(self, smooth_window=3, prominence="zscore", stringency=2,  save=None):
+	def analyze_signal_all(self, threads=1, smooth_window=3, prominence="zscore", stringency=2,  save=None):
 		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
 			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
 			Signal. Peaks are called with scipy.signal.find_peaks().
 			
 			Parameters
 			----------
+			threads: int
+				Number of threads used
+				Default: 1
 			smooth_window: int 
 				window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
 				(see tobias.utils.signals.fast_rolling_math) 
 				Default: 3
-			height: number or ndarray or sequence
-				height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-				Zero means only positive peaks are called.
-				Default: 0
 			prominence: number or ndarray or sequence or ["median", "zscore"]
 				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
 				If "median", the median for the pairs is used
@@ -2955,27 +2847,31 @@ class DistObj():
 			save: str
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
-			new_file: boolean
-				True means results are written to a new file (overwrites already existing results), False means results are appended if 
-				file already exists.
-				Default: True
 
 			Returns:
 			----------
 			None 
 				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
 		"""
+		
+		
 
 		# Check given input
 		tfcomb.utils.check_value(smooth_window, vmin=1, integer=True, name="smooth_window")
+		
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
-		self.check_corrected()
 
 		if isinstance(prominence, str):
 			tfcomb.utils.check_string(prominence, ["median", "zscore"])
 		else:
 			tfcomb.utils.check_value(prominence)
+
+		# sanity checks 	
+		self.check_corrected()
+		self.check_min_max_dist()
+
+		
 	
 		#Smooth signals with window
 		if smooth_window > 1:
@@ -2986,20 +2882,23 @@ class DistObj():
 		self.shift_signal()
 
 		#----- Find preferred peaks -----#
-		self.logger.info(f"Analyzing Signal")
+		self.logger.info(f"Analyzing Signal with threads {threads}")
 	
 		# distinguish between median, zscore and flat
 		datasource = self._get_datasource()
+
+		self.stringency = stringency
+		self.prominence = prominence
+
 		if (prominence == "median"):
+			# calculate median
 			med = datasource.set_index(["TF1", "TF2"]).median(axis=1)
 			med = med.to_frame('median')
+			# combine median into datasoure
 			combined = pd.concat((datasource.set_index(["TF1", "TF2"]), med), axis=1, ignore_index=False)
 			combined = combined.reset_index().set_index(["TF1", "TF2"], drop=False)
-			res = combined.apply(lambda row: self._analyze_signal_pair((row["TF1"], row["TF2"]),
-																		row.iloc[2:-1],
-																		prominence=row.iloc[-1],
-																		stringency=stringency,
-																		save=None), axis=1)
+
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, combined)
 			method = "median"
 
 		elif (prominence == "zscore"):
@@ -3013,31 +2912,34 @@ class DistObj():
 			zsc = pd.concat((textcols,zsc), axis=1)
 
 			zsc = zsc.reset_index(drop=True).set_index(["TF1", "TF2"], drop=False)
-			res = zsc.apply(lambda row: self._analyze_signal_pair((row["TF1"], row["TF2"]),
-																	row.iloc[2:],
-																	prominence=1, # for zscore threshold is given via stringency
-																	stringency=stringency,
-																	save=None), axis=1)
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, zsc)
 			self.zscores = zsc
 			method = "zscore"
 
 		else:
-			res = datasource.apply(lambda row: self._analyze_signal_pair((row["TF1"], row["TF2"]),
-																			row.iloc[2:],
-																			prominence=prominence, # for zscore threshold is given via stringency
-																			stringency=stringency,
-																			save=None), axis=1)
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
 			method = "flat"
 
 		#Merge peaks across pairs
-		tables = res.values
-		self.peaks = pd.concat(tables)
+		self.peaks = pd.concat(res, ignore_index=True)
 		self.peaks["Distance"] = self.peaks["Distance"].astype(int)
-
+		
 		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
 
+		# add counts (TF1-TF2)
+		self.peaks.index = self.peaks["TF1"] + "-" + self.peaks["TF2"]
+		counts = self._raw.sum(axis=1)
+		counts.name="TF1_TF2_count"
+		self.peaks = self.peaks.merge(counts.to_frame(), left_index=True, right_index=True)
+
+
+		# QoL safe of threshold and method
 		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
 		self.thresh["method"] = method
+
+		# Save dataframe
+		if save is not None:
+			self.peaks.to_csv(save)
 
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
