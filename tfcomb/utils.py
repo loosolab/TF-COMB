@@ -20,6 +20,7 @@ from tfcomb.counting import count_co_occurrence
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
 import pathlib
+import pyBigWig
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -67,7 +68,11 @@ class TFBSPair():
 
 		#Calculate orientation scenario
 		if directional == True:
-			self.orientation = ""
+
+			self.orientation = "TF1-TF2"
+			self.orientation = "TF2-TF1"
+			self.orientation = "divergent"
+			self.orientation = "convergent"
 
 		else:
 
@@ -80,7 +85,7 @@ class TFBSPair():
 		TFBS1 = ",".join([str(getattr(self.site1, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
 		TFBS2 = ",".join([str(getattr(self.site2, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
 
-		s = f"<TFBSPair | TFBS1: ({TFBS1}) | TFBS2: ({TFBS2}) | distance: {self.distance} >"
+		s = f"<TFBSPair | TFBS1: ({TFBS1}) | TFBS2: ({TFBS2}) | distance: {self.distance} | orientation: {self.orientation} >"
 		return(s)
 
 	def __repr__(self):
@@ -440,6 +445,19 @@ def open_genome(genome_f):
 
 	genome_obj = pysam.FastaFile(genome_f)
 	return(genome_obj)
+
+def open_bigwig(bigwig_f):
+	"""
+	Parameters
+	------------
+	bigwig_f : str
+		The path to a bigwig file.	
+	
+	"""
+
+	pybw_obj = pyBigWig.open(bigwig_f)
+
+	return(pybw_obj)
 
 def check_boundaries(regions, genome):
 	""" Utility to check whether regions are within the boundaries of genome.

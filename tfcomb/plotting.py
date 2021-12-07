@@ -12,9 +12,12 @@ import copy
 import distutils
 from distutils import util
 
+from dna_features_viewer import GraphicFeature, GraphicRecord
 
-from tfcomb.utils import check_columns, check_type, check_string, check_value
+import tfcomb
+from tfcomb.utils import check_columns, check_type, check_string, check_value, random_string
 from tfcomb.logging import TFcombLogger
+import tobias
 
 
 def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,4), save=None):
@@ -612,3 +615,146 @@ def network(network,
 		dot_render.render(filename=file_prefix, format=fmt, cleanup=True)
 	
 	return(dot)
+
+
+def genome_features(TFBS, 
+					window=None,
+					fasta=None,
+					bigwigs=None,
+					verbosity=1):
+
+	""" Plot regions in genome view via DnaFeaturesViewer.
+	
+	Parameters
+	--------------
+	TFBS : list or dict of lists
+	
+	window : Object with .chr, .start, .end 
+
+	fasta : str
+		The path to a fasta file containing sequence information
+
+	bigwigs : str, list or dict of strings
+
+	"""
+
+	logger = TFcombLogger(verbosity)
+
+	#----------------- Format input data ----------------#
+	
+	#Establish which region to show
+	logger.debug("Establish regions")
+	if window == None: #show all TFBS
+
+		#Only keep first chromosome of TFBS
+		chrom = TFBS[0].chrom
+		TFBS = [site for site in TFBS if site.chrom == chrom]
+
+		#Set max amount of TFBS to show
+		TFBS = TFBS[:100]
+
+		#Get min/max of all sites
+		window_start = np.inf
+		window_end = -np.inf
+		for site in TFBS:
+			
+			if site.end > window_end:
+				window_end = site.end
+			if site.start < window_start:
+				window_start = site.start
+
+		window = tobias.utils.regions.OneRegion([chrom, window_start, window_end])
+
+	else:
+
+		#Subset sites within the window 
+		TFBS = [site for site in TFBS if (site.chrom == window.chrom) and (site.start >= window.start) and (site.end <= window.end)]
+		
+
+	window_length = window.end - window.start
+
+	logger.debug(window)
+
+	#Establish how many bigwig paths were given
+	bigwigs = [] if bigwigs == None else bigwigs
+	bigwigs = [bigwigs] if isinstance(bigwigs, str) else bigwigs
+	n_bigwig_tracks = len(bigwigs)
+
+	#How many subplots to create
+	n_tracks = 1 + n_bigwig_tracks
+
+	#------------ Create plt subplots ------------#
+
+	height_ratios = [4] + [1]*n_bigwig_tracks
+
+	fig, axes = plt.subplots(n_tracks, 1, 
+								sharex=True, 
+								figsize=(8,4+n_bigwig_tracks), 
+								constrained_layout=True,
+								gridspec_kw={"height_ratios": height_ratios}
+								)
+	axes = [axes] if not isinstance(axes, np.ndarray) else axes #for n_tracks == 1
+
+	#------------ Add TFBS features to plot ------------#
+
+	## Add features from TFBS list
+	features = []
+	colors_used = {}
+	for site in TFBS:
+
+		strand_convert = {"+":1, "-":-1}
+		#Get color for this TFBS
+
+		feature = GraphicFeature(start=site.start, end=site.end, strand=strand_convert.get(site.strand, None), label=site.name)
+		features.append(feature)
+
+	#Add sequence track
+	if fasta is not None:
+
+		#Pull sequence from fasta file
+		genome_obj = tfcomb.utils.open_genome(fasta)
+		sequence = genome_obj.fetch(window.chrom, window.start, window.end)
+
+	else:
+		sequence = None
+
+	record = GraphicRecord(first_index=window.start, 
+						   sequence_length=window_length, 
+						   sequence=sequence,
+						   features=features, 
+						   #labels_spacing=20
+						   )
+	with_ruler = True if n_bigwig_tracks == 0 else False
+	record.plot(ax=axes[0], with_ruler=with_ruler)
+	plt.xticks(rotation=45, ha="right")
+
+	#Plot sequence
+	if sequence is not None:
+		record.plot_sequence(axes[0], y_offset=1)
+
+
+	#------------ Add additional features -----------#
+	#Add bigwig track(s)
+	if bigwigs is not None:
+		for i, bigwig_f in enumerate(bigwigs):
+
+			#Open pybw and pull values
+			pybw = tfcomb.utils.open_bigwig(bigwig_f)
+			signal = tobias.utils.regions.OneRegion.get_signal(window, pybw)
+
+			#Add signal to plot
+			xvals = np.arange(window.start, window.end)
+			axes[i+1].fill_between(xvals, signal, step="mid")
+			#axes[i+1].step(xvals, signal, where="mid")
+			axes[i+1].set_ylabel(os.path.basename(bigwig_f))
+
+			ymin = np.min(signal)
+			ymax = np.max(signal)
+			pad = (ymax - ymin)*0.2
+			axes[i+1].set_ylim(ymin-pad, ymax+pad)
+
+
+	#-------------- Done with plot; show -----------#
+
+	return(axes)
+	
