@@ -7,6 +7,7 @@ objects.py: Contains CombObj, DiffCombObj and DistObj classes
 """
 
 import os 
+import re
 import pandas as pd
 import itertools
 import multiprocessing as mp
@@ -504,8 +505,15 @@ class CombObj():
 		if len(files) == 0:
 			raise InputError("No '_bound'-files were found in path. Please ensure that the given path is the output of TOBIAS BINDetect.")
 		
+		#Get all conditions from filenames
+		available_conditions = {}
+		for f in files:
+			TF_name = re.search(".+/(.+)?/beds", f).group(1)
+			condition_name = os.path.basename(f).replace(TF_name +  "_", "").replace("_bound.bed", "")
+			available_conditions[condition_name] = ""
+		self.logger.debug("Available conditions are: {0}".format(available_conditions.keys()))
+
 		#Check if condition given is within available_conditions
-		available_conditions = set([os.path.basename(f).split("_")[-2] for f in files])
 		if condition not in available_conditions:
 			raise InputError("Condition must be one of: {0}".format(list(available_conditions)))
 
@@ -858,8 +866,9 @@ class CombObj():
 
 		Returns
 		-------
-		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
+		List of TFBSPair objects
+			Each entry in the list is a TFBSPair object, which contains .site1, .site2, .distance and .orientation variables
+
 
 		See also
 		---------
@@ -1820,7 +1829,8 @@ class DiffCombObj():
 						   measure="cosine", 
 						   measure_threshold=None,
 						   pvalue_threshold=0.05,
-						   plot = True, 
+						   plot = True,
+						   pseudocount = 10**-10, 
 						   **kwargs):
 		"""
 		Select differentially regulated rules on the basis of measure and pvalue.
@@ -1837,6 +1847,8 @@ class DiffCombObj():
 			The p-value threshold for selecting rules. Default: 0.05.
 		plot : boolean, optional
 			Whether to plot the volcano plot. Default: True.
+		pseudocount : float
+			Pseudocount to add to p-values before transforming. Default: 10^-10.
 
 		Returns
 		----------
@@ -1875,7 +1887,8 @@ class DiffCombObj():
 		if plot == True:
 			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
 			log_col = "-log10({0})".format(pvalue_col)
-			cp[log_col] = -np.log10(self.rules[pvalue_col])
+
+			cp[log_col] = -np.log10(self.rules[pvalue_col] + pseudocount)
 			log_threshold = -np.log10(pvalue_threshold)
 			
 			tfcomb.plotting.scatter(cp, 
@@ -1896,7 +1909,7 @@ class DiffCombObj():
 		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
 		new_obj.network = None
-		
+
 		return(new_obj)
 
 	#-------------------------------------------------------------------------------------------#

@@ -49,9 +49,15 @@ def _establish_node_attributes(table, node):
 
 	sub = table[:100000] #subset in interest of performance
 	factorized = sub.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
-
+	
 	for attribute in columns_to_assign:
-		p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+		try:
+			p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+		except ValueError: #observed frequencies != expected frequencies
+			p = 0.0 #not correlated
+		except FloatingPointError: #sum of factorized is 0 -> all nan
+			p = 0.0
+
 		if p == 1.0: #columns are fully correlated; save to node attribute
 			node_attributes.append(attribute)
 	
