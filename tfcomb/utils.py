@@ -1,3 +1,4 @@
+from math import dist
 import sys
 import os
 import pandas as pd
@@ -1377,3 +1378,95 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 		results.append(peak_info)
 		
 	return results
+
+def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", height_multiplier=0.75):
+	# make sure index is correct
+	signals = signals.reset_index()
+	signals.index = signals["TF1"] + "-" + signals["TF2"]
+
+	peaks = peaks.reset_index()
+	peaks.index = peaks["TF1"] + "-" + peaks["TF2"]
+
+	# get data column
+	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+	results = []
+	for pair in pairs:
+		# get pair
+		tf1, tf2 = pair
+		ind = "-".join(pair)
+
+		signal = signals.loc[ind].loc[distance_cols].values
+		
+		# get peaks for specific pair
+		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)]
+
+		results.append([tf1, tf2, _get_noise_measure(peaks_pair, signal, method, height_multiplier)])
+		
+	noisiness = pd.DataFrame(results, columns=["TF1", "TF2", "noisiness"])
+	peaks = peaks.merge(noisiness)
+
+	return [peaks]
+
+
+
+def _get_noise_measure(peaks, signal, method, height_multiplier):
+	#check method input
+	check_string(method, ["median", "min_max"], "method")
+
+	# get the cutting points fot the signal
+	cuts = _get_cut_points(peaks, height_multiplier, signal)
+
+	# cut all peaks out of the signal
+	for cut in cuts:
+		signal[cut[0]:cut[1]] = np.nan
+
+	measure = None
+	if method == "median":
+		measure = pd.Series(signal).median()
+	elif method == "min_max":
+		measure = signal.max() - signal.min()
+	
+	return float(measure)
+
+def _get_cut_points(peaks, height_multiplier, signal):
+	cuts =[]
+	for idx,row in peaks.iterrows():
+		# get the peak distance
+		peak = row.Distance
+		# get the peak height 
+		peak_height = signal[peak]
+		# determine cutoff, in common sense this should be "going ~25% down the peak size"
+		cut_off = height_multiplier * peak_height
+		cuts.append(_expand_peak(peak, cut_off, signal))
+	return cuts
+
+def _expand_peak(start_pos, cut_off, signal):
+	found_left = False
+	found_right = False
+	pos_left = start_pos - 1
+	pos_right = start_pos + 1
+
+	# expand the peak until both borders are found
+	while(not(found_left & found_right)):
+		# left side
+		if(not found_left):
+			# left border not found
+			if pos_left == -1: # check if position less than start of signal
+				found_left = True
+				left = 0
+			elif signal[pos_left] <= cut_off:
+				found_left = True
+				left = found_left  + 1 # we are one to far left
+			pos_left -= 1
+		
+		# right side
+		if(not found_right):
+			# right border not found	
+			if  pos_right == len(signal): # check if position higher than end of signal
+				found_right = True
+				right = len(signal) - 1
+			elif signal[pos_right] < cut_off:
+				found_right = True
+				right = pos_right - 1 # we are one to far right
+			pos_right += 1
+	return(left, right)

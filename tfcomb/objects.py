@@ -7,7 +7,6 @@ objects.py: Contains CombObj, DiffCombObj and DistObj classes
 """
 
 import os 
-import re
 import pandas as pd
 import itertools
 import multiprocessing as mp
@@ -505,15 +504,8 @@ class CombObj():
 		if len(files) == 0:
 			raise InputError("No '_bound'-files were found in path. Please ensure that the given path is the output of TOBIAS BINDetect.")
 		
-		#Get all conditions from filenames
-		available_conditions = {}
-		for f in files:
-			TF_name = re.search(".+/(.+)?/beds", f).group(1)
-			condition_name = os.path.basename(f).replace(TF_name +  "_", "").replace("_bound.bed", "")
-			available_conditions[condition_name] = ""
-		self.logger.debug("Available conditions are: {0}".format(available_conditions.keys()))
-
 		#Check if condition given is within available_conditions
+		available_conditions = set([os.path.basename(f).split("_")[-2] for f in files])
 		if condition not in available_conditions:
 			raise InputError("Condition must be one of: {0}".format(list(available_conditions)))
 
@@ -866,9 +858,8 @@ class CombObj():
 
 		Returns
 		-------
-		List of TFBSPair objects
-			Each entry in the list is a TFBSPair object, which contains .site1, .site2, .distance and .orientation variables
-
+		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
+			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
 
 		See also
 		---------
@@ -1829,8 +1820,7 @@ class DiffCombObj():
 						   measure="cosine", 
 						   measure_threshold=None,
 						   pvalue_threshold=0.05,
-						   plot = True,
-						   pseudocount = 10**-10, 
+						   plot = True, 
 						   **kwargs):
 		"""
 		Select differentially regulated rules on the basis of measure and pvalue.
@@ -1847,8 +1837,6 @@ class DiffCombObj():
 			The p-value threshold for selecting rules. Default: 0.05.
 		plot : boolean, optional
 			Whether to plot the volcano plot. Default: True.
-		pseudocount : float
-			Pseudocount to add to p-values before transforming. Default: 10^-10.
 
 		Returns
 		----------
@@ -1887,8 +1875,7 @@ class DiffCombObj():
 		if plot == True:
 			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
 			log_col = "-log10({0})".format(pvalue_col)
-
-			cp[log_col] = -np.log10(self.rules[pvalue_col] + pseudocount)
+			cp[log_col] = -np.log10(self.rules[pvalue_col])
 			log_threshold = -np.log10(pvalue_threshold)
 			
 			tfcomb.plotting.scatter(cp, 
@@ -1909,7 +1896,7 @@ class DiffCombObj():
 		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
 		new_obj.network = None
-
+		
 		return(new_obj)
 
 	#-------------------------------------------------------------------------------------------#
@@ -2154,6 +2141,8 @@ class DistObj():
 		self.zscores = None			 # calculated zscores
 		self.stringency = None       # stringency param
 		self.prominence = None       # zscore, median or array of flat values
+		self._noise_method = None 	 # private storage noise_method
+		self._height_multiplier = None # private storage height_mulitplier
 	
 		
 		self.n_bp = 0			     # Predicted number of baskets 
@@ -2639,7 +2628,10 @@ class DistObj():
 		# check function is supported
 		if not callable(func):
 			raise InputError(f"Input {func} not callable. Please provide a function")
-		check_string(func.__name__,["linress_chunks", "correct_chunks", "analyze_signal_chunks"], name="function")
+		check_string(func.__name__,["linress_chunks", 
+									"correct_chunks", 
+									"analyze_signal_chunks", 
+									"evaluate_noise_chunks"], name="function")
 
 		self.logger.debug(f"Multiprocessing chunks for {func}")
 		# open Pool for multiprocessing
@@ -2648,10 +2640,14 @@ class DistObj():
 		# get valid distance columns
 		distances = self.distances.columns[2:].tolist()
 		
-		# list all TF pairs
-		names = list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values)))
-		
 		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
+		if func == tfcomb.utils.evaluate_noise_chunks:
+			# list all TF pairs based on distances
+			names = list(zip(list(self.peaks.TF1.values), list(self.peaks.TF2.values)))
+		else:
+			# list all TF pairs based on distances
+			names = list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values)))
+		names = list(set(names))
 		n_names = len(names)
 		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
 
@@ -2660,7 +2656,6 @@ class DistObj():
 		for i in range(threads):
 			# get name subset for chunk
 			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
-
 			# subset distance information for names in this chunk
 			counts = datatable.set_index(['TF1','TF2']).sort_index().loc[subset]
 
@@ -2678,6 +2673,11 @@ class DistObj():
 				# apply function with params
 				job = pool.apply_async(func, args=(subset, counts, distances, self.stringency, self.prominence, ))
 
+			elif func == tfcomb.utils.evaluate_noise_chunks:
+				# subset peaks
+				peaks = self.peaks.set_index(['TF1','TF2']).sort_index().loc[subset]
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, peaks, distances, self._noise_method, self._height_multiplier, ))
 			jobs.append(job)
 
 		# accept no new jobs
@@ -2689,7 +2689,6 @@ class DistObj():
 		results = []
 		for job in jobs:
 			results += job.get()
-		
 		# wait for all jobs to be finished and tidy up pools
 		pool.join()
 
@@ -2989,14 +2988,14 @@ class DistObj():
 
 		self._set_datasource(datasource)
 
-	def rank_rules(self, by=["Peak Heights", "noisiness"], calc_mean=True):
+	def rank_rules(self, by=["Peak Heights", "Noisiness"], calc_mean=True):
 		""" ranks rules within each column specified. 
 
 			Params:
 			----------
 			by : list of strings
 				Columns for wich the rules should be ranked
-				Default: ["Peak Heights", "noisiness"]
+				Default: ["Peak Heights", "Noisiness"]
 			calc_mean: bool
 				True if an extra column should be calculated containing the mean rank, false otherwise
 				Default: True
@@ -3023,7 +3022,7 @@ class DistObj():
 			# new column name
 			rank_col = "rank_" + col
 			# decide if biggest number = rank 1 or rank n
-			if col =="noisiness":
+			if col =="Noisiness":
 				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=1) 
 			else:
 				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=0)
@@ -3035,90 +3034,21 @@ class DistObj():
 			# nice to have the best ranks at the top 
 			self.peaks = self.peaks.sort_values(by="mean_rank")
 		
-	def evaluate_noise(self, method="median"):
+	def evaluate_noise(self, threads=1, method="median", height_multiplier=0.75):
 		""" evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
 		"""
 		self.check_peaks()
-		self.peaks["noisiness"] = self.peaks.apply(lambda x: self._get_noise_measure((x.TF1, x.TF2), method), axis=1)
+
+		self._noise_method = method
+		self._height_multiplier = height_multiplier
 		
-
-	def _get_noise_measure(self, pair, method, height_multiplier=0.75):
-		# check pair
-		self.check_pair(pair)
-
-		#check method input
-		tfcomb.utils.check_string(method, ["median", "min_max"], "method")
-
-		datasource = self._get_datasource()
-		# get the signal for specific pair
-		signal = datasource[(datasource.TF1 == pair[0]) & (datasource.TF2 == pair[1])][self._distance_columns]
-
-		# get the cutting points fot the signal
-		cuts = self._get_cut_points(pair, height_multiplier, signal)
-
-		# cut all peaks out of the signal
-		for cut in cuts:
-			signal.iloc[0, cut[0]:cut[1]] = np.nan
-
-		measure = None
-		if method == "median":
-			measure = signal.median(axis=1)
-		elif method == "min_max":
-			measure = signal.max(axis=1) - signal.min(axis=1)
+		datasource =  self._get_datasource()
+		self.logger.info(f"Evaluating noisiness of the signals with {threads}threads")
+		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks,datasource)
+		res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
 		
-		return float(measure)
-
-
-
-	def _get_cut_points(self, pair, height_multiplier, signal):
-		# check peaks filled
-		self.check_peaks()
-		# check pair in keys
-		self.check_pair(pair)
-		# get peaks for specific pair
-		peaks = self.peaks[(self.peaks.TF1 == pair[0]) & (self.peaks.TF2 == pair[1])]
-
-		cuts =[]
-		for idx,row in peaks.iterrows():
-			# get the peak distance
-			peak = row.Distance
-			# get the peak height 
-			peak_height = signal.iloc[0, peak]
-			# determine cutoff, in common sense this should be "going ~25% down the peak size"
-			cut_off = height_multiplier * peak_height
-			cuts.append(self._expand_peak(peak, cut_off, signal))
-		return cuts
-	
-	def _expand_peak(self, start_pos, cut_off, signal):
-		found_left = False
-		found_right = False
-		pos_left = start_pos - 1
-		pos_right = start_pos + 1
-
-		# expand the peak until both borders are found
-		while(not(found_left & found_right)):
-			# left side
-			if(not found_left):
-				# left border not found
-				if pos_left == -1: # check if position less than start of signal
-					found_left = True
-					left = 0
-				elif signal.iloc[0, pos_left] <= cut_off:
-					found_left = True
-					left = found_left  + 1 # we are one to far left
-				pos_left -= 1
-			
-			# right side
-			if(not found_right):
-				# right border not found	
-				if  pos_right == len(signal): # check if position higher than end of signal
-					found_right = True
-					right = len(signal) - 1
-				elif signal.iloc[0, pos_right] < cut_off:
-					found_right = True
-					right = pos_right - 1 # we are one to far right
-				pos_right += 1
-		return(left, right)
+		self.peaks = res
+		
 
 	def check_periodicity(self):
 		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
