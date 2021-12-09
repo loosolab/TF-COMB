@@ -1131,7 +1131,9 @@ class CombObj():
 	def select_significant_rules(self, x="cosine", 
 										y="zscore", 
 										x_threshold=None,
+										x_threshold_percent=0.05,
 										y_threshold=None,
+										y_threshold_percent=0.05,
 										plot=True, 
 										**kwargs):
 		"""
@@ -1145,8 +1147,12 @@ class CombObj():
 			The name of the column within .rules containing the pvalue to be selected on. Default: 'zscore'
 		x_threshold : float, optional
 			A minimum threshold for the measure to be selected. If None, the threshold will be estimated from the data. Default: None.
+		x_threshold_percent : float between 0-1, optional
+			If x_threshold is not given, x_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
 		y_threshold : float, optional
 			A p-value threshold for selecting rules. If None, the threshold will be estimated from the data. Default: None.
+		y_threshold_percent : float between 0-1, optional
+			If y_threshold is not given, y_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
 		plot : bool, optional
 			Whether to show the 'measure vs. pvalue'-plot or not. Default: True.
 		kwargs : arguments
@@ -1168,6 +1174,8 @@ class CombObj():
 			check_value(x_threshold)
 		if y_threshold is not None:
 			check_value(y_threshold)
+		tfcomb.utils.check_value(y_threshold_percent, vmin=0, vmax=1, name="y_threshold_percent")
+		tfcomb.utils.check_value(x_threshold_percent, vmin=0, vmax=1, name="x_threshold_percent")	
 
 		#Check if measure are in columns
 		if x not in self.rules.columns:
@@ -1176,11 +1184,11 @@ class CombObj():
 		#If measure_threshold is None; try to calculate optimal threshold via knee-plot
 		if x_threshold is None:
 			self.logger.info("x_threshold is None; trying to calculate optimal threshold")
-			x_threshold = tfcomb.utils.get_threshold(self.rules[x])
+			x_threshold = tfcomb.utils.get_threshold(self.rules[x], percent=x_threshold_percent)
 
 		if y_threshold is None:
 			self.logger.info("y_threshold is None; trying to calculate optimal threshold")
-			y_threshold = tfcomb.utils.get_threshold(self.rules[y])
+			y_threshold = tfcomb.utils.get_threshold(self.rules[y], percent=y_threshold_percent)
 
 		#Set threshold on table
 		selected = self.rules.copy()
@@ -1281,6 +1289,23 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 	#-------------------------------- Plotting functionality  --------------------------------#
 	#-----------------------------------------------------------------------------------------#
+
+	def plot_TFBS(self, **kwargs):
+		"""
+		This is a wrapper for the plotting function `tfcomb.plotting.genome_view`
+
+		Parameters
+		------------
+		kwargs : arguments
+			All arguments are passed to `tfcomb.plotting.genome_view`. Please see the documentation for input parameters.
+		
+		"""
+
+		self._check_TFBS() #Requires TFBS
+
+		#Plot TFBS via genome view
+		tfcomb.plotting.genome_view(self.TFBS, **kwargs)
+
 
 	def plot_heatmap(self, n_rules=20, color_by="cosine", sort_by=None, **kwargs):
 		"""
@@ -1819,6 +1844,7 @@ class DiffCombObj():
 	def select_rules(self, contrast=None,
 						   measure="cosine", 
 						   measure_threshold=None,
+						   measure_threshold_percent=0.05,
 						   pvalue_threshold=0.05,
 						   plot = True, 
 						   **kwargs):
@@ -1833,6 +1859,8 @@ class DiffCombObj():
 			The measure to use for selecting rules. Default: "cosine" (internally converted to <prefix1>/<prefix2>_<measure>_log2fc).
 		measure_threshold : tuple, optional
 			Threshold for 'measure' for selecting rules. Default: None (the measure is estimated automatically) 
+		measure_threshold_percent : float between 0-1
+			If measure_threshold is not set, measure_threshold_percent controls the strictness of the automatic threshold. If you increase this value, more differential rules will be found and vice versa. Default: 0.05.  
 		pvalue_threshold : float, optional
 			The p-value threshold for selecting rules. Default: 0.05.
 		plot : boolean, optional
@@ -1848,6 +1876,9 @@ class DiffCombObj():
 		tfcomb.plotting.volcano
 		"""
 		
+		tfcomb.utils.check_value(measure_threshold_percent, vmin=0, vmax=1, name="measure_threshold_percent")
+		tfcomb.utils.check_value(pvalue_threshold, vmin=0, vmax=1, name="measure_threshold_percent")
+
 		#Identify measure to use based on contrast
 		if contrast == None:
 			contrast = self.contrasts[0]
@@ -1870,7 +1901,7 @@ class DiffCombObj():
 		#Find optimal measure threshold
 		if measure_threshold is None:
 			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
-			measure_threshold = tfcomb.utils.get_threshold(self.rules[measure_col], "both")
+			measure_threshold = tfcomb.utils.get_threshold(self.rules[measure_col], "both", percent=measure_threshold_percent)
 
 		if plot == True:
 			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
