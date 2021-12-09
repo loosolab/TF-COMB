@@ -12,6 +12,7 @@ import string
 import multiprocessing as mp
 from kneed import DataGenerator, KneeLocator
 import statsmodels.stats.multitest
+import importlib
 
 import pysam
 import tfcomb
@@ -131,6 +132,28 @@ def check_graphtool():
 	if error == 1:
 		s = "ERROR: Could not find the 'graph-tool' module on path. This module is needed for some of the TFCOMB network analysis functions. "
 		s += "Please visit 'https://graph-tool.skewed.de/' for information about installation."
+
+		if _is_notebook():
+			raise StopExecution(s) from None
+		else:
+			sys.exit(s)
+	
+	return(True)
+
+def check_module(module):
+	""" Check if <module> can be imported without error """
+
+	error = 0
+	try:
+		importlib.import_module(module)
+	except ModuleNotFoundError:
+		error = 1
+	except: 
+		raise #unexpected error loading module
+	
+	#Write out error if module was not found
+	if error == 1:
+		s = f"ERROR: Could not find the '{module}' module on path. This module is needed for this functionality. Please install this package to proceed."
 
 		if _is_notebook():
 			raise StopExecution(s) from None

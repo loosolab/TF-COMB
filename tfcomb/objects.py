@@ -1292,6 +1292,23 @@ class CombObj():
 	#-------------------------------- Plotting functionality  --------------------------------#
 	#-----------------------------------------------------------------------------------------#
 
+	def plot_TFBS(self, **kwargs):
+		"""
+		This is a wrapper for the plotting function `tfcomb.plotting.genome_view`
+
+		Parameters
+		------------
+		kwargs : arguments
+			All arguments are passed to `tfcomb.plotting.genome_view`. Please see the documentation for input parameters.
+		
+		"""
+
+		self._check_TFBS() #Requires TFBS
+
+		#Plot TFBS via genome view
+		tfcomb.plotting.genome_view(self.TFBS, **kwargs)
+
+
 	def plot_heatmap(self, n_rules=20, color_by="cosine", sort_by=None, **kwargs):
 		"""
 		Plot a heatmap of rules and their attribute values. This is a wrapper for the plotting function `tfcomb.plotting.heatmap`.

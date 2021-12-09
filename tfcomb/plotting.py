@@ -12,8 +12,6 @@ import copy
 import distutils
 from distutils import util
 
-from dna_features_viewer import GraphicFeature, GraphicRecord
-
 import tfcomb
 from tfcomb.utils import check_columns, check_type, check_string, check_value, random_string
 from tfcomb.logging import TFcombLogger
@@ -617,34 +615,58 @@ def network(network,
 	return(dot)
 
 
-def genome_features(TFBS, 
+def genome_view(TFBS, 
+					window_chrom=None,
+					window_start=None, 
+					window_end=None,
 					window=None,
 					fasta=None,
 					bigwigs=None,
+					save=None,
 					verbosity=1):
 
-	""" Plot regions in genome view via DnaFeaturesViewer.
+	""" Plot TFBS in genome view via the 'DnaFeaturesViewer' package. 
 	
 	Parameters
 	--------------
 	TFBS : list or dict of lists
-	
+		A list of OneTFBS objects or any other object containing .chrom, .start, .end and .name variables.
+	window_chrom : str, optional if 'window' is given
+		The chromosome of the window to show. 
+	window_start : int, optional if 'window' is given
+		The genomic coordinates for the start of the window.
+	window_end : int, optional if 'window' is given
+		The genomic coordinates for the end of the window.
 	window : Object with .chr, .start, .end 
-
-	fasta : str
-		The path to a fasta file containing sequence information
-
-	bigwigs : str, list or dict of strings
-
+		If window_chrom/window_start/window_end are not given, window can be given as an object containing .chrom, .start, .end variables
+	fasta : str, optional
+		The path to a fasta file containing sequence information to show. Default: None.
+	bigwigs : str, list or dict of strings, optional
+		Give the paths to bigwig signals to show within graph. Default: None.
+	save : str, optional
+		Save the plot to the file given in 'save'. Default: None.
 	"""
 
 	logger = TFcombLogger(verbosity)
 
+	#Test if package is available
+	if tfcomb.utils.check_module("dna_features_viewer") == True:
+		from dna_features_viewer import GraphicFeature, GraphicRecord
+
 	#----------------- Format input data ----------------#
 	
 	#Establish which region to show
-	logger.debug("Establish regions")
-	if window == None: #show all TFBS
+	logger.debug("Subsetting TFBS to window")
+
+	if window_chrom != None and window_start != None and window_end != None:
+		window = tfcomb.utils.OneTFBS(**{"chrom": window_chrom, "start": window_start, "end": window_end})
+
+	#Subset on windows or take all TFBS?
+	if window != None:
+		TFBS = [site for site in TFBS if (site.chrom == window.chrom) and (site.start >= window.start) and (site.end <= window.end)]
+
+	else: #show all TFBS
+		logger.warning("")
 
 		#Only keep first chromosome of TFBS
 		chrom = TFBS[0].chrom
@@ -665,15 +687,9 @@ def genome_features(TFBS,
 
 		window = tobias.utils.regions.OneRegion([chrom, window_start, window_end])
 
-	else:
-
-		#Subset sites within the window 
-		TFBS = [site for site in TFBS if (site.chrom == window.chrom) and (site.start >= window.start) and (site.end <= window.end)]
-		
-
-	window_length = window.end - window.start
-
 	logger.debug(window)
+		
+	window_length = window.end - window.start
 
 	#Establish how many bigwig paths were given
 	bigwigs = [] if bigwigs == None else bigwigs
@@ -700,12 +716,18 @@ def genome_features(TFBS,
 	## Add features from TFBS list
 	features = []
 	colors_used = {}
+
+	if len(TFBS) == 0:
+		logger.warning("No TFBS to show within the given window.")
+
 	for site in TFBS:
 
 		strand_convert = {"+":1, "-":-1}
-		#Get color for this TFBS
-
-		feature = GraphicFeature(start=site.start, end=site.end, strand=strand_convert.get(site.strand, None), label=site.name)
+		label = site.name
+		#Get unique color for this TFBS
+		
+		#Add feature
+		feature = GraphicFeature(start=site.start, end=site.end, strand=strand_convert.get(site.strand, None), label=label)
 		features.append(feature)
 
 	#Add sequence track
@@ -726,12 +748,11 @@ def genome_features(TFBS,
 						   )
 	with_ruler = True if n_bigwig_tracks == 0 else False
 	record.plot(ax=axes[0], with_ruler=with_ruler)
-	plt.xticks(rotation=45, ha="right")
+	plt.xticks(rotation=45, ha="right", color="grey")
 
 	#Plot sequence
 	if sequence is not None:
 		record.plot_sequence(axes[0], y_offset=1)
-
 
 	#------------ Add additional features -----------#
 	#Add bigwig track(s)
@@ -743,18 +764,31 @@ def genome_features(TFBS,
 			signal = tobias.utils.regions.OneRegion.get_signal(window, pybw)
 
 			#Add signal to plot
+			bigwig_name = os.path.splitext(os.path.basename(bigwig_f))[0]
 			xvals = np.arange(window.start, window.end)
 			axes[i+1].fill_between(xvals, signal, step="mid")
 			#axes[i+1].step(xvals, signal, where="mid")
-			axes[i+1].set_ylabel(os.path.basename(bigwig_f))
+			axes[i+1].set_ylabel(bigwig_name, rotation=0, ha="right")
+			axes[i+1].yaxis.tick_right()
 
 			ymin = np.min(signal)
 			ymax = np.max(signal)
 			pad = (ymax - ymin)*0.2
 			axes[i+1].set_ylim(ymin-pad, ymax+pad)
+			
+
+			#Set spine color to grey
+			axes[i+1].tick_params(color='grey', labelcolor='grey')
+			#plt.setp(axes[i+1].spines.values(), color="grey")
+			plt.setp([axes[i+1].get_xticklines(), axes[i+1].get_yticklines()], color="grey")
 
 
-	#-------------- Done with plot; show -----------#
+	plt.xlabel(window.chrom, color="grey")
+
+	#-------------- Done with plot; show/save -----------#
+
+	if save is not None:
+		plt.savefig(save, dpi=600)
 
 	return(axes)
 	
