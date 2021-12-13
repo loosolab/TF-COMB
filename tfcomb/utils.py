@@ -1402,6 +1402,7 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 		#Get distances from columns
 		peak_distances = [distance_cols[idx] for idx in peaks_idx]
 
+		'''
 		#Collect peaks for TF pair
 		peak_info = pd.DataFrame().from_dict(properties)
 		peak_info["Distance"] = peak_distances
@@ -1417,6 +1418,17 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 		peak_info.rename(columns= { "peak_heights":"Peak Heights",
 									"prominences": "Prominences"}, inplace=True)
 		results.append(peak_info)
+		'''
+		n_peaks = len(peak_distances)
+		# insert tf1,tf2 names number of peaks times
+		properties["TF1"] = [tf1]*n_peaks
+		properties["TF2"] = [tf2]*n_peaks
+
+		properties["Distance"] = peak_distances
+		properties["Threshold"] = threshold
+
+
+		results.append(properties)
 		
 	return results
 
@@ -1435,7 +1447,6 @@ def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", hei
 		# get pair
 		tf1, tf2 = pair
 		ind = "-".join(pair)
-
 		signal = signals.loc[ind].loc[distance_cols].values
 		
 		# get peaks for specific pair
@@ -1443,10 +1454,7 @@ def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", hei
 
 		results.append([tf1, tf2, _get_noise_measure(peaks_pair, signal, method, height_multiplier)])
 		
-	noisiness = pd.DataFrame(results, columns=["TF1", "TF2", "noisiness"])
-	peaks = peaks.merge(noisiness)
-
-	return [peaks]
+	return results
 
 
 

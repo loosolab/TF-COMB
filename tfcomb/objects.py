@@ -2963,8 +2963,15 @@ class DistObj():
 			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
 			method = "flat"
 
-		#Merge peaks across pairs
-		self.peaks = pd.concat(res, ignore_index=True)
+		res = pd.concat([pd.DataFrame(pair_res) for pair_res in res]).reset_index(drop=True)
+
+		#Format order of columns
+		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
+		res = res[columns]
+		res.rename(columns= { "peak_heights":"Peak Heights",
+									"prominences": "Prominences"}, inplace=True)
+
+		self.peaks = res
 		self.peaks["Distance"] = self.peaks["Distance"].astype(int)
 		
 		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
@@ -3074,11 +3081,17 @@ class DistObj():
 		self._height_multiplier = height_multiplier
 		
 		datasource =  self._get_datasource()
-		self.logger.info(f"Evaluating noisiness of the signals with {threads}threads")
+		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
 		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks,datasource)
-		res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
+
+		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
+
+		# merge noisiness
+		self.peaks = self.peaks.merge(noisiness)
+
+		#res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
 		
-		self.peaks = res
+		#self.peaks = res
 		
 
 	def check_periodicity(self):
