@@ -1500,12 +1500,12 @@ def _expand_peak(start_pos, cut_off, signal):
 		# left side
 		if(not found_left):
 			# left border not found
-			if pos_left == -1: # check if position less than start of signal
+			if pos_left <= -1: # check if position less than start of signal
 				found_left = True
 				left = 0
 			elif signal[pos_left] <= cut_off:
 				found_left = True
-				left = found_left  + 1 # we are one to far left
+				left = pos_left  + 1 # we are one to far left
 			pos_left -= 1
 		
 		# right side
