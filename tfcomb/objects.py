@@ -2382,7 +2382,7 @@ class DistObj():
 		#save the min values to reset the signals
 		self.shift = None
 
-		self.self._set_datasource(datasource)	
+		self._set_datasource(datasource)	
 		
 	def _get_datasource(self):
 		""" Determines whether .corrected or .smoothed should be used and returns the base columns for this
@@ -2932,6 +2932,7 @@ class DistObj():
 
 		self.stringency = stringency
 		self.prominence = prominence
+		distance_cols = np.array([-1 if dist == "neg" else dist for dist in self.distances.columns[2:].tolist()]) 
 
 		if (prominence == "median"):
 			# calculate median
@@ -2945,13 +2946,14 @@ class DistObj():
 			method = "median"
 
 		elif (prominence == "zscore"):
-			stds = np.std(datasource, axis=1)
+			stds = datasource[distance_cols].std(ddof=0, axis=1)
 			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
-			means = np.mean(datasource, axis=1)
-
+			means = datasource[distance_cols].mean(axis=1)
+			
 			# Calculate zscore (x-mean)/std
+			zsc = datasource[distance_cols].subtract(means, axis =0).divide(stds, axis =0).fillna(0) 
+
 			textcols = datasource[['TF1', 'TF2']]
-			zsc = datasource.drop(['TF1', 'TF2'], axis=1).subtract(means, axis =0).divide(stds, axis =0).fillna(0) 
 			zsc = pd.concat((textcols,zsc), axis=1)
 
 			zsc = zsc.reset_index(drop=True).set_index(["TF1", "TF2"], drop=False)
@@ -2978,7 +2980,7 @@ class DistObj():
 
 		# add counts (TF1-TF2)
 		self.peaks.index = self.peaks["TF1"] + "-" + self.peaks["TF2"]
-		counts = self._raw.sum(axis=1)
+		counts = self._raw[distance_cols].sum(axis=1)
 		counts.name="TF1_TF2_count"
 		self.peaks = self.peaks.merge(counts.to_frame(), left_index=True, right_index=True)
 
@@ -3531,52 +3533,69 @@ class DistObj():
 		datasource = self._get_datasource()
 		
 		distances = datasource.columns[2:].to_numpy()
-		x = datasource.loc[ind].iloc[2:].to_numpy() #y-values in plot
-		
-		negative = False
-		neg = x[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			x = x[1:]
-			offset_neg = -4
+		y = datasource.loc[ind].iloc[2:].to_numpy() #y-values in plot
+		x = distances
 		
 		# if data is classified, exclude class from plotting
-		if (type(x[-1]) is np.bool_) or (type(x[-1]) is bool):
+		if (type(y[-1]) is np.bool_) or (type(y[-1]) is bool):
+			y = y[:-1]
 			x = x[:-1]
 		
+		# calculate zscore values (why? zscore values are saved in .zsc)
 		if (method =="zscore"):
-			x = (x - x.mean())/x.std()
+			y = (y - y.mean())/y.std()
 		
+		negative = False
+		offset_neg = None
+		if (self.min_dist == 0) and (self.max_overlap > 0):
+			negative = True
+			# save negative value for extra plot
+			neg = y[0]
+			y = y[1:]
+			# remove "-1" from x values 
+			x = x[1:]
+			# "x-value" for negative plot
+			offset_neg = -4
 
+		# Plot only peaking signals?
 		if (only_peaking) and (len(peaks) == 0):
 			self.logger.debug(f"Only plots for pairs with at least one peak should be plotted. {tf1}-{tf2} has no peak.")
 			return
 
 		fig, ax = plt.subplots(1, 1)
-		plt.plot(distances, x)
+		plt.plot(x, y)
+		'''
 		if self.min_dist == 0 :
 			crosses = peaks + 1 
 		else:
 			crosses = peaks
+		'''
 
+		neg_cross = False
 		if(len(peaks) > 0):
-			x_crosses = peaks
-			peak_idx = [list(distances).index(peak) for peak in peaks]
-			y_crosses = x[peak_idx] #y-values for peaks
-			plt.plot(x_crosses, y_crosses, "x")
+			# get indices of the peaks (mainly needed for ranges not starting with position 0)
+			peak_idx = [offset_neg if peak==-1 else list(x).index(peak) for peak in peaks]
 
-		plt.plot([thresh] * len(x), "--", color="gray")
+			# check if a peak is at the negative position
+			if offset_neg in peak_idx:
+				neg_cross = True
+				peak_idx.remove(offset_neg)
+			y_crosses = y[peak_idx] #y-values for peaks
+			plt.plot(peak_idx, y_crosses, "x")
+
+		plt.plot([thresh] * len(y), "--", color="gray")
 		plt.xlabel('Distance in bp')
 		plt.ylabel('Corrected count per distance')
 		
 		xt = ax.get_xticks() 
 		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
+			plt.bar(offset_neg, neg, color='tab:orange')
 			xt[0] = offset_neg
-			xt[0] = -1
 			xt = xt[:-1]
 			xtl = xt.tolist()
 			xtl[0] = "neg"
+			if neg_cross:
+				plt.plot(offset_neg, neg, "x")
 		else:
 			xt = xt[1:-1]
 			xtl = xt.tolist()
