@@ -26,12 +26,13 @@ from kneed import KneeLocator
 #Modules for plotting
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tfcomb import utils
 
 #Utilities from TOBIAS
 import tobias
 from tobias.utils.motifs import MotifList
 from tobias.utils.regions import OneRegion, RegionList
-from tobias.utils.signals import fast_rolling_math
+#from tobias.utils.signals import fast_rolling_math
 
 #TF-comb modules
 import tfcomb
@@ -1086,6 +1087,39 @@ class CombObj():
 
 		#Create new object with selected rules
 		self.logger.info("Creating subset of object")
+		new_obj = self.copy()
+		new_obj.rules = selected
+
+		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
+		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		new_obj.network = None
+
+		return(new_obj)
+	
+	def select_custom_rules(self, custom_list):
+		""" Select rules based on a custom list of TF pairs. 
+		
+		Parameters
+		------------
+		TF_list : list
+			List of TF pairs fitting to TF1/TF2 combination within .rules.
+
+		Returns
+		--------
+		tfcomb.objects.CombObj()
+			An object containing a subset of <Combobj>.rules
+		"""
+		#Check input
+		self._check_rules()
+		check_type(custom_list, list, name="TF_list")
+		check_type(custom_list[0], [tuple, list], name="Pairs")
+
+		#Create selected subset
+		selected = self.rules.copy()
+
+		selected = selected.set_index(["TF1","TF2"]).loc[custom_list].reset_index()
+
+		#Create new object with selected rules
 		new_obj = self.copy()
 		new_obj.rules = selected
 
@@ -2308,7 +2342,7 @@ class DistObj():
 		self.smooth_window = window_size
 		self.logger.info(f"Smoothing signals with window size {window_size}")
 
-		smoothed = self.corrected.apply(lambda row: fast_rolling_math(np.array(list(row[2:])), window_size, "mean"), axis=1, result_type="expand")
+		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[2:])), window_size), axis=1, result_type="expand")
 		smoothed = smoothed.fillna(0) 
 		smoothed.columns = self.corrected.columns[2:] 
 		self.smoothed = pd.concat((self.corrected[["TF1","TF2"]], smoothed), axis=1)
