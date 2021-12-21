@@ -1,4 +1,3 @@
-from math import dist
 import sys
 import os
 import pandas as pd
@@ -1269,7 +1268,7 @@ def linress_chunks(pairs, dist_counts, distances):
 	dist_counts = dist_counts.reset_index()
 	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
 	
-	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
 
 	#save results as list
 	results = []
@@ -1310,7 +1309,7 @@ def correct_chunks(pairs, dist_counts, distances, linres):
 	dist_counts = dist_counts.reset_index()
 	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
 
-	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
 
 	linres = linres.reset_index()
 	linres.index = linres["TF1"] + "-" + linres["TF2"]
@@ -1369,7 +1368,7 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 	datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
 
 	# get data column
-	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
 
 	results = []
 	for pair in pairs:
@@ -1441,7 +1440,7 @@ def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", hei
 	peaks.index = peaks["TF1"] + "-" + peaks["TF2"]
 
 	# get data column
-	distance_cols = np.array([-1 if dist == "neg" else dist for dist in distances]) #neg counts as -1
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
 	results = []
 	for pair in pairs:
 		# get pair
@@ -1519,3 +1518,25 @@ def _expand_peak(start_pos, cut_off, signal):
 				right = pos_right - 1 # we are one to far right
 			pos_right += 1
 	return(left, right)
+
+def fast_rolling_mean(arr, w):
+	"""
+	Aaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
+	Rolling operation of arr with window size w 
+	"""
+
+	L = arr.shape[0]
+	roll_arr = np.zeros(L)
+	#Mean in window
+	for i in range(L):
+		valsum = 0
+		# need to handle flanking reagion
+		actual_w = 0
+		for j in range(w):
+			actual_w += 1
+			if (i+j) >= L:
+				break 
+			valsum += arr[i+j]
+			
+		roll_arr[i] = valsum/actual_w
+	return roll_arr
