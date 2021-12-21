@@ -1521,22 +1521,28 @@ def _expand_peak(start_pos, cut_off, signal):
 
 def fast_rolling_mean(arr, w):
 	"""
-	Aaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
+	Adaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
 	Rolling operation of arr with window size w 
 	"""
 
 	L = arr.shape[0]
 	roll_arr = np.zeros(L)
+	lf = int(np.floor(w / 2.0))
 	#Mean in window
 	for i in range(L):
 		valsum = 0
 		# need to handle flanking reagion
-		actual_w = 0
+		#actual_w = 0
+		start_i = i-lf 
 		for j in range(w):
-			actual_w += 1
-			if (i+j) >= L:
+			# continue until "start is reached"
+			if (start_i + j) < 0:
+				continue
+			# break if end is reached
+			if (start_i + j) >= L:
 				break 
-			valsum += arr[i+j]
+			#actual_w += 1
+			valsum += arr[start_i+j]
 			
-		roll_arr[i] = valsum/actual_w
+		roll_arr[i] = valsum/w
 	return roll_arr
