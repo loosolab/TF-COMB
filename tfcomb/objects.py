@@ -3018,7 +3018,15 @@ class DistObj():
 		counts.name="TF1_TF2_count"
 		self.peaks = self.peaks.merge(counts.to_frame(), left_index=True, right_index=True)
 
+		# add distance counts
+		lf = int(np.floor(smooth_window / 2.0))
+		rf = int(np.ceil(smooth_window / 2.0)) 
 
+		self.peaks["Distance_percent"] = self.peaks.apply(lambda row: sum(self._raw.loc[row.name, 
+																						([row[2]-lf if row[2]-lf > self.min_dist else self.min_dist][0]):( [row[2]+rf if row[2]+rf < self.max_dist else self.max_dist][0])]),
+																						axis=1)
+
+		self.peaks["Distance_percent"] = self.peaks["Distance_percent"] / self.peaks["TF1_TF2_count"]
 		# QoL safe of threshold and method
 		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
 		self.thresh["method"] = method
@@ -3062,14 +3070,14 @@ class DistObj():
 
 		self._set_datasource(datasource)
 
-	def rank_rules(self, by=["Peak Heights", "Noisiness"], calc_mean=True):
+	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" ranks rules within each column specified. 
 
 			Params:
 			----------
 			by : list of strings
 				Columns for wich the rules should be ranked
-				Default: ["Peak Heights", "Noisiness"]
+				Default: ["Distance_percent", "Peak Heights", "Noisiness"]
 			calc_mean: bool
 				True if an extra column should be calculated containing the mean rank, false otherwise
 				Default: True
