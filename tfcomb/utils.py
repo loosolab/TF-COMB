@@ -21,6 +21,7 @@ from tfcomb.logging import TFcombLogger, InputError
 from tfcomb.counting import count_co_occurrence
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
+from tobias.utils.signals import fast_rolling_math
 import pathlib
 import pyBigWig
 
@@ -1525,24 +1526,18 @@ def fast_rolling_mean(arr, w):
 	Rolling operation of arr with window size w 
 	"""
 
-	L = arr.shape[0]
-	roll_arr = np.zeros(L)
-	lf = int(np.floor(w / 2.0))
-	#Mean in window
-	for i in range(L):
-		valsum = 0
-		# need to handle flanking reagion
-		#actual_w = 0
-		start_i = i-lf 
-		for j in range(w):
-			# continue until "start is reached"
-			if (start_i + j) < 0:
-				continue
-			# break if end is reached
-			if (start_i + j) >= L:
-				break 
-			#actual_w += 1
-			valsum += arr[start_i+j]
-			
-		roll_arr[i] = valsum/w
+	lf = int(np.ceil( (w-1) / 2.0))
+	rf = int(np.floor( (w-1) / 2.0))
+	#Expand the array with the first value to the left 
+	arr = np.concatenate((np.repeat(arr[0], lf), arr))
+	#Expand the array with the last value to the right 
+	arr = np.concatenate((arr, np.repeat(arr[0], rf)))
+
+	# use fast_rolling_math from tobias.utils.signals
+	roll_arr = fast_rolling_math(arr.astype(float), w, "mean")
+	
+
+	#remove nan's ( artifical new flanks)
+	roll_arr = roll_arr[~np.isnan(roll_arr)]
+
 	return roll_arr
