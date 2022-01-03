@@ -2333,22 +2333,25 @@ class DistObj():
 		
 		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
 		self.check_min_max_dist()
+		self.check_corrected()
 
 		if self.shift is not None:
 			self.logger.info("Signal is already shifted! smoothing it again may cause false result. Skipping smoothing.")
 			return
-
-		if self.corrected is None:
-			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
-			sys.exit(0)
 		
 		self.smooth_window = window_size
 		self.logger.info(f"Smoothing signals with window size {window_size}")
+		
+		static_cols = ["TF1","TF2"]
+		pos_cols = list(self.corrected.columns[2:])
+		if (-1 in pos_cols):
+			pos_cols.remove(-1)
+			static_cols.append(-1)
 
-		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[2:])), window_size), axis=1, result_type="expand")
+		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[pos_cols])), window_size), axis=1, result_type="expand")
 		smoothed = smoothed.fillna(0) 
-		smoothed.columns = self.corrected.columns[2:] 
-		self.smoothed = pd.concat((self.corrected[["TF1","TF2"]], smoothed), axis=1)
+		smoothed.columns = pos_cols
+		self.smoothed = pd.concat((self.corrected[static_cols], smoothed), axis=1)
 
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
