@@ -4,7 +4,8 @@ __version__ = "0.1.0"
 
 #Set classes to be available directly from upper tfcomb, i.e. "from tfcomb import CombObj"
 global_classes = ["tfcomb.objects.CombObj",
-                  "tfcomb.objects.DiffCombObj"]
+                  "tfcomb.objects.DiffCombObj",
+                  "tfcomb.objects.DistObj"]
 
 for c in global_classes:
     

@@ -447,7 +447,8 @@ def network(network,
 				min_node_size=14,
 				max_node_size=20,
 				save=None,
-				verbosity = 1):
+				verbosity=1,
+				show_legend=True):
 	"""
 	Plot network of a networkx object using Graphviz for python.
 
@@ -476,8 +477,10 @@ def network(network,
 		Default: 20.
 	save : str, optional
 		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
-	verbosity : int
+	verbosity : int, optional
 		verbosity of the logging. Default: 1.
+	show_legend : bool, optional
+		Default: True
 
 	Raises
 	-------
@@ -521,7 +524,7 @@ def network(network,
 	dot.attr(size=size)
 	dot.attr(outputorder="edgesfirst")
 	dot.attr(overlap="false")
-	
+
 	############ Setup colormaps/sizemaps ############
 	map_value = {}
 	
@@ -596,6 +599,38 @@ def network(network,
 
 		#After collecting all edge attributes; add edge to dot object
 		dot.edge(node1, node2, _attributes=attributes)
+
+	if show_legend:
+		html_legend = '<<TABLE  ALIGN="LEFT" BORDER="1" CELLBORDER="0" CELLSPACING="0">'
+		first_line = True
+		if color_node_by is not None:
+			first_line = False			
+			html_legend += f'<TR><TD ALIGN="LEFT"> Nodes colored by: </TD><TD ALIGN="LEFT">{color_node_by}</TD><TD WIDTH="100" HEIGHT="20" FIXEDSIZE="true" BGCOLOR="/reds9/4:/reds9/7"></TD></TR>'
+		if color_edge_by is not None:
+			# only plot hr sep if not first argument
+			if not first_line:
+				html_legend += '<HR/>'
+			else:
+				first_line = False
+			html_legend += f'<TR><TD ALIGN="LEFT"> Edges colored by: </TD><TD ALIGN="LEFT">{color_edge_by}</TD><TD WIDTH="100" HEIGHT="20" FIXEDSIZE="true" BGCOLOR="/reds9/4:/reds9/7"></TD></TR>'
+		if size_node_by is not None: 
+			# only plot hr sep if not first argument
+			if not first_line:
+				html_legend += '<HR/>'
+			else:
+				first_line = False
+			html_legend += f'<TR><TD ALIGN="LEFT"> Nodes sized by: </TD><TD ALIGN="LEFT">{size_node_by}</TD><TD></TD></TR>'
+		if size_edge_by is not None:
+			# only plot hr sep if not first argument
+			if not first_line:
+				html_legend += '<HR/>'
+			else:
+				first_line = False
+			html_legend += f'<TR><TD ALIGN="LEFT"> Edges sized by: </TD><TD ALIGN="LEFT">{size_edge_by}</TD><TD></TD></TR>'
+		html_legend += '</TABLE>>'
+		dot.attr(label=html_legend)
+		dot.attr(labelloc="b")
+		dot.attr(labeljust="r")
 
 	############### Save to file ###############
 	if save != None:

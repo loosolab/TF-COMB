@@ -7,6 +7,7 @@ from copy import deepcopy
 import time
 import datetime
 import scipy.stats
+from scipy.signal import find_peaks
 import random
 import string
 import multiprocessing as mp
@@ -20,6 +21,7 @@ from tfcomb.logging import TFcombLogger, InputError
 from tfcomb.counting import count_co_occurrence
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
+from tobias.utils.signals import fast_rolling_math
 import pathlib
 import pyBigWig
 
@@ -838,7 +840,7 @@ def locations_to_bed(locations, outfile, fmt="bed"):
 	outfile : str
 		The path which the pair locations should be written to.
 	fmt : str, optional
-		The format of the output file. Bust be pne of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
+		The format of the output file. Must be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
 	"""
 	
 	tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
@@ -1241,3 +1243,298 @@ def set_contrast(contrast, available_contrasts):
 			raise ValueError("Contrast {0} is not valid (available contrasts are {1})".format(contrast, available_contrasts))
 
 	return(contrast)
+
+# ------------------------- chunk operations ---------------------------------------- #
+def linress_chunks(pairs, dist_counts, distances):
+	''' Helper function to process linear regression for chunks 
+		
+		Parameters
+		-----------
+		pairs: list<tuple>
+			   A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+		dist_counts: pd.DataFrame
+			   A (sub-)Dataframe with the distance counts for the pairs
+		distances: list
+			   A list of valid column names for the distances  
+		
+		Returns
+		-----------
+		results: list 
+				A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+	'''
+	# make sure index is correct
+	dist_counts = dist_counts.reset_index()
+	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
+	
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+
+	#save results as list
+	results = []
+	for pair in pairs:
+
+		# get count for specific pair
+		ind = "-".join(pair)
+		counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+		counts = np.array(counts, dtype=float)
+		
+		# fit linear regression
+		res = scipy.stats.linregress(distances, counts)
+
+		# get TF1, TF2 names from pair
+		tf1, tf2 = pair
+		results.append([tf1, tf2, res])
+	return results
+
+def correct_chunks(pairs, dist_counts, distances, linres):
+	""" Subtracts the estimated background from the Signal for a given pair. 
+			
+	Parameters
+	-----------
+	pairs: list<tuple>
+		   A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+	dist_counts: pd.DataFrame
+		   A (sub-)Dataframe with the distance counts for the pairs
+	distances: list
+		   A list of valid column names for the distances  
+		
+	Returns
+	-----------
+	results: list 
+			A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+	"""
+
+	# make sure index is correct
+	dist_counts = dist_counts.reset_index()
+	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
+
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+
+	linres = linres.reset_index()
+	linres.index = linres["TF1"] + "-" + linres["TF2"]
+
+	linres_col = "Linear Regression"
+	
+	#save results as list
+	results = []
+	for pair in pairs:
+
+		# get count for specific pair
+		ind = "-".join(pair)
+		counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+		counts = np.array(counts, dtype=float)
+
+		linres_pair = linres.loc[ind].loc[linres_col] #exclude TF1, TF2 columns
+	
+		# subtract background
+		corrected = counts - (linres_pair.intercept + linres_pair.slope * np.array(distances))
+		
+		# get TF1, TF2 names from pair
+		tf1, tf2 = pair
+		corrected = [tf1, tf2] + corrected.tolist()
+
+		results.append(corrected)
+		
+	return results
+
+def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
+	""" After background correction is done (see ._correct_pair() or .correct_all()), the signal is analyzed for peaks, 
+		indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
+		Signal. Peaks are called with scipy.signal.find_peaks().
+		
+		Parameters
+		----------
+		pairs : list<tuple(str,str)>
+			TF names for which the preferred binding distance(s) should be found. e.g. ("NFYA","NFYB")
+		datasource : pd.DataFrame 
+			A (sub-)Dataframe with the (corrected) distance counts for the pairs
+		distances: list
+			A list of valid column names for the distances  
+		stringency: number
+			stringency the prominence threshold should be multiplied with.
+		prominence: number or ndarray or sequence
+			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
+			Default: 0
+
+		Returns:
+		----------
+		list 
+			list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
+	"""
+
+	# make sure index is correct
+	datasource = datasource.reset_index()
+	datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+
+	# get data column
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+
+	results = []
+	for pair in pairs:
+		# get pair
+		tf1, tf2 = pair
+		ind = "-".join(pair)
+
+		# signal.find_peaks() will not find peaks on first and last position without having 
+		# an other number left and right. 
+		signal = datasource.loc[ind].loc[distance_cols].values
+		x = [0] + list(signal) + [0]
+
+		# determine prominence
+		if prominence =="zscore":
+			prom = 1
+		elif prominence =="median":
+			prom = datasource.loc[ind].loc["median"].values
+		else:
+			prom = prominence
+		
+		# calc threshold 
+		threshold = prom * stringency
+
+		#Find positions of peaks
+		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
+
+		# subtract the position added above (first zero) 
+		peaks_idx = peaks_idx - 1 
+
+		#Get distances from columns
+		peak_distances = [distance_cols[idx] for idx in peaks_idx]
+
+		'''
+		#Collect peaks for TF pair
+		peak_info = pd.DataFrame().from_dict(properties)
+		peak_info["Distance"] = peak_distances
+		peak_info["TF1"] = tf1
+		peak_info["TF2"] = tf2
+
+		#Add additional peak-information per pair
+		peak_info["Threshold"] = threshold
+		
+		#Format order of columns
+		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
+		peak_info = peak_info[columns]
+		peak_info.rename(columns= { "peak_heights":"Peak Heights",
+									"prominences": "Prominences"}, inplace=True)
+		results.append(peak_info)
+		'''
+		n_peaks = len(peak_distances)
+		# insert tf1,tf2 names number of peaks times
+		properties["TF1"] = [tf1]*n_peaks
+		properties["TF2"] = [tf2]*n_peaks
+
+		properties["Distance"] = peak_distances
+		properties["Threshold"] = threshold
+
+
+		results.append(properties)
+		
+	return results
+
+def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", height_multiplier=0.75):
+	# make sure index is correct
+	signals = signals.reset_index()
+	signals.index = signals["TF1"] + "-" + signals["TF2"]
+
+	peaks = peaks.reset_index()
+	peaks.index = peaks["TF1"] + "-" + peaks["TF2"]
+
+	# get data column
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+	results = []
+	for pair in pairs:
+		# get pair
+		tf1, tf2 = pair
+		ind = "-".join(pair)
+		signal = signals.loc[ind].loc[distance_cols].values
+		
+		# get peaks for specific pair
+		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)]
+
+		results.append([tf1, tf2, _get_noise_measure(peaks_pair, signal, method, height_multiplier)])
+		
+	return results
+
+
+
+def _get_noise_measure(peaks, signal, method, height_multiplier):
+	#check method input
+	check_string(method, ["median", "min_max"], "method")
+
+	# get the cutting points fot the signal
+	cuts = _get_cut_points(peaks, height_multiplier, signal)
+
+	# cut all peaks out of the signal
+	for cut in cuts:
+		signal[cut[0]:cut[1]] = np.nan
+
+	measure = None
+	if method == "median":
+		measure = pd.Series(signal).median()
+	elif method == "min_max":
+		measure = signal.max() - signal.min()
+	
+	return float(measure)
+
+def _get_cut_points(peaks, height_multiplier, signal):
+	cuts =[]
+	for idx,row in peaks.iterrows():
+		# get the peak distance
+		peak = row.Distance
+		# get the peak height 
+		peak_height = signal[peak]
+		# determine cutoff, in common sense this should be "going ~25% down the peak size"
+		cut_off = height_multiplier * peak_height
+		cuts.append(_expand_peak(peak, cut_off, signal))
+	return cuts
+
+def _expand_peak(start_pos, cut_off, signal):
+	found_left = False
+	found_right = False
+	pos_left = start_pos - 1
+	pos_right = start_pos + 1
+
+	# expand the peak until both borders are found
+	while(not(found_left & found_right)):
+		# left side
+		if(not found_left):
+			# left border not found
+			if pos_left <= -1: # check if position less than start of signal
+				found_left = True
+				left = 0
+			elif signal[pos_left] <= cut_off:
+				found_left = True
+				left = pos_left  + 1 # we are one to far left
+			pos_left -= 1
+		
+		# right side
+		if(not found_right):
+			# right border not found	
+			if  pos_right == len(signal): # check if position higher than end of signal
+				found_right = True
+				right = len(signal) - 1
+			elif signal[pos_right] < cut_off:
+				found_right = True
+				right = pos_right - 1 # we are one to far right
+			pos_right += 1
+	return(left, right)
+
+def fast_rolling_mean(arr, w):
+	"""
+	Adaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
+	Rolling operation of arr with window size w 
+	"""
+
+	lf = int(np.ceil( (w-1) / 2.0))
+	rf = int(np.floor( (w-1) / 2.0))
+	#Expand the array with the first value to the left 
+	arr = np.concatenate((np.repeat(arr[0], lf), arr))
+	#Expand the array with the last value to the right 
+	arr = np.concatenate((arr, np.repeat(arr[0], rf)))
+
+	# use fast_rolling_math from tobias.utils.signals
+	roll_arr = fast_rolling_math(arr.astype(float), w, "mean")
+	
+
+	#remove nan's ( artifical new flanks)
+	roll_arr = roll_arr[~np.isnan(roll_arr)]
+
+	return roll_arr
