@@ -2192,7 +2192,9 @@ class DistObj():
 		#Variables for storing data
 		self.rules = None  		     # Filled in by .fill_rules()
 		self.TF_names = []		     # List of TF names
+		self.TF_table = None		 # List of all TF counts
 		self._raw = None             # Raw distance data [Pandas DataFrame of size n_pairs x maxDist]
+		self.network = None			 # Network obj
 
 		self.distances = None 	     # Pandas DataFrame of size n_pairs x maxDist
 		self.corrected = None        # Pandas DataFrame of size n_pairs x maxDist
@@ -2282,6 +2284,7 @@ class DistObj():
 		self.directional = comb_obj.directional
 		self.max_overlap = comb_obj.max_overlap
 		self.stranded = comb_obj.stranded
+		self.TF_table = comb_obj.TF_table
 		#self.anchor = comb_obj.anchor
 
 	def set_anchor(self, anchor):
@@ -3144,6 +3147,22 @@ class DistObj():
 		"""
 		pass
 
+
+	def build_network(self):
+		""" 
+		Builds a TF-TF co-occurrence network for the rules within object. This is a wrapper for the tfcomb.network.build_nx_network() function, 
+		which uses the python networkx package. 
+			 
+		Returns
+		-------
+		None - fills the .network attribute of the `CombObj` with a networkx.Graph object
+		"""
+
+		#Build network
+		self.logger.debug("Building network using tfcomb.network.build_nx_network")
+		self.network = tfcomb.network.build_nx_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
+		self.logger.info("Finished! The network is found within <CombObj>.<distObj>.network.")
+
 	#-------------------------------------------------------------------------------------------------------------#
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
@@ -3647,5 +3666,42 @@ class DistObj():
 		if save is not None:
 			plt.savefig(save, dpi=600)
 			plt.close()
-	
+
+	def plot_network(self, color_node_by="TF1_count",
+						   color_edge_by="Distance", 
+						   size_edge_by="Distance_percent",
+						   **kwargs): 
+		"""
+		Plot the rules in .rules as a network using Graphviz for python. This function is a wrapper for 
+		building the network (using tfcomb.network.build_network) and subsequently plotting the network (using tfcomb.plotting.network).
+
+		Parameters
+		-----------
+		color_node_by : str, optional
+			A column in .rules or .TF_table to color nodes by. Default: 'TF1_count'.
+		color_edge_by : str, optional
+			A column in .rules to color edges by. Default: 'Distance'.
+		size_edge_by : str, optional
+			A column in rules to size edge width by. Default: 'TF1_TF2_count'.
+		kwargs : arguments
+			All other arguments are passed to tfcomb.plotting.network.
+
+		See also
+		--------
+		tfcomb.network.build_network and tfcomb.plotting.network
+		"""
+
+		#Fetch network from object or build network
+		if self.network is None:
+			self.logger.warning("The .network attribute is not set yet - running build_network().")
+			self.build_network()			#running build network()
+			
+		#Plot network
+		G = self.network 
+		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, 
+										 color_edge_by=color_edge_by, 
+										 size_edge_by=size_edge_by, 
+										 verbosity=self.verbosity, **kwargs)
+
+		return(dot)
 
