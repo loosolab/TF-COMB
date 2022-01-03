@@ -316,6 +316,7 @@ def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
 	aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
 
 	#Plot enriched terms 
+	#todo: size of plot depending on number of terms to show
 	ax = sns.scatterplot(x="-log(p-value)", 
 								y="name",
 								size="n_genes",
@@ -666,7 +667,7 @@ def genome_view(TFBS,
 		TFBS = [site for site in TFBS if (site.chrom == window.chrom) and (site.start >= window.start) and (site.end <= window.end)]
 
 	else: #show all TFBS
-		logger.warning("")
+		logger.warning("No window was set - showing the first 100 sites in .TFBS")
 
 		#Only keep first chromosome of TFBS
 		chrom = TFBS[0].chrom
@@ -744,7 +745,7 @@ def genome_view(TFBS,
 						   sequence_length=window_length, 
 						   sequence=sequence,
 						   features=features, 
-						   #labels_spacing=20
+						   labels_spacing=20
 						   )
 	with_ruler = True if n_bigwig_tracks == 0 else False
 	record.plot(ax=axes[0], with_ruler=with_ruler)

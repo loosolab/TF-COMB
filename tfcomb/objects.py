@@ -127,7 +127,7 @@ class CombObj():
 		#Merge TFBS
 		combined.TFBS = RegionList(self.TFBS + obj.TFBS)
 		combined.TFBS.loc_sort() 				#sort TFBS by coordinates
-		combined.TFBS = tfcomb.utils.remove_duplicates(combined.TFBS) #remove duplicated sites 
+		combined.TFBS = combined.TFBS.remove_duplicates() #remove duplicated sites 
 
 		#Set .TF_names of the new list
 		counts = {r.name: "" for r in combined.TFBS}
@@ -174,7 +174,7 @@ class CombObj():
 		""" Internal check whether the .TFBS was already filled. Raises InputError when .TFBS is not available."""
 
 		#Check that TFBS exist and that it is RegionList
-		if self.TFBS is None or not isinstance(self.TFBS, RegionList):
+		if self.TFBS is None or (not isinstance(self.TFBS, list) and not isinstance(self.TFBS, RegionList)):
 			raise InputError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS.")
 
 	def _check_counts(self):
@@ -244,7 +244,7 @@ class CombObj():
 		Raises
 		-------
 		InputError
-			If read object is not an instance of CombObj .
+			If read object is not an instance of CombObj.
 		
 		See also
 		----------
@@ -1964,14 +1964,24 @@ class DiffCombObj():
 		matrix = self.rules[cols].corr(method=method)
 		sns.clustermap(matrix,
 							cbar_kws={'label': method})
+		#todo: rotate x-axis labels
 
+	def plot_rules_heatmap(self):
+		""" Plot a heatmap of size n_rules x n_objects """ 
+
+		cols = [prefix + "_" + self.measure for prefix in self.prefixes]
+
+	
+
+
+	#todo: plot_contrast heatmap
 	def plot_heatmap(self, contrast=None, 
 						   n_rules=10, 
 						   color_by="cosine_log2fc", 
 						   sort_by=None, 
 						   **kwargs):
 		"""
-		Functionality to plot a heatmap of differentially co-occurring TF pairs. 
+		Functionality to plot a heatmap of differentially co-occurring TF pairs for a certain contrast. 
 
 		Parameters
 		------------
@@ -1991,6 +2001,7 @@ class DiffCombObj():
 		tfcomb.plotting.heatmap
 		"""
 
+		#todo: requires log2fcs to be calculated
 		contrast = tfcomb.utils.set_contrast(contrast, self.contrasts)
 
 		#Decide columns based on color_by / sort_by

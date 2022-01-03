@@ -1125,9 +1125,6 @@ def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, l
 	col = measure + "_pvalue"
 	table[col] = pvalues
 
-	#Adjust pvalues
-	table[col + "_adj"] = statsmodels.stats.multitest.multipletests(table[col], method="Bonferroni")[1]
-
 	#no return, table is changed in place
 
 def _pvalues_for_chunks(TF_int_combinations, bg_dist_dict, alternative="greater"):
