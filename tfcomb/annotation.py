@@ -9,10 +9,12 @@ import shutil
 import requests
 import tobias
 import glob
+import multiprocessing as mp
 
 #UROPA annotation
 import logging
 import pysam
+import uropa
 from uropa.annotation import annotate_single_peak
 from uropa.utils import format_config
 
@@ -41,7 +43,7 @@ organism_to_taxid = dict(zip(taxid_table[0], taxid_table[1]))
 #----------------------------- Annotation of sites -----------------------------#
 #-------------------------------------------------------------------------------#
 
-def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
+def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=1):
 	"""
 	Annotate regions with genes from .gtf using UROPA _[1]. 
 
@@ -53,6 +55,8 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 		Path to .gtf file containing genomic elements for annotation.
 	config : dict, optional
 		A dictionary indicating how regions should be annotated. Default is to annotate feature 'gene' within -10000;1000bp of the gene start. See 'Examples' of how to set up a custom configuration dictionary.
+	best : boolean
+		Whether to return the best annotation or all valid annotations. Default: True (only best are kept).
 	threads : int, optional
 		Number of threads to use for multiprocessing. Default: 1.
 	verbosity : int, optional
@@ -81,7 +85,7 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 	"""
 	
 	#Check input types
-	check_type(regions, [list, tobias.utils.regions.RegionList], "regions")
+	check_type(regions, [list, tobias.utils.regions.RegionList, pd.DataFrame], "regions")
 	check_type(gtf, str, "gtf")
 	check_type(config, [type(None), dict], "config")
 	check_value(threads, vmin=1, name="threads")
@@ -101,20 +105,29 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 
 	cfg_dict = copy.deepcopy(cfg_dict) #make sure that config is not being changed in place
 	cfg_dict = format_config(cfg_dict, logger=logger)
-
-	#print(cfg_dict)
 	logger.debug("Config dictionary: {0}".format(cfg_dict))
-	
-	#Convert peaks to dict for uropa
+
+	#Convert regions to dict for uropa
 	region_dicts = []
-	for region in regions:
-		d = {"peak_chr": region.chrom, 
-			 "peak_start": region.start, 
-			 "peak_end": region.end, 
-			 "peak_id": region.name,
-			 "peak_score": region.score,
-			 "peak_strand": region.strand}
-		region_dicts.append(d)
+	if type(regions) == pd.DataFrame:	
+		for idx, row in regions.iterrows():
+			elements = row.iloc[:6].tolist()
+			d = {"peak_chr": elements[0],
+				 "peak_start": elements[1],
+				 "peak_end": elements[2],
+				 "peak_id": elements[3],
+				 "peak_score": elements[4],
+				 "peak_strand": elements[5]}
+			region_dicts.append(d)
+	else:
+		for region in regions:
+			d = {"peak_chr": region.chrom, 
+				"peak_start": region.start, 
+				"peak_end": region.end, 
+				"peak_id": region.name,
+				"peak_score": region.score,
+				"peak_strand": region.strand}
+			region_dicts.append(d)
 	
 	#Index tabix
 	gtf_index = gtf + ".tbi"
@@ -134,11 +147,11 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 	region_dict_chunks = [region_dicts[i:i+per_chunk] for i in range(0, n_reg, per_chunk)]
 
 	#Calculate annotations for each chunk
-	best_annotations = []
+	annotations = []
 	if threads == 1:
 		for region_chunk in region_dict_chunks:
 			chunk_annotations = _annotate_peaks_chunk(region_chunk, gtf, cfg_dict)
-			best_annotations.extend(chunk_annotations)
+			annotations.extend(chunk_annotations)
 	else:
 		
 		#Start multiprocessing pool
@@ -155,48 +168,55 @@ def annotate_regions(regions, gtf, config=None, threads=1, verbosity=1):
 		n_done = [job.ready() for job in jobs]
 
 		#Collect results:
-		best_annotations = []
 		for job in jobs:
 			chunk_annotations = job.get()
-			best_annotations.extend(chunk_annotations)
+			annotations.extend(chunk_annotations)
 
 		pool.join()
 
-	"""
-	#Open tabix file
-	tabix_obj = pysam.TabixFile(gtf, index=gtf_index)
-
-	#For each peak in input peaks, collect all_valid_annotations
-	#logger.debug("Annotating peaks in chunk {0}".format(idx))
-	all_valid_annotations = []
-	n_regions = len(region_dicts)
-	n_progress = int(n_regions / 10)
-	for i, region in enumerate(region_dicts):
-		
-		#Print out progress
-		if i + 1 % n_progress == 0:
-			logger.info("Progress: {0}/{1} regions annotated".format(i+1, n_regions))
-
-		#Annotate single peak
-		valid_annotations = annotate_single_peak(region, tabix_obj, cfg_dict, logger=logger)
-		all_valid_annotations.extend(valid_annotations)
-
-	tabix_obj.close()
+	#Select best annotations
+	if best == True:
+		annotations = [annotations[i] for i, anno in enumerate(annotations) if anno["best_hit"] == 1]
 	
-	best_annotations = [region for region in all_valid_annotations if region.get("best_hit", 0) == 1]
-	"""
+	#Extend feat_attributes per annotation and format for output
+	del_keys = ["raw_distance", "anchor_pos", "query", "peak_center", "peak_length", "feat_length", "feat_center"] 
+	for anno in annotations:
+		if "feat_attributes" in anno:
+			for key in anno["feat_attributes"]:
+				anno[key] = anno["feat_attributes"][key]
+			del anno["feat_attributes"]
+
+		#remove certain keys
+		for key in del_keys:
+			if key in anno:
+				del anno[key]
+
+		#Remove best_hit column if best is True
+		if best == True:
+			del anno["best_hit"]
+
+		#Convert any lists to string
+		for key in anno:
+			if isinstance(anno[key], list):
+				anno[key] = anno[key][0]
+
+	#Convert to pandas table
+	annotations_table = pd.DataFrame(annotations)
+	#print(annotations_table)
 
 	#Add information to .annotation for each peak
-	for i, region in enumerate(regions):
-		region.annotation = best_annotations[i]
+	#for i, region in enumerate(regions):
+	#	region.annotation = best_annotations[i]
 	
-	logger.info("Attribute '.annotation' was added to each region")
+	return(annotations_table)
+
+	#logger.info("Attribute '.annotation' was added to each region")
 	#Return None; alters peaks in place
 
 def _annotate_peaks_chunk(region_dicts, gtf, cfg_dict):
 	""" Multiprocessing safe function to annotate a chunk of regions """
 
-	logger = logging.getLogger("logger")
+	logger = uropa.utils.UROPALogger()
 
 	#Open tabix file
 	tabix_obj = pysam.TabixFile(gtf)
@@ -210,10 +230,8 @@ def _annotate_peaks_chunk(region_dicts, gtf, cfg_dict):
 		all_valid_annotations.extend(valid_annotations)
 
 	tabix_obj.close()
-	
-	best_annotations = [region for region in all_valid_annotations if region.get("best_hit", 0) == 1]
 
-	return(best_annotations)
+	return(all_valid_annotations)
 
 def get_annotated_genes(regions, attribute="gene_name"):
 	""" Get list of genes from the list of annotated regions from annotate_regions(). 
@@ -270,25 +288,23 @@ class GOAnalysis():
 
 	def plot_enrichment():
 		pass
-	
-
 
 
 def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, plot=True):
 	"""
-	Perform a GO-term enrichment based on the input gene_ids. 
+	Perform a GO-term enrichment based on a list of gene_ids. 
 
 	Parameters
 	-----------
 	gene_ids : list
-		A list of gene ids
+		A list of gene ids.
 	organism : :obj:`str`, optional
 		The organism of which the gene_ids originate. Defaults to 'hsapiens'.
 	background : list, optional
 		A specific list of background gene ids to use. Default: The list of protein coding genes of the 'organism' given. 
-	verbosity : int
-	
-	cutoff : float
+	verbosity : int, optional
+		Default: 1.
+	cutoff : float, optional
 		0.05
 	plot : bool
 
@@ -312,13 +328,13 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 	logger = TFcombLogger(verbosity)
 	
 	#TODO: Gene_ids must be a list
-	tfcomb.utils.check_type(gene_ids, [list], "gene_ids")
+	tfcomb.utils.check_type(gene_ids, [list, set], "gene_ids")
 	
 	#Organism must be in human/mouse
 	if organism not in available_organisms:
 		raise InputError("Organism '{0}' not available. Please choose any of: {1}".format(organism, available_organisms))
 	taxid = organism_to_taxid[organism]
-	logger.info("Running GO-term enrichment for organism {0} (taxid: {1})".format(organism, taxid))
+	logger.info("Running GO-term enrichment for organism '{0}' (taxid: {1})".format(organism, taxid))
 	
 	##### Read data #####
 
@@ -361,7 +377,7 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 
 	logger.debug("fin_gene2go: {0}".format(fin_gene2go))
 
-	logger.info("Gene2GoReader")
+	logger.debug("Setting up Gene2GoReader")
 	objanno = Gene2GoReader(fin_gene2go, taxids=[taxid])
 	logger.debug(objanno)
 
@@ -375,9 +391,10 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 	gene_table = pd.read_csv(DATA_PATH + organism + "_genes.txt", sep="\t")
 
 	###### Setup gene ids ####### 
+	logger.info("Setting up gene ids")
+
 	target_col = "entrezgene_id"
 
-	##Setup input gene ids
 	#Check if gene_ids are in ns2assoc; else, try to convert
 	all_gene_ids = set(sum([list(ns2assoc[aspect].keys()) for aspect in ns2assoc.keys()], []))
 	n_found = sum([gene_id in all_gene_ids for gene_id in gene_ids])
@@ -390,7 +407,8 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 		
 		#Find out how many ids can be converted
 		not_found = set(gene_ids) - set(gene_table[id_col])
-		logger.warning("{0} gene ids from 'gene_ids' could not be converted to entrez ids for {1}".format(len(not_found), organism))
+		if len(not_found) > 0:
+			logger.warning("{0} gene ids from 'gene_ids' could not be converted to entrez ids for {1}".format(len(not_found), organism))
 
 		#Convert to entrez id
 		ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
@@ -404,7 +422,7 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 		gene_ids_entrez = gene_ids #gene ids were already entrez
 		entrez2id = dict(zip(gene_ids, gene_ids))
 
-	##Setup background gene ids 
+	###### Setup background gene ids ######
 	if background == None:
 
 		#Read data from package
@@ -438,7 +456,6 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 				prt=None, 
 				log=None) 
 	
-
 	##### Run study #####
 	logger.debug("Running .run_study():")
 	if verbosity <= 1:
@@ -446,8 +463,9 @@ def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, p
 	else:
 		goea_results_all = goeaobj.run_study(gene_ids_entrez)
 	
-	#Convert study items to original ids
-	#entrez2id
+	#Convert study items (entrez) to original ids
+	for res in goea_results_all:
+		res.study_items = [entrez2id[entrez] for entrez in res.study_items]
 
 	##### Format to dataframe #####
 
