@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import re
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -377,6 +378,7 @@ def _values_to_cmap(values, plt_cmap=None):
 		name2val = dict(zip(values_unique, floats)) #map strings to cmap values
 
 		color_func = lambda string: _rgb_to_hex(cmap(name2val[string], bytes=True)[:3])
+		typ = "string"
 
 	#Check if values are boolean
 	elif sum([isinstance(s, bool) for s in values]) > 0:
@@ -388,7 +390,8 @@ def _values_to_cmap(values, plt_cmap=None):
 
 		#sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
 		#cmap = sm.get_cmap()
-
+		typ = "bool"
+	
 	#Values are int/float
 	else:
 
@@ -413,8 +416,9 @@ def _values_to_cmap(values, plt_cmap=None):
 		cmap = sm.get_cmap()
 		cmap.set_bad(color="grey") #set color for np.nan
 		color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
-	
-	return(color_func)
+		typ = "continuous"
+
+	return((typ, color_func))
 
 def _isnan(num):
 	return num != num
@@ -435,6 +439,19 @@ def _convert_boolean(values):
 	else:
 		return(values)     #not all values could be converted - these are not boolean values
 
+
+def _get_html_colormap(colormap, vmin, vmax, n):
+	""" Function to create a text-colormap for network legend """
+
+	html = ""
+	steps = np.linspace(vmin, vmax, n)
+	for step in steps:
+		color = colormap(step)
+		html += f'<FONT COLOR="{color}">█</FONT>'
+
+	return(html)
+
+
 def network(network, 
 				color_node_by=None,
 				color_edge_by=None,
@@ -448,7 +465,7 @@ def network(network,
 				max_node_size=20,
 				save=None,
 				verbosity=1,
-				show_legend=True):
+				legend_size=25):
 	"""
 	Plot network of a networkx object using Graphviz for python.
 
@@ -479,8 +496,8 @@ def network(network,
 		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
 	verbosity : int, optional
 		verbosity of the logging. Default: 1.
-	show_legend : bool, optional
-		Default: True
+	legend_size : int, optional
+		Whether to show a legend explaining color_node_by/color_edge_by/size_node_by/size_edge_by. Set to 0 to hide legend. Default: True.
 
 	Raises
 	-------
@@ -496,6 +513,7 @@ def network(network,
 	############### Test input ###############
 	
 	check_type(network, [nx.Graph, nx.DiGraph, nx.MultiGraph, nx.MultiDiGraph])
+	check_value(legend_size, vmin=0, integer=True, name="legend_size")
 
 	#Read nodes and edges from graph and check attributes
 	node_view = network.nodes(data=True)
@@ -527,25 +545,30 @@ def network(network,
 
 	############ Setup colormaps/sizemaps ############
 	map_value = {}
+	map_type = {}
 	
 	#Node color
 	if color_node_by != None:
 		all_values = [node[-1][color_node_by] for node in node_view]
-		map_value["node_color"] = _values_to_cmap(all_values)
+		typ, cmap = _values_to_cmap(all_values)
+		map_type["node_color"] = typ
+		map_value["node_color"] = cmap
 	
 	#Edge color
 	if color_edge_by != None:
 		all_values = [edge[-1][color_edge_by] for edge in edge_view]
-		map_value["edge_color"] = _values_to_cmap(all_values)
+		typ, cmap = _values_to_cmap(all_values)
+		map_type["edge_color"] = typ
+		map_value["edge_color"] = cmap
 	
 	#Node size
-	if size_node_by != None:
+	if size_node_by != None: #must be continuous
 		all_values = [node[-1][size_node_by] for node in node_view]
 		nmin, nmax = np.min(all_values), np.max(all_values)
 		map_value["node_size"] = lambda value: np.round((value-nmin)/(nmax-nmin)*(max_node_size-min_node_size)+min_node_size, 2)
 	
 	#Edge size
-	if size_edge_by != None:
+	if size_edge_by != None: #must be continuous
 		all_values = [edge[-1][size_edge_by] for edge in edge_view]
 		vmin, vmax = np.min(all_values), np.max(all_values)
 		map_value["edge_size"] = lambda value: np.round((value-vmin)/(vmax-vmin)*(max_edge_size-min_edge_size)+min_edge_size, 2)
@@ -600,34 +623,62 @@ def network(network,
 		#After collecting all edge attributes; add edge to dot object
 		dot.edge(node1, node2, _attributes=attributes)
 
-	if show_legend:
-		html_legend = '<<TABLE  ALIGN="LEFT" BORDER="1" CELLBORDER="0" CELLSPACING="0">'
-		first_line = True
+	#Plot legend to dot object
+	if legend_size > 0:
+		h = int(legend_size/3)
+		spacer = f'<TR><TD HEIGHT="{h}"></TD></TR>' #spacer between rows
+		
+		html_legend = f'<<FONT POINT-SIZE="{legend_size}" FACE="ARIAL">'
+		html_legend += '<TABLE ALIGN="LEFT" BORDER="1" CELLBORDER="0" CELLSPACING="0" VALIGN="MIDDLE">'
+		html_legend += spacer
+
 		if color_node_by is not None:
-			first_line = False			
-			html_legend += f'<TR><TD ALIGN="LEFT"> Nodes colored by: </TD><TD ALIGN="LEFT">{color_node_by}</TD><TD WIDTH="100" HEIGHT="20" FIXEDSIZE="true" BGCOLOR="/reds9/4:/reds9/7"></TD></TR>'
+			html_legend += f'<TR><TD ALIGN="LEFT" > <b>Nodes colored by:</b> </TD><TD ALIGN="LEFT">  {color_node_by}  </TD>'
+			
+			#Whether to create colormap
+			if map_type["node_color"] == "continuous":
+				all_values = [node[-1][color_node_by] for node in node_view]
+				min_val = round(np.min(all_values), 2)
+				max_val = round(np.max(all_values), 2)
+				html_colormap = _get_html_colormap(map_value["node_color"], min_val, max_val, 10)
+				html_legend += f'<TD ALIGN="RIGHT"><i>{min_val}</i> </TD><TD>{html_colormap}</TD><TD ALIGN="left"><i>{max_val}</i> </TD>'
+			html_legend += '</TR>' + spacer 
+
 		if color_edge_by is not None:
-			# only plot hr sep if not first argument
-			if not first_line:
-				html_legend += '<HR/>'
-			else:
-				first_line = False
-			html_legend += f'<TR><TD ALIGN="LEFT"> Edges colored by: </TD><TD ALIGN="LEFT">{color_edge_by}</TD><TD WIDTH="100" HEIGHT="20" FIXEDSIZE="true" BGCOLOR="/reds9/4:/reds9/7"></TD></TR>'
+			html_legend += f'<TR><TD ALIGN="LEFT"> <b>Edges colored by:</b> </TD><TD ALIGN="LEFT">  {color_edge_by}  </TD>'
+
+			#Whether to create colormap
+			if map_type["edge_color"] == "continuous":
+				all_values = [edge[-1][color_edge_by] for edge in edge_view]
+				min_val = round(np.min(all_values), 2)
+				max_val = round(np.max(all_values), 2)
+				html_colormap = _get_html_colormap(map_value["edge_color"], min_val, max_val, 10)
+				html_legend += f'<TD ALIGN="RIGHT"><i>{min_val}</i> </TD><TD>{html_colormap}</TD><TD ALIGN="left"><i>{max_val}</i> </TD>'
+			html_legend += "</TR>" + spacer
+
 		if size_node_by is not None: 
-			# only plot hr sep if not first argument
-			if not first_line:
-				html_legend += '<HR/>'
-			else:
-				first_line = False
-			html_legend += f'<TR><TD ALIGN="LEFT"> Nodes sized by: </TD><TD ALIGN="LEFT">{size_node_by}</TD><TD></TD></TR>'
+			html_legend += f'<TR><TD ALIGN="LEFT"> <b>Nodes sized by:</b> </TD><TD ALIGN="LEFT">  {size_node_by}  </TD>'
+
+			all_values = [node[-1][size_node_by] for node in node_view]
+			min_val = round(np.min(all_values), 2)
+			max_val = round(np.max(all_values), 2)
+			html_legend += f'<TD></TD><TD ALIGN="CENTER"> <i>{min_val}</i>  ●⬤⚫ <i>{max_val}</i> </TD><TD></TD>'
+			html_legend += '</TR>' + spacer
+
 		if size_edge_by is not None:
-			# only plot hr sep if not first argument
-			if not first_line:
-				html_legend += '<HR/>'
-			else:
-				first_line = False
-			html_legend += f'<TR><TD ALIGN="LEFT"> Edges sized by: </TD><TD ALIGN="LEFT">{size_edge_by}</TD><TD></TD></TR>'
-		html_legend += '</TABLE>>'
+			html_legend += f'<TR><TD ALIGN="LEFT"> <b>Edges sized by:</b> </TD><TD ALIGN="LEFT">  {size_edge_by}  </TD>'
+
+			all_values = [edge[-1][size_edge_by] for edge in edge_view]
+			min_val = round(np.min(all_values), 2)
+			max_val = round(np.max(all_values), 2)
+			html_legend += f'<TD></TD><TD ALIGN="CENTER"> <i>{min_val}</i>  ◄ <i>{max_val}</i> </TD><TD></TD>'
+			html_legend += '</TR>' + spacer
+
+		#Finalize legend
+		html_legend += '</TABLE>'
+		html_legend += '</FONT>>'
+
+		#Add legend and location to dot obj
 		dot.attr(label=html_legend)
 		dot.attr(labelloc="b")
 		dot.attr(labeljust="r")
