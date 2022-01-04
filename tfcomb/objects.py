@@ -2621,7 +2621,8 @@ class DistObj():
 									self.max_dist,
 									self.max_overlap,
 									self.anchor_mode,
-									directional
+									directional,
+									#TODO: self.max_motif
 									)
 		#self.directional = directional
 
@@ -2678,7 +2679,7 @@ class DistObj():
 			self.distances[data_columns] = self.distances[data_columns].div(rowsums, axis=0) #divide by zero returns NaN
 			"""
 			# minmax normalization
-			self.distances[data_columns]  = self.distances[data_columns].apply(lambda x:(x.astype(float) - min(x))/(max(x)-min(x)), axis = 1)
+			self.distances[data_columns]  = self.distances[data_columns].apply(lambda x:(x.astype(float) - min(x))/(max(x)-min(x)), axis=1)
 			self.distances.fillna(0, inplace=True)
 
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
@@ -3014,6 +3015,7 @@ class DistObj():
 									"prominences": "Prominences"}, inplace=True)
 
 		self.peaks = res
+		# TODO: replace Distance + / - lf/rf
 		self.peaks["Distance"] = self.peaks["Distance"].astype(int)
 		
 		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
@@ -3068,6 +3070,8 @@ class DistObj():
 
 		self.check_peaks()
 
+		self.logger.info("classifying rules")
+
 		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
 		
 		datasource = self._get_datasource()
@@ -3075,6 +3079,8 @@ class DistObj():
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
 		self._set_datasource(datasource)
+
+		self.logger.info(f"classifcation done. Results can be found in {datasource.__name__}")
 
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" ranks rules within each column specified. 
