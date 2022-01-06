@@ -409,6 +409,9 @@ def _values_to_cmap(values, plt_cmap=None):
 			plt_cmap = colormap_blue
 		elif vmin < 0 and vmax >= 0:
 			plt_cmap = colormap_divergent
+			max_abs = max([abs(vmin), abs(vmax)])
+			vmin = -max_abs #make sure that convergent maps are centered at 0
+			vmax = max_abs
 			
 		#Normalize values and create cmap
 		norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
@@ -463,15 +466,18 @@ def network(network,
 				max_edge_size=8,
 				min_node_size=14,
 				max_node_size=20,
+				legend_size='auto',
+				node_border=False,
 				save=None,
 				verbosity=1,
-				legend_size=25):
+				):
 	"""
 	Plot network of a networkx object using Graphviz for python.
 
 	Parameters
 	-----------
 	network : networkx.Graph
+		A networkx Graph/DiGraph object containing the network to plot.
 	color_node_by : str, optional
 		The name of a node attribute
 	color_edge_by : str, optional
@@ -492,12 +498,14 @@ def network(network,
 		Default: 14.
 	max_node_size : float, optional
 		Default: 20.
+	legend_size : int, optional
+		Fontsize for legend explaining color_node_by/color_edge_by/size_node_by/size_edge_by. Set to 0 to hide legend. Default: 'auto'.
+	node_border : bool, optional
+		Whether to plot border on nodes. Can be useful if the node colors are very light. Default: False.
 	save : str, optional
 		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
 	verbosity : int, optional
 		verbosity of the logging. Default: 1.
-	legend_size : int, optional
-		Whether to show a legend explaining color_node_by/color_edge_by/size_node_by/size_edge_by. Set to 0 to hide legend. Default: True.
 
 	Raises
 	-------
@@ -513,7 +521,8 @@ def network(network,
 	############### Test input ###############
 	
 	check_type(network, [nx.Graph, nx.DiGraph, nx.MultiGraph, nx.MultiDiGraph])
-	check_value(legend_size, vmin=0, integer=True, name="legend_size")
+	if legend_size is not 'auto':
+		check_value(legend_size, vmin=0, integer=True, name="legend_size")
 
 	#Read nodes and edges from graph and check attributes
 	node_view = network.nodes(data=True)
@@ -537,8 +546,13 @@ def network(network,
 	#todo: check size with re
 	
 	############### Initialize graph ###############
-	
-	dot = graphviz.Graph(engine=engine)
+
+	#Establish if network is directional
+	if not nx.is_directed(network):
+		dot = graphviz.Graph(engine=engine)
+	else:
+		dot = graphviz.Digraph(engine=engine)
+
 	dot.attr(size=size)
 	dot.attr(outputorder="edgesfirst")
 	dot.attr(overlap="false")
@@ -585,10 +599,14 @@ def network(network,
 		attributes = {} #attributes for dot
 		attributes["style"] = "filled"
 
+		#Set color of node border (default: black)
+		if node_border == False and color_node_by != None: #node border cannot be none if there is no color
+			attributes["color"] = "none"
+
 		#Set node color
 		if color_node_by != None:
 			value = node_att[color_node_by]
-			attributes["color"] = map_value["node_color"](value)
+			attributes["fillcolor"] = map_value["node_color"](value)
 			
 		#Set node size
 		if size_node_by != None:
@@ -624,11 +642,18 @@ def network(network,
 		dot.edge(node1, node2, _attributes=attributes)
 
 	#Plot legend to dot object
+	if legend_size == 'auto':
+		n_nodes = len(node_view)
+		legend_size = int(10 + n_nodes*0.1) #incrementally increasing size 
+		logger.debug("legend_size is estimated at: {0}".format(legend_size))
+
 	if legend_size > 0:
 		h = int(legend_size/3)
 		spacer = f'<TR><TD HEIGHT="{h}"></TD></TR>' #spacer between rows
 		
+		#Start building legend
 		html_legend = f'<<FONT POINT-SIZE="{legend_size}" FACE="ARIAL">'
+		#TODO: add a bit of space between nodes and legend position
 		html_legend += '<TABLE ALIGN="LEFT" BORDER="1" CELLBORDER="0" CELLSPACING="0" VALIGN="MIDDLE">'
 		html_legend += spacer
 
@@ -662,7 +687,7 @@ def network(network,
 			all_values = [node[-1][size_node_by] for node in node_view]
 			min_val = round(np.min(all_values), 2)
 			max_val = round(np.max(all_values), 2)
-			html_legend += f'<TD></TD><TD ALIGN="CENTER"> <i>{min_val}</i>  ●⬤⚫ <i>{max_val}</i> </TD><TD></TD>'
+			html_legend += f'<TD></TD><TD ALIGN="CENTER"> <i>{min_val} </i> ● ⬤<i> {max_val}</i> </TD><TD></TD>'
 			html_legend += '</TR>' + spacer
 
 		if size_edge_by is not None:
