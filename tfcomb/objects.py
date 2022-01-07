@@ -3091,7 +3091,7 @@ class DistObj():
 
 		self._set_datasource(datasource)
 
-		self.logger.info(f"classifcation done. Results can be found in {datasource.__name__}")
+		self.logger.info(f"classifcation done. Results can be found in {datasource}")
 
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" ranks rules within each column specified. 
