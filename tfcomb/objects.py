@@ -1879,12 +1879,13 @@ class DiffCombObj():
 						   measure="cosine", 
 						   measure_threshold=None,
 						   measure_threshold_percent=0.05,
-						   pvalue_threshold=0.05,
+						   mean_threshold=None,
+						   mean_threshold_percent=0.05,
 						   plot = True, 
 						   **kwargs):
 		"""
-		Select differentially regulated rules on the basis of measure and pvalue.
-
+		Select differentially regulated rules using a MA-plot on the basis of measure and mean of measures per contrast.
+		
 		Parameters
 		-----------
 		contrast : tuple
@@ -1892,13 +1893,17 @@ class DiffCombObj():
 		measure : str, optional
 			The measure to use for selecting rules. Default: "cosine" (internally converted to <prefix1>/<prefix2>_<measure>_log2fc).
 		measure_threshold : tuple, optional
-			Threshold for 'measure' for selecting rules. Default: None (the measure is estimated automatically) 
+			Threshold for 'measure' for selecting rules. Default: None (the threshold is estimated automatically) 
 		measure_threshold_percent : float between 0-1
 			If measure_threshold is not set, measure_threshold_percent controls the strictness of the automatic threshold. If you increase this value, more differential rules will be found and vice versa. Default: 0.05.  
-		pvalue_threshold : float, optional
-			The p-value threshold for selecting rules. Default: 0.05.
+		mean_threshold : float, optional
+			Threshold for 'mean' for selecting rules. Default: None (the threshold is estimated automatically) 
+		mean_threshold_percent : float between 0-1
+			if mean_threshold is not set, mean_threshold_percent controls the strictness of the automatic threshold. If you increase this value, more differential rules will be found and vice versa. Default: 0.05.  
 		plot : boolean, optional
 			Whether to plot the volcano plot. Default: True.
+		kwargs : arguments, optional
+			Additional arguments are passed to tfcomb.plotting.scatter.
 
 		Returns
 		----------
@@ -1910,8 +1915,17 @@ class DiffCombObj():
 		tfcomb.plotting.volcano
 		"""
 		
+		table = self.rules.copy() #make sure not to change self.rules
+
+		#Check input
+		if measure_threshold is not None:
+			tfcomb.utils.check_type(measure_threshold, tuple, name="measure_threshold")
+			measure_threshold = tuple(sorted(measure_threshold)) #ensure that lower threshold is first in tuple
+		if mean_threshold is not None:
+			tfcomb.utils.check_value(mean_threshold, name="mean_threshold")
+
 		tfcomb.utils.check_value(measure_threshold_percent, vmin=0, vmax=1, name="measure_threshold_percent")
-		tfcomb.utils.check_value(pvalue_threshold, vmin=0, vmax=1, name="measure_threshold_percent")
+		tfcomb.utils.check_value(mean_threshold_percent, vmin=0, vmax=1, name=" mean_threshold_percent")
 
 		#Identify measure to use based on contrast
 		if contrast == None:
@@ -1925,35 +1939,35 @@ class DiffCombObj():
 		measure_col = "{0}/{1}_{2}_log2fc".format(contrast[0], contrast[1], measure)
 		self.logger.debug("Measure column is: {0}".format(measure_col))
 
-		#Calculate pvalue for measure
-		pvalue_col = measure_col + "_pvalue"
-		if pvalue_col not in self.rules.columns:
-			self.logger.warning("pvalue column given ('{0}') is not in .rules".format(pvalue_col))
-			self.logger.warning("Calculating pvalues from measure '{0}'".format(measure_col))
-			tfcomb.utils.tfcomb_pvalue(self.rules, measure=measure_col, alternative="two-sided")
-	
+		#Calculate mean of measures
+		measure_cols = [c + "_" + measure for c in contrast]
+		mean_col = "Mean of '{0}' for {1} and {2}".format(measure, contrast[0], contrast[1])
+		table[mean_col] = table[measure_cols].mean(axis=1)
+
 		#Find optimal measure threshold
 		if measure_threshold is None:
 			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
-			measure_threshold = tfcomb.utils.get_threshold(self.rules[measure_col], "both", percent=measure_threshold_percent)
+			measure_threshold = tfcomb.utils.get_threshold(table[measure_col], "both", percent=measure_threshold_percent)
 
+		#Find optimal mean threshold
+		if mean_threshold is None:
+			self.logger.info("mean_threshold is None; trying to calculate optimal threshold")
+			mean_threshold = tfcomb.utils.get_threshold(table[mean_col], "upper", percent=mean_threshold_percent)
+
+		#Plot the MA-plot if chosen
 		if plot == True:
-			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
-			log_col = "-log10({0})".format(pvalue_col)
-			cp[log_col] = -np.log10(self.rules[pvalue_col])
-			log_threshold = -np.log10(pvalue_threshold)
-			
-			tfcomb.plotting.scatter(cp, 
-									x=measure_col, 
-									y=log_col, 
-									x_threshold=measure_threshold,
-									y_threshold=log_threshold,
+	
+			tfcomb.plotting.scatter(table, 
+									x=mean_col, 
+									y=measure_col, 
+									x_threshold=mean_threshold,
+									y_threshold=measure_threshold,
 									**kwargs)
-		
+
 		#Set threshold on rules
 		selected = self.rules.copy()
 		selected = selected[((selected[measure_col] <= measure_threshold[0]) | (selected[measure_col] >= measure_threshold[1])) &
-							(selected[pvalue_col] <= pvalue_threshold)]
+							(table[mean_col] >= mean_threshold)]
 
 		#Create a DiffCombObj with the subset of  rules
 		self.logger.info("Creating subset of rules using thresholds")

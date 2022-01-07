@@ -10,6 +10,7 @@ import requests
 import tobias
 import glob
 import multiprocessing as mp
+import psutil
 
 #UROPA annotation
 import logging
@@ -130,6 +131,7 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 			region_dicts.append(d)
 	
 	#Index tabix
+	gtf_given = gtf 	#gtf before indexing
 	gtf_index = gtf + ".tbi"
 	if not os.path.exists(gtf_index):
 		try:
@@ -140,6 +142,12 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 			if not os.path.exists(gtf_index):
 				gtf_gz = pysam.tabix_index(gtf_gz, preset="gff", keep_original=True)
 			gtf = gtf_gz
+
+	#Force close of gtf file left open; pysam issue 1038
+	proc = psutil.Process()
+	for f in proc.open_files():
+		if f.path == os.path.abspath(gtf_given):
+			os.close(f.fd) 
 
 	#Split input regions into cores
 	n_reg = len(region_dicts)
