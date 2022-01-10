@@ -1044,7 +1044,7 @@ class CombObj():
 		self.rules = sub_rules #overwrite .rules with simplified rules
 		
 	def select_TF_rules(self, TF_list, TF1=True, TF2=True):
-		""" Select rules based on a list of TF names. 
+		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
 		
 		Parameters
 		------------
@@ -1055,10 +1055,15 @@ class CombObj():
 		TF2 : bool, optional
 			Whether to subset the rules containing 'TF_list' TFs within "TF2". Default: True.
 
+		Raises
+		--------
+		InputError
+			If TF1 and TF2 are True or if no rules were selected based on input.
+
 		Returns
 		--------
 		tfcomb.objects.CombObj()
-			An object containing a subset of <Combobj>.rules
+			An object containing a subset of <Combobj>.rules.
 		"""
 
 		#Check input
@@ -1068,21 +1073,37 @@ class CombObj():
 		check_type(TF2, bool, "TF2")
 
 		#Create selected subset
-		selected = self.rules.copy()
+		selected = self.rules
 
-		if TF1 == True:
-			selected_bool = selected["TF1"].isin(TF_list)
-			if sum(selected_bool) == 0:
-				self.logger.warning("")
-			else:
-				selected = selected[selected_bool]
-		
-		if TF2 == True:
-			selected_bool = selected["TF2"].isin(TF_list)
-			if sum(selected_bool) == 0:
-				self.logger.warning("")
-			else:
-				selected = selected[selected_bool]
+		if TF1 == False and TF2 == False:
+			raise InputError("Either TF1 or TF2 must be True in order to create a selection.")
+
+		#Create selections for TF1/TF2
+		selections = []
+		for (TF_bool, TF_col) in zip([TF1, TF2], ["TF1", "TF2"]):
+
+			if TF_bool == True:
+
+				#Write out any TFs from TF_list not in TF_col names
+				not_found = set(TF_list) - set(self.rules[TF_col])
+				if len(not_found) > 0:
+					self.logger.warning("{0}/{1} names in 'TF_list' were not found within '{2}' names: {3}".format(len(not_found), len(TF_list), TF_col, list(not_found)))
+
+				#Create selection
+				selected_bool = self.rules[TF_col].isin(TF_list)
+				selected = self.rules[selected_bool]
+				selections.append(selected)
+
+		#Join selections from TF1 and TF2
+		if len(selections) > 1:
+			selected = selections[0].merge(selections[1]) #inner merge
+		else:
+			selected = selections[0]
+
+		#Stop if no rules were able to be selected
+		if len(selected) == 0:
+			raise InputError("No rules could be selected - please adjust TF_list and/or TF1/TF2 parameters.")
+
 		self.logger.info("Selected {0} rules".format(len(selected)))
 
 		#Create new object with selected rules
