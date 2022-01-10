@@ -1058,7 +1058,7 @@ class CombObj():
 		Raises
 		--------
 		InputError
-			If TF1 and TF2 are True or if no rules were selected based on input.
+			If both TF1 and TF2 are False or if no rules were selected based on input.
 
 		Returns
 		--------
