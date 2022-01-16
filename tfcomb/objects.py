@@ -2235,6 +2235,8 @@ class DistObj():
 		self.prominence = None       # zscore, median or array of flat values
 		self._noise_method = None 	 # private storage noise_method
 		self._height_multiplier = None # private storage height_mulitplier
+		self._collapsed = None 		#stores the negative values to be able to expand negative section again
+		self._collapsed_peaks = None #stores the negative peaks to be able to expand negative section again
 	
 		
 		self.n_bp = 0			     # Predicted number of baskets 
@@ -2310,7 +2312,7 @@ class DistObj():
 		self.max_overlap = comb_obj.max_overlap
 		self.stranded = comb_obj.stranded
 		self.TF_table = comb_obj.TF_table
-		#self.anchor = comb_obj.anchor
+		self.set_anchor(comb_obj.anchor)
 
 	def set_anchor(self, anchor):
 		""" set anchor for distance measure mode
@@ -2369,9 +2371,9 @@ class DistObj():
 		
 		static_cols = ["TF1","TF2"]
 		pos_cols = list(self.corrected.columns[2:])
-		if (-1 in pos_cols):
-			pos_cols.remove(-1)
-			static_cols.append(-1)
+		if self._collapsed is not None:
+			pos_cols.remove("neg")
+			static_cols.append("neg")
 
 		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[pos_cols])), window_size), axis=1, result_type="expand")
 		smoothed = smoothed.fillna(0) 
@@ -2647,7 +2649,6 @@ class DistObj():
 									self.max_overlap,
 									self.anchor_mode,
 									directional,
-									#TODO: self.max_motif
 									)
 		#self.directional = directional
 
@@ -2679,7 +2680,8 @@ class DistObj():
 		#Converting to pandas format 
 		self.logger.debug("Converting raw count data to pretty dataframe")
 
-		min_dist = -1 if self.min_dist == 0 and self.max_overlap > 0 else self.min_dist
+		#min_dist = -1 if self.min_dist == 0 and self.max_overlap > 0 else self.min_dist
+		min_dist = self.min_dist
 		columns = ['TF1', 'TF2'] + list(range(min_dist, self.max_dist + 1))
 		columns = ["neg" if col == "-1" else col for col in columns] #replace any '-1' column with "neg"
 		self.distances = pd.DataFrame(self._raw, columns=columns)
@@ -3024,6 +3026,8 @@ class DistObj():
 
 			zsc = zsc.reset_index(drop=True).set_index(["TF1", "TF2"], drop=False)
 			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, zsc)
+			zsc = zsc.reset_index(drop=True)
+			zsc.index = zsc["TF1"] + "-" + zsc["TF2"]
 			self.zscores = zsc
 			method = "zscore"
 
@@ -3103,9 +3107,10 @@ class DistObj():
 
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
 		self._set_datasource(datasource)
 
-		self.logger.info(f"classifcation done. Results can be found in {datasource}")
+		self.logger.info(f"classifcation done")
 
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" ranks rules within each column specified. 
@@ -3197,510 +3202,265 @@ class DistObj():
 		self.network = tfcomb.network.build_nx_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
 		self.logger.info("Finished! The network is found within <CombObj>.<distObj>.network.")
 
+	def collapse_negative(self, method="max"):
+
+		# check method
+		tfcomb.utils.check_string(method, ["max","min","mean","sum"])
+		# check if negative positions possible
+		if self.min_dist >= 0:
+			raise InputError("Data must contain negative position to collapse")
+		# check  if already collapsed
+		if self._collapsed is not None:
+			raise InputError("Data is already collapsed")
+		# get datasource (either corrected or smoothed)
+		datasource = self._get_datasource()
+		# create negative columns 
+		neg_cols = neg_cols = [ x for x in range(self.min_dist,0)]
+		
+		#select negative part
+		neg = datasource[["TF1","TF2"] + neg_cols]
+
+		self._collapsed_method = method
+		#add negative column according to method
+		if method =="max":	
+			neg["neg"] = neg[neg_cols].max(axis=1)
+		elif method=="min":
+			neg["neg"] = neg[neg_cols].min(axis=1)
+		elif method=="mean":
+			neg["neg"] = neg[neg_cols].mean(axis=1)
+		elif method=="sum":
+			neg["neg"] = neg[neg_cols].sum(axis=1)
+
+		# remove negative columns from df
+		datasource = datasource.drop(neg_cols, axis=1)
+		try:
+			# try inserting collapsed negative value
+			datasource.insert(2, "neg", neg["neg"])
+		except ValueError:
+			raise InputError("Datasource already contains a negative column")
+		# save collapsed data
+		self._collapsed = neg.drop("neg",  axis=1)
+		# update datasource
+		self._set_datasource(datasource)
+
+		if self.peaks is not None:
+			# save negative peaks
+			self._collapsed_peaks = self.peaks.copy()
+			# replace every negative position with "neg"
+			[self.peaks["Distance"].replace(x,"neg", inplace=True) for x in range(self.min_dist,0)]
+
+
+	def expand_negative(self):
+
+		datasource = self._get_datasource()
+		#check if collapsed
+		if "neg" not in datasource.columns:
+			raise InputError("Datasource must contain a negative column")
+
+		#remove neg column
+		datasource = datasource.drop("neg", axis=1)
+		# merge datasource into collapsed (to preserve order TFNames - neg - pos)
+		datasource = self._collapsed.merge(datasource)
+
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+		# reset self._collapsed
+		self._collapsed = None 
+		# update datasource
+		self._set_datasource(datasource)
+
+		if self._collapsed_peaks is not None:
+			self.peaks = self._collapsed_peaks
+			self._collapsed_peaks = None
+
 	#-------------------------------------------------------------------------------------------------------------#
 	#---------------------------------------------- plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
-	
-	def _plot_distribution(self, 
-							pair, 
-							style="hist",
-							n_bins=None,
-							bwadjust=0.1, 
-							show_bg=True,
-							show_peaks=True,
-							corrected=False,
-							save=None):
-		"""
-		WORK IN PROGRESS: Plots distribution of TFBS distances for the given TF-TF pair.
+		
+	def plot(self, pair, method="signal", save=None, config=None):
 
-		Parameters
-		----------
-		pair : tuple(str,str)
-			Pair to create plot for.
-		style : str
-			Style of the plot. One of "hist" (histogram) or "kde". 
-		n_bins: int
-			Number of bins of style == "hist". Default: None (Binning is done automatically)
-		bwadjust: float
-			Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. See kdeplot() from seaborn. Default: 0.1
-		show_bg : bool
-			Default: True.
-		show_peaks : bool 
-			Default: True.
-		"""
-
-		#Check input parameter validity
-		tfcomb.utils.check_string(style, ["hist", "kde"], "style")
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
+		# checks
 		self.check_distances()
+		self.check_pair(pair)
 		self.check_min_max_dist()
 
-		#Invalid combinations
+		#check method is string
+		tfcomb.utils.check_type(method, [str], "method")
 
+		# check method given is supported
+		supported = ["hist", "corrected", "density", "linres", "signal", "smoothed"]
+		tfcomb.utils.check_string(method, supported)
 
-		#Define input data
-		self.check_pair(pair)
+		# check config is dict 
+		tfcomb.utils.check_type(config, [dict, type(None)], "config")
+
+		# check save is writeable
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
+		
+		# get TF1, TF2 out of pair
 		tf1, tf2 = pair
-		ind = tf1 + "-" + tf2
 
-		if corrected == False:
-			source_table = self.distances
+		# construct index
+		ind = tf1 + "-" + tf2#
+
+		# start subplot
+		fig, ax = plt.subplots(1, 1)
+
+	
+		# get datasource
+		if method == "corrected":
+			self.check_corrected()
+			source_table = self.corrected	
+		elif method == "signal":
+			source_table = self._get_datasource()
+		elif method == "smoothed":
+			self.check_smoothed()
+			source_table = self.smoothed
 		else: 
-			source_table = self.corrected
+			source_table = self.distances
 
-		#data_start_i = 2 if 	
-		distances = source_table.columns[2:].tolist() #names of distances counted (includes "neg")
-		weights = np.array(source_table.loc[ind].iloc[2:])
-
-		#Decide how to deal with negative values
-		negative = False
-		if (self.min_dist == 0) and (self.max_overlap > 0): #negative values can occur
-			negative = True
-			offset_neg = -4
-			distances[distances.index("neg")] = offset_neg #replace "neg" with a value
+		# calc x-values
+		if method == "density":
+			param = 0.1
+			if(config is not None):
+				if "bwadjust" in config.keys():
+					param = config["bwadjust"]
+			tfcomb.utils.check_value(param, vmin=0)
+			x_data = range(self.min_dist, self.max_dist + 1)
+		elif method == "signal":
+			zsc = True if self.zscores is not None else False
+			distances = source_table.columns[2:].to_numpy()
+			x_data = distances
 		else:
-			weights = weights[1:] #remove "neg" column
-			distances = distances[1:]
-
-		distances = np.array([int(dist) for dist in distances]) #convert column-name strings to int
-
-		#Setup plot
-		fig, ax = plt.subplots(1, 1)
-
-		if style == "hist":
-			if n_bins is None:
-				n_bins = np.max(distances) - np.min(distances) #as many bins as 'bp' between min/max distance
-
-			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', ec='tab:blue', label="counts") #ec needed to plot thin bars
-			ax.set_ylabel('Count per distance')
-
-		elif style == "kde":
-			sns.kdeplot(distances, weights=weights, bw_adjust=bwadjust, x="distance", ax=ax)
-			ax.set_ylabel('Count per distance')
-
-		#Handle xtick labels for negative distances 
-		xt = ax.get_xticks() 
-		xtl = xt.tolist() #labels
-		if negative == True:
-			xt[0] = offset_neg
-			xtl[0] = "neg"
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-
-		#Handle xlimit to be equal padding left/right
-		xmin, _ = ax.get_xlim()
-		pad_left = xmin - xt[0] #padding between xlim and first label
-		ax.set_xlim(xmin, xt[-1]+pad_left)
-
-		#Add flavors to plot
-		if show_bg:
-			if self.linres is not None:
-				linres = self.linres.loc[ind, "Linear Regression"]
-				plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted background')
-			else:
-				self.logger.warning("show_bw == True, but there was no linres available")
-
-		if show_peaks:
-			if self.peaks is not None:
-				peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-										(self.peaks["TF2"] == tf2))].Distance.to_numpy()
-				
-				#Establish x-axis
-
-				if (len(peaks) > 0):
-					plt.plot(crosses, x[(crosses)], "x")
-			else:
-				self.logger.warning("")
-
-		#Pretty plot; legends, labels, titles
-		ax.set_xlabel('Distance in bp')
-		plt.title(f"{tf1} - {tf2}")
-		plt.legend()
-
-		#Save final plot to file
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-
-
-	def plot_hist(self, pair, n_bins=None, save=None):
-		""" Histograms for a list of TF-pairs
-
-		 	Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			n_bins: int
-				Number of bins. Default: None (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-		self.check_distances()
-		self.check_pair(pair)
-		self.check_min_max_dist()
-
-		source_table = self.distances
-		tf1, tf2 = pair
+			param = self.max_dist - self.min_dist + 1
+			if(config is not None):
+				if "n_bins" in config.keys():
+					param = config["n_bins"]
+			tfcomb.utils.check_type(param, [int], "n_bins")
+			if method == "smoothed":
+				zsc = True if self.zscores is not None else False
+			x_data = np.linspace(self.min_dist, self.max_dist + 1, param)
 		
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
-
-		ind = tf1 + "-" + tf2
-		weights = source_table.loc[ind].iloc[2:]
-		
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-		
-
-		fig, ax = plt.subplots(1, 1)
-
-		x_data = range(0, len(weights))
-
-		plt.hist(x_data, bins=n_bins, weights=weights, color='tab:blue')
-		plt.xlabel('Distance in bp')
-		
-		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt[0] = -1
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-
-		plt.ylabel('Count per distance')
-		plt.title(pair)
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-
-	def plot_dens(self, pair, bwadjust=0.1, save=None):
-		""" KDE Plots for a list of TF-pairs
-
-			Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			bwadjust: float
-				Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. 
-				See kdeplot() from seaborn. Default: 0.1
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		tfcomb.utils.check_type(pair, [tuple, list], "pair")
-		tfcomb.utils.check_value(bwadjust, vmin=0)
-		
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-
-
-		self.check_distances()
-		self.check_pair(pair)
-
-		source_table = self.distances
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-		weights = list(source_table.loc[ind].iloc[2:])
-		
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-
-		fig, ax = plt.subplots(1, 1)
-
-		sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(f"{tf1} - {tf2}")
-
-		xt = ax.get_xticks() 
-		if negative:
-			sns.kdeplot([offset_neg], bw_adjust=bwadjust, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-
-		plt.xlabel('Distance in bp')
-
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-	
-	def plot_corrected(self, pair, n_bins=None, save=None):
-		""" Plots corrected signal
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			nbins: int
-				Number of bins. Default: None (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-
-		self.check_distances()
-		self.check_corrected()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-
-		weights = self.corrected.loc[ind].iloc[2:]
-
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
-
-		fig, ax = plt.subplots(1, 1)
-
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-
-		n_data = len(weights)
-		x_data = np.linspace(0, n_data, n_bins)
-		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=False, alpha=0.6, color='tab:blue')
-		linres = linregress(range(0, n_data), np.array(weights, dtype=float))
-		plt.plot(x_data, linres.intercept + linres.slope*x_data, 'r', label='fitted line')
-		plt.xlabel('Distance in bp')
-		plt.ylabel('Corrected count per distance')
-
-		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-			ax.legend(["negative", "positive"])
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-		plt.title(f"{tf1} - {tf2}")
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-		
-	
-	def plot_linres(self, pair, n_bins=None, save=None):
-		""" Plots linear regression line into original signal
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			nbins: int
-				Number of bins. Default: None (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-
-		self.check_distances()
-		self.check_linres()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-		weights = self.distances.loc[ind].iloc[2:]
-		linres = self.linres.loc[ind].iloc[2]
-
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
-		
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-		
-		n_data = len(weights)
-		
-		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
-
-		fig, ax = plt.subplots(1, 1)
-
-		plt.hist(range(0, n_data), weights=weights, bins=n_bins, alpha=0.6)
-		plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
-		plt.xlabel('Distance in bp')
-		plt.ylabel('Counts per distance')
-
-		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt[0] = -1
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-		title = f"{tf1} - {tf2}" 
-		plt.title(title)
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-
-	def plot_analyzed_signal(self, pair, only_peaking=True, save=None):
-		""" Plots the analyzed signal
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			only_peaking: bool
-				True if only those plots should be produced in which at least one peak was found, False otherwise.
-				Default: True (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		self.check_corrected()
-		self.check_peaks()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-		peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-								(self.peaks["TF2"] == tf2))].Distance.to_numpy(dtype=int)
-		thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-								(self.thresh["TF2"] == tf2))].iloc[0,2]
-		method = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-								(self.thresh["TF2"] == tf2))].iloc[0,3]
-
-
-		datasource = self._get_datasource()
-		
-		distances = datasource.columns[2:].to_numpy()
-		y = datasource.loc[ind].iloc[2:].to_numpy() #y-values in plot
-		x = distances
-		
-		# if data is classified, exclude class from plotting
-		if (type(y[-1]) is np.bool_) or (type(y[-1]) is bool):
-			y = y[:-1]
-			x = x[:-1]
-		
-		# calculate zscore values (why? zscore values are saved in .zsc)
-		if (method =="zscore"):
-			y = (y - y.mean())/y.std()
-		
-		negative = False
+		# check whether data is collapsed or not see .collapse_negative() for more information
+		collapsed = False
 		offset_neg = None
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			# save negative value for extra plot
-			neg = y[0]
-			y = y[1:]
-			# remove "-1" from x values 
-			x = x[1:]
-			# "x-value" for negative plot
-			offset_neg = -4
+		if "neg" in source_table.columns:
+			collapsed = True
 
-		# Plot only peaking signals?
-		if (only_peaking) and (len(peaks) == 0):
-			self.logger.debug(f"Only plots for pairs with at least one peak should be plotted. {tf1}-{tf2} has no peak.")
-			return
+		# get y_data
+		y_data = source_table.loc[ind].iloc[2:]
+		if ((method == "signal") or (method == "smoothed")) and zsc:
+			y_data = self.zscores.loc[ind].iloc[2:]
 
-		fig, ax = plt.subplots(1, 1)
-		plt.plot(x, y)
-		'''
-		if self.min_dist == 0 :
-			crosses = peaks + 1 
-		else:
-			crosses = peaks
-		'''
+		# remove negative data if collapsed
+		if collapsed:
+			neg = y_data[0]
+			if zsc:
+				if self._collapsed_method =="max":	
+					neg = y_data[:(-self.min_dist)+1].max()
+				elif self._collapsed_method=="min":
+					neg = y_data[:(-self.min_dist)+1].min()
+				elif self._collapsed_method=="mean":
+					neg = y_data[:(-self.min_dist)+1].mean()
+				elif self._collapsed_method=="sum":
+					neg = y_data[:(-self.min_dist)+1].sum()
+				y_data = y_data[-self.min_dist:]
+			else:
+				y_data = y_data[1:]
+			offset_neg = -4	
+			
+			if method =="smoothed":
+				x_data = x_data[-self.min_dist:]
+			else:
+				x_data = x_data[1:]
 
-		neg_cross = False
-		if(len(peaks) > 0):
-			# get indices of the peaks (mainly needed for ranges not starting with position 0)
-			peak_idx = [offset_neg if peak==-1 else list(x).index(peak) for peak in peaks]
+				
+		# standard ylbl, replace with specific option if needed
+		ylbl = "Count per Distance"
 
-			# check if a peak is at the negative position
-			if offset_neg in peak_idx:
-				neg_cross = True
-				peak_idx.remove(offset_neg)
-			y_crosses = y[peak_idx] #y-values for peaks
-			plt.plot(peak_idx, y_crosses, "x")
+		# plot according to method
+		if method == "density":
+			# kde plot, see seaborn.kdeplot() for more information
+			sns.kdeplot(x_data, weights=y_data, bw_adjust=param, x="distance").set_title(f"{tf1,tf2}")
+		elif method == "signal":
+			# plot signal with peaks found
+			self.check_corrected()
+			self.check_peaks()
+				
+			peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
+									(self.peaks["TF2"] == tf2))].Distance.to_numpy()
+			thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
+									(self.thresh["TF2"] == tf2))].iloc[0,2]
 
-		plt.plot([thresh] * len(y), "--", color="gray")
-		plt.xlabel('Distance in bp')
-		plt.ylabel('Corrected count per distance')
+			y_data = y_data.to_numpy()
+
+			# if data is classified, exclude class from plotting
+			if (type(y_data[-1]) is np.bool_) or (type(y_data[-1]) is bool):
+				y_data = y_data[:-1]
+				x_data = x_data[:-1]
+			
+			plt.plot(x_data, y_data)
+			neg_cross = False
+			if(len(peaks) > 0):
+				# get indices of the peaks (mainly needed for ranges not starting with position 0)
+				peak_idx = [peak if peak=="neg" else list(x_data).index(peak)for peak in peaks]
+				# check if a peak is at the negative position
+				if collapsed & ("neg" in peak_idx):
+					neg_cross = True
+					peak_idx.remove("neg")
+				y_crosses = y_data[peak_idx] #y-values for peaks
+				if not collapsed:
+					peak_idx = [x + self.min_dist for x in peak_idx]
+				plt.plot(peak_idx, y_crosses, "x")
+
+			plt.plot(x_data, ([thresh] * len(x_data)), "--", color="gray")
+
+			ylbl = 'Corrected count per distance'
+			
+		else: # corrected, linres, histogram, smoothed
+			plt.hist(x_data, weights=y_data, bins=param, density=False, alpha=0.6, color='tab:blue')
+			if method =="corrected":
+				# add linear regression line to plot, recalculate for corrected, should be a line on y=0, if not, something went wrong
+				linres = linregress(x_data, np.array(y_data, dtype=float))
+				plt.plot(x_data, linres.intercept + linres.slope*x_data, 'r', label='fitted line')
+				ylbl = "Corrected count per Distance"
+			elif method == "linres":
+				# add linear regression line to plot
+				self.check_linres()
+				linres = self.linres.loc[ind].iloc[2]
+				plt.plot(x_data, linres.intercept + linres.slope * x_data, 'r', label='fitted line')
 		
+		# add labels to plot
+		plt.xlabel('Distance in bp')
+		plt.ylabel(ylbl)
+	
+		# make x-axis pretty
 		xt = ax.get_xticks() 
-		if negative:
+		if collapsed: # adjust to collapsed
 			plt.bar(offset_neg, neg, color='tab:orange')
 			xt[0] = offset_neg
 			xt = xt[:-1]
 			xtl = xt.tolist()
 			xtl[0] = "neg"
-			if neg_cross:
-				plt.plot(offset_neg, neg, "x")
 		else:
 			xt = xt[1:-1]
 			xtl = xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-		plt.title(f"Analyzed signal for {tf1}-{tf2}")
+		
+		# add cross for negative if needed
+		if method == "signal":
+			if neg_cross:
+				plt.plot(offset_neg, neg, "x")
+
+		# set pair as plot title
+		plt.title(pair)
+
+		#save plot
 		if save is not None:
 			plt.savefig(save, dpi=600)
 			plt.close()
-
+	
 	def plot_network(self, color_node_by="TF1_count",
 						   color_edge_by="Distance", 
 						   size_edge_by="Distance_percent",
