@@ -3163,11 +3163,15 @@ class DistObj():
 		"""
 		self.check_peaks()
 
+		if self._collapsed is not None: 
+			raise InputError("Collapsed signals can't be analyzed, see .expand_negative() for more details.")
+
 		self._noise_method = method
 		self._height_multiplier = height_multiplier
 		
 		datasource =  self._get_datasource()
 		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
+
 		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks,datasource)
 
 		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
