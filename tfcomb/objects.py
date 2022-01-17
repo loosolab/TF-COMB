@@ -2271,7 +2271,7 @@ class DistObj():
 			A value between 0-3 where 0 (only errors), 1 (info), 2 (debug), 3 (spam debug). 
 		
 		Returns
-		----------
+		-------
 		None 
 			Sets the verbosity level for the Logger inplace
 		"""
@@ -2285,11 +2285,11 @@ class DistObj():
 
 		Parameters
 		----------
-		comb_obj: tfcomb.objects
+		comb_obj : tfcomb.objects
 			Object from which the rules and parameters should be copied from
 
 		Returns
-		----------
+		-------
 		None 
 			Copies values and parameters from a combObj or diffCombObj.
 		
@@ -2326,7 +2326,7 @@ class DistObj():
 			one of ["inner","outer","center"] or [0,1,2]
 
 		Returns
-		----------
+		-------
 		None 
 			Sets anchor mode inplace
 		"""
@@ -2347,13 +2347,13 @@ class DistObj():
 			
 		Parameters
 		----------
-		window_size: int 
+		window_size : int 
 			window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
 			(see tobias.utils.signals.fast_rolling_math) 
 			Default: 3
 
-		Returns:
-		----------
+		Returns
+		--------
 		None 
 			Fills the object variable .smoothed
 		"""
@@ -2383,10 +2383,10 @@ class DistObj():
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
 			
-			Returns:
-			----------
-			bool 
-				True if smoothed, False otherwiese
+		Returns
+		--------
+		bool 
+			True if smoothed, False otherwiese
 		"""
 		
 		if (self.smoothed is None) or (self.smooth_window <= 1): 
@@ -2396,8 +2396,8 @@ class DistObj():
 	def shift_signal(self):
 		""" Shifts the signal above zero. 
 
-		Returns:
-		----------
+		Returns
+		--------
 		None 
 			Fills the object variables .shift and  either .smoothed or .corrected
 
@@ -2424,8 +2424,8 @@ class DistObj():
 	def reset_signal(self):
 		""" Resets the signals to their original state. 
 
-		Returns:
-		----------
+		Returns
+		--------
 		None 
 			Resets the object variables .shift and fills either .smoothed or .corrected
 
@@ -2454,8 +2454,8 @@ class DistObj():
 	def _get_datasource(self):
 		""" Determines whether .corrected or .smoothed should be used and returns the base columns for this
 
-		Returns:
-		----------
+		Returns
+		--------
 		pandas.DataFrame 
 			Either .smoothed or .corrected
 
@@ -2470,7 +2470,12 @@ class DistObj():
 		return(datasource)
 
 	def _set_datasource(self, datasource):
-		""" Sets datasource
+		""" Sets datasource (either smoothed or corrected)
+		
+		Parameters
+		----------
+		datasource : pd.DataFrame
+			Datatable to set either smoothed or corrected to 
 		"""
 		if self.is_smoothed():
 			self.smoothed = datasource
@@ -2596,7 +2601,7 @@ class DistObj():
 			Default: None
 		
 		Returns
-		----------
+		--------
 		None 
 			Fills the object variable .distances.
 
@@ -2667,11 +2672,13 @@ class DistObj():
 			TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
 			
 			Parameters
-			-------------
+			-----------
 			normalize : bool
-			True if data should be normalized, False otherwise. Normalization method is min_max normalization:
+			True if data should be normalized, False otherwise.
 			Default: True
 
+			Note: 
+			Normalization method is min_max normalization: (x[i] - min(x))/(max(x)-min(x))
 		"""
 
 		tfcomb.utils.check_type(normalize, bool)
@@ -2723,6 +2730,29 @@ class DistObj():
 	#-------------------------------------------------------------------------------------------#
 
 	def _multiprocess_chunks(self, threads, func, datatable):
+		"""
+		Split Data in chunks to multiprocess it. Because of the rather short but numerous calls mp.Pool() creates to much overhead. 
+		So instead utilize chunks. 
+		Following functions can be multiprocessed: 
+		["linress", "correct background", "analyze_signal", "evaluate_noise"]
+
+		Parameters
+		----------
+		threads : int
+			Number of threads used
+		func : tfcomb.utils.*_chunks function
+			Related chunk process function from tfcomb.utils
+		datatable: pd.DataFrame
+			Datatable to operate on (e.g. .distances)
+
+		See also
+		-------
+		tfcomb.utils.linress_chunks 
+		tfcomb.utils.correct_chunks 
+		tfcomb.utils.analyze_signal_chunks
+		tfcomb.utils.evaluate_noise_chunks
+
+		"""
 		
 		# check function is supported
 		if not callable(func):
@@ -2802,18 +2832,18 @@ class DistObj():
 			
 			Parameters
 			----------
-			threads: int
+			threads : int
 				Number of threads used for fitting linear regression
-			n_bins: int 
+			n_bins : int 
 				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
 				Default: None
-			save: str 
+			save : str 
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
 
 			Returns
-			----------
-			None:
+			-----
+			None
 				Fills the object variable .linres
 		"""
 
@@ -2838,7 +2868,7 @@ class DistObj():
 
 		if save is not None:
 			self.logger.info("Plotting all linear regressions. This may take a while")
-			self._plot_all(n_bins, save, self.plot_linres)
+			self._plot_all(save, "linres")
 
 		self.logger.info("Linear regression finished! Results can be found in .linres")
 
@@ -2848,17 +2878,17 @@ class DistObj():
 			
 			Parameters
 			----------
-			threads: int
+			threads : int
 				Number of threads used for fitting linear regression
-			n_bins: int 
+			n_bins : int 
 				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
 				Default: None
-			save: str
+			save : str
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
 
-			Returns:
-			----------
+			Returns
+			--------
 			None 
 				Fills the object variable .corrected
 		"""
@@ -2885,7 +2915,7 @@ class DistObj():
 		
 		if save is not None:
 			self.logger.info("Plotting all corrected signals. This may take a while")
-			self._plot_all(n_bins, save, self.plot_corrected)
+			self._plot_all(save, "corrected")
 
 		self.logger.info("Background correction finished! Results can be found in .corrected")
 	
@@ -2893,9 +2923,18 @@ class DistObj():
 		""" Calculate the mean distance for the given pair.
 		
 		Parameters
-		------------
+		----------
 		pair : tuple(str,str)
 			TF names for which to calculate the mean distance e.g. ("NFYA","NFYB")
+		
+		Returns
+		------
+		float
+			numpy average
+		
+		See also
+		--------
+		numpy.average
 		"""
 
 		self.check_pair(pair)
@@ -2910,7 +2949,14 @@ class DistObj():
 		return(avg)
 
 	def mean_distance_all(self):
-		""" Calculates the mean distance for all pairs in <distObj> """
+		""" 
+		Calculates the mean distance (numpy average) for all pairs in <distObj>
+		
+		See also
+		--------
+		numpy.average
+
+		"""
 
 		self.mean_distances = pd.DataFrame(index=self.distances.index, columns=["mean_distance"])
 		for pair in zip(self.distances.TF1, self.distances.TF2):
@@ -2918,51 +2964,65 @@ class DistObj():
 			self.mean_distances.loc[key, "mean_distance"] = self._mean_distance_pair(pair)
 			
 
-	def _plot_all(self, n_bins, save_path, plot_func):
+	def _plot_all(self, save_path, method):
+		"""
+		Plots all pairs.
+		
+		Parameters
+		----------
+		save_path : str
+			Directory path to save plots to. Filename will be created with "{method}_{tf1}_{tf2}.png".
+			e.g. save_path/linres_NFYA_NFYB.png
+		method : str
+			Plotting style	
+		"""
 
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		self.check_min_max_dist()
-		self.check_distances
+		self.check_distances()
+		self.check
 		tfcomb.utils.check_dir(save_path)
 
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
-
 		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
-			plot_func((tf1, tf2), n_bins=n_bins, save=os.path.join(save_path,f"{tf1}_{tf2}.png"))
+			self.plot((tf1, tf2), method=method, save=os.path.join(save_path,f"{method}_{tf1}_{tf2}.png"))
 
 
 	def analyze_signal_all(self, threads=1, smooth_window=3, prominence="zscore", stringency=2,  save=None):
-		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
-			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
-			Signal. Peaks are called with scipy.signal.find_peaks().
-			
-			Parameters
-			----------
-			threads: int
-				Number of threads used
-				Default: 1
-			smooth_window: int 
-				window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-				(see tobias.utils.signals.fast_rolling_math) 
-				Default: 3
-			prominence: number or ndarray or sequence or ["median", "zscore"]
-				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-				If "median", the median for the pairs is used
-				If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
-				Attention, this also changes the scale and output column names.
-				If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
-				Default: "zscore"
-			stringency: number
-				stringency the prominence threshold should be multiplied with. Default: 2
-			save: str
-				Path to save the plots to. If save is None plots won't be plotted. 
-				Default: None
+		""" 
+		After background correction is done, the signal is analyzed for peaks, 
+		indicating preferred binding distances. There can be more than one peak (more than one preferred binding distance) per 
+		Signal. Peaks are called with scipy.signal.find_peaks().
+		
+		Parameters
+		----------
+		threads : int
+			Number of threads used
+			Default: 1
+		smooth_window : int 
+			window size for the rolling smoothing window. To avoid flanking NaN regions the signal is expanded with the first/last value
+			Default: 3
+		prominence : number or ndarray or sequence or ["median", "zscore"]
+			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
+			If "median", the median for the pairs is used
+			If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
+			Attention, this also changes the scale and output column names.
+			If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
+			Default: "zscore"
+		stringency : number
+			stringency the prominence threshold should be multiplied with. 
+			Default: 2
+		save : str
+			Path to save the plots to. If save is None plots won't be plotted. 
+			Default: None
 
-			Returns:
-			----------
-			None 
-				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
+		Returns
+		-------
+		None 
+			Fills the object variable self.peaks, self.smooth_window, self.peaking_count
+		
+		See also
+		--------
+		tfcomb.objects.correct_all
+		tfcomb.utils.fast_rolling_mean
 		"""
 		
 		
@@ -3075,12 +3135,13 @@ class DistObj():
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
 	def analyze_hubs(self):
-		""" Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
+		""" 
+		Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
 
-			Returns:
-			----------
-			pd.Series 
-				A panda series with the tf as index and the count as integer
+		Returns
+		--------
+		pd.Series 
+			A panda series with the tf as index and the count as integer
 		"""
 		
 		self.check_peaks()
@@ -3090,11 +3151,13 @@ class DistObj():
 		return pd.Series(occurrences)		
 
 	def classify_rules(self):
-		""" Classify all rules True if at least one peak was found, False otherwise.  
+		""" 
+		Classify all rules True if at least one peak was found, False otherwise.  
 
-			Returns:
-			----------
-			None adds a column to either .smoothed or .corrected
+		Returns
+		--------
+		None 
+			adds a column to either .smoothed or .corrected
 		"""
 
 		self.check_peaks()
@@ -3113,25 +3176,27 @@ class DistObj():
 		self.logger.info(f"classifcation done")
 
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
-		""" ranks rules within each column specified. 
+		""" 
+		ranks rules within each column specified. 
 
-			Params:
-			----------
-			by : list of strings
-				Columns for wich the rules should be ranked
-				Default: ["Distance_percent", "Peak Heights", "Noisiness"]
-			calc_mean: bool
-				True if an extra column should be calculated containing the mean rank, false otherwise
-				Default: True
+		Parameters
+		----------
+		by : list of strings
+			Columns for wich the rules should be ranked
+			Default: ["Distance_percent", "Peak Heights", "Noisiness"]
+		calc_mean : bool
+			True if an extra column should be calculated containing the mean rank, false otherwise
+			Default: True
 			
-			Raises
-			-------
-			InputError
-				If columns selection (parameter: by) is not valid.
+		Raises
+		-------
+		InputError
+			If columns selection (parameter: by) is not valid.
 
-			Returns:
-			----------
-			None adds a rank column for each criteria given plus one for the mean if set to True
+		Returns
+		-------
+		None 
+			adds a rank column for each criteria given plus one for the mean if set to True
 		"""
 
 		# check peaks are calculated + by are only valid columns
@@ -3159,7 +3224,25 @@ class DistObj():
 			self.peaks = self.peaks.sort_values(by="mean_rank")
 		
 	def evaluate_noise(self, threads=1, method="median", height_multiplier=0.75):
-		""" evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
+		"""
+		Evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
+
+		Parameters
+		---------
+		threads : int
+			Number of threads used for evaluation.
+			Default: 1
+		method : str
+			Measurement to calculate the noisiness of a signal.
+			One of ["median", "min_max"].
+			Default: "median"
+		height_multiplier : float
+			Height multiplier (percentage) to calculate cut points. Must be between 0 and 1.
+			Default: 0.75
+
+		See also 
+		--------
+		tfcomb.utils.evaluate_noise_chunks
 		"""
 		self.check_peaks()
 
@@ -3185,7 +3268,8 @@ class DistObj():
 		
 
 	def check_periodicity(self):
-		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
+		"""
+		checks periodicity of distances (like 10 bp indicating DNA full turn)
 			- placeholder for functionality upgrade - 
 		"""
 		pass
@@ -3193,12 +3277,16 @@ class DistObj():
 
 	def build_network(self):
 		""" 
-		Builds a TF-TF co-occurrence network for the rules within object. This is a wrapper for the tfcomb.network.build_nx_network() function, 
-		which uses the python networkx package. 
+		Builds a TF-TF co-occurrence network for the rules within object.
 			 
 		Returns
 		-------
-		None - fills the .network attribute of the `CombObj` with a networkx.Graph object
+		None 
+			fills the .network attribute of the `CombObj` with a networkx.Graph object
+
+		See also
+		-------
+		tfcomb.network.build_nx_network
 		"""
 
 		#Build network
@@ -3207,6 +3295,26 @@ class DistObj():
 		self.logger.info("Finished! The network is found within <CombObj>.<distObj>.network.")
 
 	def collapse_negative(self, method="max"):
+		"""
+		Method to collapse negative coulmns(-min distance to 0). e.g. columns [-3, -2, -1] will ne summarized as "neg".
+		
+		Parameters
+		-----------
+		method : str, optional
+			Summarization Method. One of ["max","min","mean","sum"].
+			e.g. with "max" 2.3 is chosen from [1.2, 2.3, 1.5], for sum: "neg" would be 5 
+			Default: max
+
+		Notes
+		--------
+		This method is intended to alter the plots produced, not to run analysis on it. Although it is possible 
+		with most of the functions, we recommend not to use collapsed data for analysis steps.  
+		To revert collapsing, use .expand_negative().
+
+		See also
+		--------
+		tfcomb.objects.expand_negative
+		"""
 
 		# check method
 		tfcomb.utils.check_string(method, ["max","min","mean","sum"])
@@ -3255,6 +3363,14 @@ class DistObj():
 
 
 	def expand_negative(self):
+		"""
+		Method to expand negative coulmns back to -min distance to 0. \n
+		e.g. "neg" column will be expanded back to [-3,-2,-1].
+
+		See also
+		--------
+		tfcomb.objects.collapse_negative
+		"""
 
 		datasource = self._get_datasource()
 		#check if collapsed
@@ -3281,6 +3397,29 @@ class DistObj():
 	#-------------------------------------------------------------------------------------------------------------#
 		
 	def plot(self, pair, method="signal", save=None, config=None):
+		"""
+		Produces different plots.
+		
+		Parameters
+		-----------
+		pair : tuple(str, str)
+			TF names to plot. e.g. ("NFYA","NFYB")
+		method : str, optional
+			Plotting Method. One of ["hist", "corrected", "density", "linres", "signal", "smoothed"].
+			Default: signal
+		save: str
+			Path to save the plots to. If save is None plots won't be plotted. 
+			Default: None
+		config : dict, optional
+			Config for some plotting methods. \n
+			e.g. {"nbins":100} for histogram like plots or {"bwadjust":0.1} for kde (densitiy) plot. \n
+			If set to *None*, below mentioned default parameters are used.\n
+			possible parameters: \n
+			[hist, linres, corrected, smoothed]: n_bins, Default: self.max_dist - self.min_dist + 1 \n
+			[density]: bwadjust, Default: 0.1 (see seaborn.kdeplot()) \n
+			[signal]: None \n
+			Default: None
+		"""
 
 		# checks
 		self.check_distances()
@@ -3481,7 +3620,7 @@ class DistObj():
 			A column in .rules to color edges by. Default: 'Distance'.
 		size_edge_by : str, optional
 			A column in rules to size edge width by. Default: 'TF1_TF2_count'.
-		kwargs : arguments
+		**kwargs : arguments
 			All other arguments are passed to tfcomb.plotting.network.
 
 		See also

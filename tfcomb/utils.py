@@ -1012,7 +1012,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 	elif which == "both":
 		final = tuple(thresholds)
 		
-	#Plot fit and threshold
+	#Plot fit and threshol
 	#plt.hist(data, bins=20, density=True)
 	#xmin = np.min(data)
 	#xmax = np.max(data)
@@ -1248,19 +1248,23 @@ def set_contrast(contrast, available_contrasts):
 def linress_chunks(pairs, dist_counts, distances):
 	''' Helper function to process linear regression for chunks 
 		
-		Parameters
-		-----------
-		pairs: list<tuple>
-			   A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
-		dist_counts: pd.DataFrame
-			   A (sub-)Dataframe with the distance counts for the pairs
-		distances: list
-			   A list of valid column names for the distances  
-		
-		Returns
-		-----------
-		results: list 
-				A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+	Parameters
+	-----------
+	pairs: list<tuple>
+			A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+	dist_counts: pd.DataFrame
+			A (sub-)Dataframe with the distance counts for the pairs
+	distances : list
+			A list of valid column names for the distances  
+	
+	Returns
+	--------
+	results : list 
+			A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+
+	Note
+	----
+	Constraint: DataFrame with distance counts need to contain a signal for each pair given within pairs. Same for linear regression DataFrame
 	'''
 	# make sure index is correct
 	dist_counts = dist_counts.reset_index()
@@ -1274,9 +1278,11 @@ def linress_chunks(pairs, dist_counts, distances):
 
 		# get count for specific pair
 		ind = "-".join(pair)
-		counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
-		counts = np.array(counts, dtype=float)
-		
+		try:
+			counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+			counts = np.array(counts, dtype=float)
+		except:
+			raise ValueError(f"No distance counts found for pair {ind}")	
 		# fit linear regression
 		res = scipy.stats.linregress(distances, counts)
 
@@ -1290,17 +1296,25 @@ def correct_chunks(pairs, dist_counts, distances, linres):
 			
 	Parameters
 	-----------
-	pairs: list<tuple>
-		   A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
-	dist_counts: pd.DataFrame
-		   A (sub-)Dataframe with the distance counts for the pairs
-	distances: list
-		   A list of valid column names for the distances  
+	pairs : list<tuple>
+		A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+	dist_counts : pd.DataFrame
+		A (sub-)Dataframe with the distance counts for the pairs
+	distances : list
+		A list of valid column names for the distances  
+	linres: pd.DataFrame
+		A (sub-)DataFrame containing linear regression objects for the pairs
 		
 	Returns
-	-----------
-	results: list 
-			A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+	-------
+	results : list 
+			A list with the results in form of a list [TF1, TF2, Corrected Signal] with Corrected signal with dynamic columns between min distance and max distance.
+			e.g. [-2,-1,0,1,2,3] for min distance = -2, max distance = 3
+	
+	Note
+	-----
+	Constraint: DataFrame with distance counts need to contain a signal for each pair given within pairs. Same for linear regression DataFrame
+
 	"""
 
 	# make sure index is correct
@@ -1320,11 +1334,16 @@ def correct_chunks(pairs, dist_counts, distances, linres):
 
 		# get count for specific pair
 		ind = "-".join(pair)
-		counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
-		counts = np.array(counts, dtype=float)
+		try:
+			counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+			counts = np.array(counts, dtype=float)
+		except:
+			raise ValueError(f"No distance counts found for pair  {ind}")	
 
-		linres_pair = linres.loc[ind].loc[linres_col] #exclude TF1, TF2 columns
-	
+		try:
+			linres_pair = linres.loc[ind].loc[linres_col] #exclude TF1, TF2 columns
+		except:
+			raise ValueError(f"No fitted linear regression found for pair  {ind}")		
 		# subtract background
 		corrected = counts - (linres_pair.intercept + linres_pair.slope * np.array(distances))
 		
@@ -1337,9 +1356,7 @@ def correct_chunks(pairs, dist_counts, distances, linres):
 	return results
 
 def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
-	""" After background correction is done (see ._correct_pair() or .correct_all()), the signal is analyzed for peaks, 
-		indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
-		Signal. Peaks are called with scipy.signal.find_peaks().
+	""" Evaluating signal for chunks. 
 		
 		Parameters
 		----------
@@ -1347,18 +1364,27 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 			TF names for which the preferred binding distance(s) should be found. e.g. ("NFYA","NFYB")
 		datasource : pd.DataFrame 
 			A (sub-)Dataframe with the (corrected) distance counts for the pairs
-		distances: list
+		distances : list
 			A list of valid column names for the distances  
-		stringency: number
+		stringency : number
 			stringency the prominence threshold should be multiplied with.
-		prominence: number or ndarray or sequence
+		prominence : number or ndarray or sequence
 			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
 			Default: 0
 
-		Returns:
-		----------
+		Returns
+		--------
 		list 
 			list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
+		
+		See also
+		--------
+		tfcomb.object.analyze_signal_all
+
+		Note
+		-----
+		Constraint: DataFrame with corrected distance counts need to contain a signal for each pair given within pairs.
+
 	"""
 
 	# make sure index is correct
@@ -1376,7 +1402,10 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 
 		# signal.find_peaks() will not find peaks on first and last position without having 
 		# an other number left and right. 
-		signal = datasource.loc[ind].loc[distance_cols].values
+		try:
+			signal = datasource.loc[ind].loc[distance_cols].values
+		except:
+			raise ValueError(f"No corrected distances found for pair  {ind}")	
 		x = [0] + list(signal) + [0]
 
 		# determine prominence
@@ -1399,23 +1428,6 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 		#Get distances from columns
 		peak_distances = [distance_cols[idx] for idx in peaks_idx]
 
-		'''
-		#Collect peaks for TF pair
-		peak_info = pd.DataFrame().from_dict(properties)
-		peak_info["Distance"] = peak_distances
-		peak_info["TF1"] = tf1
-		peak_info["TF2"] = tf2
-
-		#Add additional peak-information per pair
-		peak_info["Threshold"] = threshold
-		
-		#Format order of columns
-		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
-		peak_info = peak_info[columns]
-		peak_info.rename(columns= { "peak_heights":"Peak Heights",
-									"prominences": "Prominences"}, inplace=True)
-		results.append(peak_info)
-		'''
 		n_peaks = len(peak_distances)
 		# insert tf1,tf2 names number of peaks times
 		properties["TF1"] = [tf1]*n_peaks
@@ -1430,12 +1442,44 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 	return results
 
 def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", height_multiplier=0.75):
+	""" 
+	Evaluate the noisiness of a signal for chunks (a chunk can also be the whole dataset). 
+
+	Parameters
+	---------
+	pairs : list(tuples(str,str))
+		list of pairs to perform analysis on 
+	signals : pd.Dataframe 
+		A (sub-)Dataframe containing signal data for each pair (pairs without signal raises error)
+	peaks : pd.DataFrame
+		A (sub-)DataFrame containing all peaks for the given pairs (pairs without peaks are possible)
+	distances : list()
+		list with distance columns, either integer (usually between min distance and max distance) or artificall "neg" column
+	method : str, otional
+		Method used to get noise measurement, either "median" or "min_max" allowed.
+		Default: "median" 
+	height_multiplier : float, optional
+		Height multiplier (percentage) to calculate cut points. Must be between 0 and 1.
+		Default: 0.75
+	
+	Raises
+	------
+	ValueError
+		If no signal data is given for a pair
+	
+	Note
+	-----
+	Constraint: DataFrame with signals need to contain a signal for each pair given within pairs.
+
+	"""
 	# make sure index is correct
 	signals = signals.reset_index()
 	signals.index = signals["TF1"] + "-" + signals["TF2"]
 
 	peaks = peaks.reset_index()
 	peaks.index = peaks["TF1"] + "-" + peaks["TF2"]
+
+	check_value(height_multiplier, vmin=0, vmax=1)
 
 	# get data column
 	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
@@ -1444,7 +1488,10 @@ def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", hei
 		# get pair
 		tf1, tf2 = pair
 		ind = "-".join(pair)
-		signal = signals.loc[ind].loc[distance_cols].values
+		try:
+			signal = signals.loc[ind].loc[distance_cols].values
+		except:
+			raise ValueError(f"No signal found for pair  {ind}")	
 		
 		# get peaks for specific pair
 		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)]
@@ -1520,7 +1567,18 @@ def _expand_peak(start_pos, cut_off, signal):
 def fast_rolling_mean(arr, w):
 	"""
 	Adaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
-	Rolling operation of arr with window size w 
+	Rolling operation "mean" of arr with window size w 
+
+	Parameters
+	----------
+	arr : np.ndarray[np.float64_t, ndim=1]
+		array to perform operation on
+	w : int
+		window size 
+
+	See also
+	--------
+	tobias.utils.signals.fast_rolling_math 
 	"""
 
 	lf = int(np.ceil( (w-1) / 2.0))
