@@ -26,9 +26,13 @@ from goatools.anno.genetogo_reader import Gene2GoReader
 from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.obo_parser import GODag
 
+#Plotting
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 #Import tfcomb
 import tfcomb
-from tfcomb.utils import check_type, check_value
+from tfcomb.utils import check_type, check_value, check_string
 from tfcomb.logging import TFcombLogger, InputError
 
 #Load internal data
@@ -50,8 +54,9 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 
 	Parameters
 	----------
-	regions : tobias.utils.regions.RegionList()
-		A RegionList object with positions of genomic elements e.g. TFBS.
+	regions : tobias.utils.regions.RegionList() or pandas.DataFrame
+		A RegionList object with positions of genomic elements e.g. TFBS or a DataFrame containing chr/start/stop-coordinates. If DataFrame, the function assumes that the order of columns is: 
+		'chromosome', 'start', 'end', 'id', 'score', 'strand'.
 	gtf : str
 		Path to .gtf file containing genomic elements for annotation.
 	config : dict, optional
@@ -81,6 +86,11 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 								  "feature": "gene"}],
 					"priority": True, 
 					"show_attributes": "all"}
+	
+	#Annotate regions (data/ refers to the data directory of the tfcomb github repository)
+	regions = pd.read_csv("data/GM12878_hg38_chr4_ATAC_peaks.bed")				
+	annotate_regions(regions, gtf="data/chr4_genes.gtf",
+							  config=custom_config)
 
 	#TODO
 	"""
@@ -274,231 +284,320 @@ def get_annotated_genes(regions, attribute="gene_name"):
 #------------------------------- GO-term enrichment ----------------------------#
 #-------------------------------------------------------------------------------#
 
-def _fmt_field(v):
-	""" Format a object to string depending on type. For use when formatting table entries of tuple/list """
+class GOAnalysis(pd.DataFrame):
 
-	if isinstance(v, str):
-		s = v
-	elif isinstance(v, tuple):
-		s = "/".join([str(i) for i in v])
-	elif isinstance(v, list) or isinstance(v, set):
-		o = sorted(list(v))
-		s = ", ".join([str(i) for i in o])
-	else: #float/int
-		s = v
-	return(s)
+	aspect_translation = {"BP": "Biological process",
+						  "MF": "Molecular function",
+						  "CC": "Cellular component"}
+	@property
+	def _constructor(self):
+		return GOAnalysis
 
-class GOAnalysis():
+	@staticmethod
+	def _fmt_field(v):
+		""" Format a object to string depending on type. For use when formatting table entries of tuple/list """
 
-	def __init__():
-		pass
+		if isinstance(v, str):
+			s = v
+		elif isinstance(v, tuple):
+			s = "/".join([str(i) for i in v])
+		elif isinstance(v, list) or isinstance(v, set):
+			o = sorted(list(v))
+			s = ", ".join([str(i) for i in o])
+		else: #float/int
+			s = v
+		return(s)
 
+	@staticmethod
+	def _match_column(table, lst):
+		""" Returns the column name with the best match to the list of ids/values """
 
-	def plot_enrichment():
-		pass
-
-
-def go_enrichment(gene_ids, organism="hsapiens", background=None, verbosity=1, plot=True):
-	"""
-	Perform a GO-term enrichment based on a list of gene_ids. 
-
-	Parameters
-	-----------
-	gene_ids : list
-		A list of gene ids.
-	organism : :obj:`str`, optional
-		The organism of which the gene_ids originate. Defaults to 'hsapiens'.
-	background : list, optional
-		A specific list of background gene ids to use. Default: The list of protein coding genes of the 'organism' given. 
-	verbosity : int, optional
-		Default: 1.
-	cutoff : float, optional
-		0.05
-	plot : bool
-
-	See also
-	---------
-	tfcomb.plotting.go_bubble
-
-	Returns
-	--------
-	pd.DataFrame
-
-	Reference
-	----------
-	https://www.nature.com/articles/s41598-018-28948-z
-	
-	"""
-	
-	#verbosity 0/1/2
-
-	#setup logger
-	logger = TFcombLogger(verbosity)
-	
-	#TODO: Gene_ids must be a list
-	tfcomb.utils.check_type(gene_ids, [list, set], "gene_ids")
-	
-	#Organism must be in human/mouse
-	if organism not in available_organisms:
-		raise InputError("Organism '{0}' not available. Please choose any of: {1}".format(organism, available_organisms))
-	taxid = organism_to_taxid[organism]
-	logger.info("Running GO-term enrichment for organism '{0}' (taxid: {1})".format(organism, taxid))
-	
-	##### Read data #####
-
-	## Setup GOATOOLS GO DAG
-	obo_fname = "go-basic.obo"
-	if not os.path.isfile(obo_fname):
-		logger.info("Downloading ontologies")
-		obo_fname = download_go_basic_obo()
-	obodag = GODag(obo_fname)
-	
-	## Setup gene -> GO term associations
-	#check if gene2go contains any data; delete if not
-	fin_gene2go = "gene2go"
-	if os.path.exists(fin_gene2go):
-		s = os.path.getsize(fin_gene2go)
-		if s == 0:
-			logger.warning("gene2go has size 0; deleting the file")
-			os.remove(fin_gene2go)
-
-	else: #file does not exist; try downloading
-		logger.info("Downloading NCBI associations")
-		try:
-			fin_gene2go = download_ncbi_associations()
-		except:
-			logger.warning("An error occurred downloading NCBI associations using goatools")
-			logger.warning("TF-COMB will attempt to download and extract the file manually")
-			
-			url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2go.gz"
-			base = os.path.basename(url) #gene2go.gz
-			
-			logger.debug("Downloading {0}".format(url))
-			with open(base, "wb") as f:
-				r = requests.get(url)
-				f.write(r.content)
-
-			logger.debug("Decompressing {0}".format(base))
-			with gzip.open(base, 'rb') as f_in:
-				with open(fin_gene2go, 'wb') as f_out:
-					shutil.copyfileobj(f_in, f_out)
-
-	logger.debug("fin_gene2go: {0}".format(fin_gene2go))
-
-	logger.debug("Setting up Gene2GoReader")
-	objanno = Gene2GoReader(fin_gene2go, taxids=[taxid])
-	logger.debug(objanno)
-
-	ns2assoc = objanno.get_ns2assc()
-	#logger.debug(ns2assoc)
-
-	
-	###### Setup analysis #####
-
-	#Read data from package
-	gene_table = pd.read_csv(DATA_PATH + organism + "_genes.txt", sep="\t")
-
-	###### Setup gene ids ####### 
-	logger.info("Setting up gene ids")
-
-	target_col = "entrezgene_id"
-
-	#Check if gene_ids are in ns2assoc; else, try to convert
-	all_gene_ids = set(sum([list(ns2assoc[aspect].keys()) for aspect in ns2assoc.keys()], []))
-	n_found = sum([gene_id in all_gene_ids for gene_id in gene_ids])
-	
-	if n_found == 0:
-		
 		#Which column from gene_table has the best match?
-		id_col = match_column(gene_table, gene_ids)
-		logger.debug("gene_ids best match column: {0}".format(id_col))
+		match = []
+		for column in table.columns:
+			tup = (column, sum([value in table[column].tolist() for value in lst]))
+			match.append(tup)
 		
-		#Find out how many ids can be converted
-		not_found = set(gene_ids) - set(gene_table[id_col])
-		if len(not_found) > 0:
-			logger.warning("{0} gene ids from 'gene_ids' could not be converted to entrez ids for {1}".format(len(not_found), organism))
+		id_col = sorted(match, key=lambda t: -t[1])[0][0] #column with best matching IDs
 
-		#Convert to entrez id
-		ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
-		gene_ids_entrez = [ids2entrez.get(s, -1) for s in gene_ids]
-		gene_ids_entrez = set([gene for gene in gene_ids_entrez if gene > 0]) #only genes for which there was a match
+		return(id_col)	
 
-		#Save dict for converting back to original values
-		entrez2id = dict(zip(gene_table[target_col], gene_table[id_col]))
+	def enrichment(self, genes, 
+						organism="hsapiens", 
+						background=None, 
+						propagate_counts=True,
+						verbosity=1):
+		"""
+		Perform a GO-term enrichment based on a list of genes. This is a TF-COMB wrapper for goatools.
 
-	else:
-		gene_ids_entrez = gene_ids #gene ids were already entrez
-		entrez2id = dict(zip(gene_ids, gene_ids))
+		Parameters
+		-----------
+		gene_ids : list
+			A list of gene ids.
+		organism : :obj:`str`, optional
+			The organism of which the gene_ids originate. Defaults to 'hsapiens'.
+		background : list, optional
+			A specific list of background gene ids to use. Default: The list of protein coding genes of the 'organism' given. 
+		verbosity : int, optional
+			Default: 1.
 
-	###### Setup background gene ids ######
-	if background == None:
+		See also
+		---------
+		tfcomb.annotation.GOAnalysis.plot_bubble()
+
+		Returns
+		--------
+		GOAnalysis object containing enrichment results
+
+		Reference
+		----------
+		https://www.nature.com/articles/s41598-018-28948-z
+		
+		"""
+		
+		#verbosity 0/1/2
+
+		#setup logger
+		logger = TFcombLogger(verbosity)
+		
+		#TODO: Gene_ids must be a list
+		tfcomb.utils.check_type(genes, [list, set], "gene_ids")
+		
+		#Organism must be in human/mouse
+		if organism not in available_organisms:
+			raise InputError("Organism '{0}' not available. Please choose any of: {1}".format(organism, available_organisms))
+		taxid = organism_to_taxid[organism]
+		logger.info("Running GO-term enrichment for organism '{0}' (taxid: {1})".format(organism, taxid))
+		
+		############### Read data ###############
+
+		## Setup GOATOOLS GO DAG
+		obo_fname = "go-basic.obo"
+		if not os.path.isfile(obo_fname):
+			logger.info("Downloading ontologies")
+			obo_fname = download_go_basic_obo()
+		obodag = GODag(obo_fname)
+		
+		## Setup gene -> GO term associations
+		#check if gene2go contains any data; delete if not
+		fin_gene2go = "gene2go"
+		if os.path.exists(fin_gene2go):
+			s = os.path.getsize(fin_gene2go)
+			if s == 0:
+				logger.warning("gene2go has size 0; deleting the file")
+				os.remove(fin_gene2go)
+
+		else: #file does not exist; try downloading
+			logger.info("Downloading NCBI associations")
+			try:
+				fin_gene2go = download_ncbi_associations()
+			except:
+				logger.warning("An error occurred downloading NCBI associations using goatools")
+				logger.warning("TF-COMB will attempt to download and extract the file manually")
+				
+				url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2go.gz"
+				base = os.path.basename(url) #gene2go.gz
+				
+				logger.debug("Downloading {0}".format(url))
+				with open(base, "wb") as f:
+					r = requests.get(url)
+					f.write(r.content)
+
+				logger.debug("Decompressing {0}".format(base))
+				with gzip.open(base, 'rb') as f_in:
+					with open(fin_gene2go, 'wb') as f_out:
+						shutil.copyfileobj(f_in, f_out)
+
+		logger.debug("fin_gene2go: {0}".format(fin_gene2go))
+
+		logger.debug("Setting up Gene2GoReader")
+		objanno = Gene2GoReader(fin_gene2go, taxids=[taxid])
+		logger.debug(objanno)
+
+		ns2assoc = objanno.get_ns2assc()
+		#logger.debug(ns2assoc)
+
+		
+		############### Setup analysis ###############
 
 		#Read data from package
 		gene_table = pd.read_csv(DATA_PATH + organism + "_genes.txt", sep="\t")
 
-		logger.debug("Getting background_gene_ids from gene_table")
-		background_gene_ids_entrez = list(set(gene_table["entrezgene_id"].tolist())) #unique gene ids from table
+		###### Setup gene ids ####### 
+		logger.info("Setting up gene ids")
 
-	else:
+		target_col = "entrezgene_id"
 
-		#Find best-fitting column in gene_table
-		id_col = match_column(gene_table, background)
-		ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
-		background_gene_ids_entrez = [ids2entrez.get(s, -1) for s in background]
-		background_gene_ids_entrez = set([gene for gene in background_gene_ids_entrez if gene > 0]) #only genes for which there was a match
+		#Check if genes are in ns2assoc; else, try to convert
+		all_gene_ids = set(sum([list(ns2assoc[aspect].keys()) for aspect in ns2assoc.keys()], []))
+		n_found = sum([gene_id in all_gene_ids for gene_id in genes])
+		
+		if n_found == 0:
+			
+			#Which column from gene_table has the best match?
+			id_col = self._match_column(gene_table, genes)
+			logger.debug("genes best match column: {0}".format(id_col))
+			
+			#Find out how many ids can be converted
+			not_found = set(genes) - set(gene_table[id_col])
+			if len(not_found) > 0:
+				logger.warning("{0}/{1} gene ids from 'genes' could not be converted to entrez ids for {2}".format(len(not_found), len(set(genes)), organism))
+
+			#Convert to entrez id
+			ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
+			gene_ids_entrez = [ids2entrez.get(s, -1) for s in genes]
+			gene_ids_entrez = set([gene for gene in gene_ids_entrez if gene > 0]) #only genes for which there was a match
+
+			#Save dict for converting back to original values
+			entrez2id = dict(zip(gene_table[target_col], gene_table[id_col]))
+
+		else:
+			gene_ids_entrez = genes #gene ids were already entrez
+			entrez2id = dict(zip(genes, genes))
+
+		###### Setup background gene ids ######
+		if background == None:
+
+			#Use data from package
+			logger.debug("Getting background_gene_ids from gene_table")
+			background_gene_ids_entrez = list(set(gene_table["entrezgene_id"].tolist())) #unique gene ids from table
+
+		else:
+
+			#Find best-fitting column in gene_table
+			id_col = self._match_column(gene_table, background)
+			ids2entrez = dict(zip(gene_table[id_col], gene_table[target_col]))
+			background_gene_ids_entrez = [ids2entrez.get(s, -1) for s in background]
+			background_gene_ids_entrez = set([gene for gene in background_gene_ids_entrez if gene > 0]) #only genes for which there was a match
+		
+		#Check if genes were in ns2assoc
+
+
+
+
+		#Setup goeaobj
+		logger.info("Setting up GO enrichment")
+		goeaobj = GOEnrichmentStudyNS(
+					background_gene_ids_entrez, # List of protein-coding genes in entrezgene format
+					ns2assoc, # geneid/GO associations
+					obodag, # Ontologies
+					propagate_counts = propagate_counts,
+					alpha = 0.05, # default significance cut-off
+					methods = ['fdr_bh'], # defult multipletest correction method
+					prt=None, 
+					log=None) 
+		
+		############### Run study ###############
+		logger.debug("Running .run_study():")
+		if verbosity <= 1:
+			goea_results_all = goeaobj.run_study(gene_ids_entrez, prt=None)
+		else:
+			goea_results_all = goeaobj.run_study(gene_ids_entrez)
+		
+		#Convert study items (entrez) to original ids
+		for res in goea_results_all:
+			res.study_items = [entrez2id[entrez] for entrez in res.study_items]
+
+		############### Format to dataframe ###############
+
+		keys_to_use = ["GO", "name", "NS", "depth", "enrichment", "ratio_in_study", "ratio_in_pop", 
+					"p_uncorrected", "p_fdr_bh", "study_count", "study_items"]
+		lines = [[self._fmt_field(res.__dict__[key]) for key in keys_to_use] for res in goea_results_all]
+		table = pd.DataFrame(lines, columns=keys_to_use)
+
+		#Convert e (enriched)/p (purified) to increased/decreased
+		translation_dict = {"e": "increased", "p": "decreased"}
+		table.replace({"enrichment": translation_dict}, inplace=True)
+
+		#Sort by FDR
+		table.sort_values(["p_fdr_bh", "study_count"], ascending=[True, False], inplace=True)
+
+		#Convert to GOAnalysis object
+		table = GOAnalysis(table)
+		logger.debug("Finished go_enrichment!")
+
+		return(table)
+
+
+	def plot_bubble(self, aspect="BP", n_terms=20, threshold=0.05, title=None, save=None):
+		"""
+		Plot a bubble-style plot of GO-enrichment results.
+
+		Parameters
+		--------------
+		aspect : str
+			The aspect for which GO-terms should be shown. Must be one of ["BP", "MF", "CC"]. Default: "BP".
+		n_terms : int
+			Maximum number of terms to show in graph. Default: 20
+		threshold : float between 0-1
+			FDR threshold for significant GO-terms. Default: 0.05.	
+		title : str
+			Custom title for the plot. Default: 'GO-terms for <aspect>'.
+		save : str, optional
+			Save the plot to the file given in 'save'. Default: None.
+		
+		Returns
+		----------
+		ax
+
+		"""
+		
+		check_string(aspect, ["BP", "CC", "MF"], "aspect") #aspect has to be one of {'BP', 'CC', 'MF'}
+		
+		#Choose aspect
+		table = self #self is a subclass of pd.dataframe
+		aspect_table = table[table["NS"] == aspect]
+		aspect_table.loc[:,"-log(FDR)"] = -np.log(aspect_table["p_fdr_bh"])
+		aspect_table.loc[:,"n_genes"] = aspect_table["study_count"]
+
+		#Sort by pvalue and ngenes
+		aspect_table = aspect_table.sort_values(["-log(FDR)", "n_genes"], ascending=False)
+		aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
+
+		#Setup plot
+		w, h = 6, (n_terms/20)*4.5 #size 6x4.5 for 20 terms
+		fig, ax = plt.subplots(figsize=(w,h))
+
+		#Plot enriched terms 
+		ax = sns.scatterplot(x="-log(FDR)", 
+									y="name",
+									size="n_genes",
+									#sizes=(20,500),
+									#alpha=0.5,
+									hue="-log(FDR)",
+									data=aspect_table, 
+									ax=ax
+									)
+		
+		#Plot adjustments
+		aspect_name = self.aspect_translation[aspect]
+		ax.set_ylabel(aspect_name)
+		ax.axvline(-np.log(threshold), color="red")
+		ax.legend(bbox_to_anchor=(1.01, 1), borderaxespad=0)
+		ax.grid()
+		ax.set_axisbelow(True) #puts the grid behind data points
+
+		#Set title for plot depending on input
+		if title is None:
+			ax.set_title("GO-terms for '{0}'".format(aspect_name)) #, pad=20, size=15)
+		else:
+			ax.set_title(title)
+
+		if save is not None:
+			plt.savefig(save, dpi=600)
+
+		return(ax)
+
 	
-	#Check if genes were in ns2assoc
+	def compare(self, compare_table):
+		"""
+		IN PROGRESS: Plot a comparison of two GO-term analysis
 
-
-
-
-	#Setup goeaobj
-	logger.info("Setting up GO enrichment")
-	goeaobj = GOEnrichmentStudyNS(
-				background_gene_ids_entrez, # List of protein-coding genes in entrezgene format
-				ns2assoc, # geneid/GO associations
-				obodag, # Ontologies
-				propagate_counts = True,
-				alpha = 0.05, # default significance cut-off
-				methods = ['fdr_bh'], # defult multipletest correction method
-				prt=None, 
-				log=None) 
+		Parameters
+		-------------
+		compare_table : GOAnalysis object
+		"""
+		pass
 	
-	##### Run study #####
-	logger.debug("Running .run_study():")
-	if verbosity <= 1:
-		goea_results_all = goeaobj.run_study(gene_ids_entrez, prt=None)
-	else:
-		goea_results_all = goeaobj.run_study(gene_ids_entrez)
-	
-	#Convert study items (entrez) to original ids
-	for res in goea_results_all:
-		res.study_items = [entrez2id[entrez] for entrez in res.study_items]
 
-	##### Format to dataframe #####
 
-	keys_to_use = ["GO", "name", "NS", "depth", "enrichment", "ratio_in_study", "ratio_in_pop", 
-				   "p_uncorrected", "p_fdr_bh", "study_count", "study_items"]
-	lines = [[_fmt_field(res.__dict__[key]) for key in keys_to_use] for res in goea_results_all]
-	table = pd.DataFrame(lines, columns=keys_to_use)
-
-	#Convert e (enriched)/p (purified) to increased/decreased
-	translation_dict = {"e": "increased", "p": "decreased"}
-	table.replace({"enrichment": translation_dict}, inplace=True)
-
-	logger.debug("Finished go_enrichment!")
-
-	return(table)
-
-def match_column(table, lst):
-	""" Returns the column name with the best match to the list of ids/values """
-
-	#Which column from gene_table has the best match?
-	match = []
-	for column in table.columns:
-		tup = (column, sum([value in table[column].tolist() for value in lst]))
-		match.append(tup)
-	
-	id_col = sorted(match, key=lambda t: -t[1])[0][0] #column with best matching IDs
-
-	return(id_col)
