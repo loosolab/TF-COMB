@@ -198,8 +198,7 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 					int max_distance=100,
 					float max_overlap=0, 
 					short anchor_mode=0, 
-					bint directional=False, 
-					int max_motif_size=40):
+					bint directional=False):
 
 	"""
 	Superfast counting of TF-TF co-occurrences within a given windowsize and with a maximum overlap fraction 
@@ -249,15 +248,14 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 	cdef int n_pairs = len(rules)
 
 	cdef int tf1, tf2
-	#Count all negative distances as "-1"
-	if min_distance == 0 and max_overlap > 0:
-		min_distance = -1
+	#Check if overlapping is allowed
+	if min_distance <= 0 and max_overlap == 0:
+		min_distance = 0 # if no overlapping allowed, min_dist cannot be below zero
 
 
 	#Create rule x distance range matrix || +3 for 2 tf names + 1-off 
 	cdef int offset = 3
 	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((n_pairs, offset + (max_distance-min_distance)), dtype=int)
-	cdef np.ndarray[np.int64_t, ndim=2] neg_count_mat = np.zeros((n_pairs, max_motif_size), dtype=int)
 	
 	# initialize tfnames
 	for tf1, tf2 in rules:
@@ -309,9 +307,6 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 
 					#Calculate distance between the two sites
 					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-					if distance < 0:
-						neg_distance = distance
-						distance = -1 #cap any negative distances to -1
 
 					if (TF1_chr == TF2_chr) and (distance <= max_distance): #check that sites are within window
 						if distance >= min_distance: #Check that sites are more than min distance away; else stay in finding_assoc
@@ -331,7 +326,6 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 
 							#Save counts of association
 							if valid_pair == 1:
-								
 								#dist_ind calculation remains the same regardless directionality
 								dist_ind = offset + distance - min_distance - 1 
 								
@@ -339,18 +333,12 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 								if (TF1_name, TF2_name) in rules:
 									pair_ind = rules[(TF1_name, TF2_name)] #index of pair in count mat
 									dist_count_mat[pair_ind, dist_ind] += 1
-									# count negative in own table
-									if distance == -1 :
-										neg_count_mat[pair_ind, (-neg_distance)-1] +=1
 								
 								#Also add counts to TF2-TF1 if not directional
 								if directional == False and TF1_name != TF2_name: #do not add extra counts for TF-self-pairs
 									if (TF2_name, TF1_name) in rules:
 										pair_ind = rules[(TF2_name, TF1_name)] #index of pair in count mat
 										dist_count_mat[pair_ind, dist_ind] += 1
-										# count negative in own table
-										if distance == -1 :
-											neg_count_mat[pair_ind, (-neg_distance)-1] +=1
 
 					elif (TF1_chr == TF2_chr) and (distance > max_distance): #This TF2 is on the same chromosome but more than max_distance away
 					
@@ -375,10 +363,4 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 						finding_assoc = False   #break out of finding_assoc-loop
 
 		## Done finding TF2's for current TF1; i has been incremented
-
-	# deal with negative counts
-	if min_distance == -1:
-		for i in range(n_pairs):
-			dist_count_mat[i,offset-1] = np.max(neg_count_mat[i])
-
 	return (dist_count_mat)
