@@ -222,7 +222,7 @@ def count_distances(np.ndarray[np.int_t, ndim=2] sites,
 		Whether to count TF1-TF2 exclusively, or count TF2-TF1 counts for the TF1-TF2 pair. Setting 'False' means TF1-TF2 counts == TF2-TF1 counts, and
 		'True' means distances are only counted in the TF1-TF2 direction. Default: False.
 	max_distance : int
-		Size of the largest TF. Needed to determine array length in advance. Default Value is unsparing.  Default: 50
+		Size of the largest TF. Needed to determine array length in advance. Default Value is unsparing.  Default: 100
 
 	Returns:
 	-----------
