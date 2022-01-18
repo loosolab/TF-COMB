@@ -1214,7 +1214,12 @@ def remove_val_from_dist(value, mu, std, n):
 	return((bg_mean, bg_std, bg_n))
 
 
-#--------------------------------- Working with TF-comb objects ---------------------------------#
+#--------------------------------- Working with TF-COMB objects ---------------------------------#
+
+def is_symmetric(matrix):
+	""" Check if a matrix is symmetric around the diagonal """
+	b = np.allclose(matrix, matrix.T, equal_nan=True)
+	return(b)
 
 def make_symmetric(matrix):
 	"""

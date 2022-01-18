@@ -754,6 +754,10 @@ class CombObj():
 		name_to_idx = {name: idx for idx, name in enumerate(TF_names)}
 		sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, name_to_idx[site.name]) for site in TFBS]) #numpy integer array
 
+		#Sort sites by mid if anchor is center:
+		if anchor == "center": 
+			sites = np.array(sorted(sites, key=lambda site: int((site[1] + site[2]) / 2)))
+
 		#---------- Count co-occurrences within TFBS ---------#
 		self.logger.info("Counting co-occurrences within sites")
 		n_TFs = len(TF_names)
@@ -820,6 +824,7 @@ class CombObj():
 
 		#Update object variables
 		self.rules = None 	#Remove .rules if market_basket() was previously run
+		self.n_TFBS = len(self.TFBS)	#number of TFBS counted
 		self.min_distance = min_distance
 		self.max_distance = max_distance
 		self.stranded = stranded
@@ -936,8 +941,7 @@ class CombObj():
 			tfcomb.utils.check_string(col, available)
 
 		##### Calculate market basket analysis #####
-		
-		n_baskets = len(self.TFBS) #number of baskets is the number of TFBS
+		n_baskets = self.n_TFBS #number of baskets is the number of TFBS
 
 		#Convert pair counts to table and convert to long format
 		pair_counts_table = pd.DataFrame(self.pair_counts, index=self.count_names, columns=self.count_names) #size n x n TFs
@@ -1508,6 +1512,24 @@ class CombObj():
 			for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 				self.plot_analyzed_signal((tf1, tf2), only_peaking=True, save=os.path.join(parent_directory, "peaks", f"{tf1}_{tf2}.png"))
 		
+
+	def analyze_orientation(self):
+		""" Analyze preferred orientation of sites in .TFBS. This is a wrapper for tfcomb.analysis.orientation().
+		
+		Returns: 
+		--------
+		pd.DataFrame
+		
+		See also:
+		----------
+		tfcomb.analysis.orientation
+		"""
+
+		self._check_rules() #market basket must be run.
+
+		table = tfcomb.analysis.orientation(self.rules) 
+
+		return(table)
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------------------ Network analysis -------------------------------------#
@@ -2331,7 +2353,8 @@ class DistObj():
 		self.max_overlap = comb_obj.max_overlap
 		self.stranded = comb_obj.stranded
 		self.TF_table = comb_obj.TF_table
-		#self.anchor = comb_obj.anchor
+
+		self.set_anchor(comb_obj.anchor) #sets anchor_mode integer from 0-2
 
 	def set_anchor(self, anchor):
 		""" set anchor for distance measure mode
