@@ -3407,7 +3407,7 @@ class DistObj():
 		method : str, optional
 			Plotting Method. One of ["hist", "corrected", "density", "linres", "signal", "smoothed"].
 			Default: signal
-		save: str
+		save: str, optional
 			Path to save the plots to. If save is None plots won't be plotted. 
 			Default: None
 		config : dict, optional
