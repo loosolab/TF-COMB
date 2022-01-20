@@ -9,37 +9,61 @@ from scipy.stats import chisquare
 import re
 import copy
 import multiprocessing as mp
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 #Internal functions
 from tfcomb.logging import TFcombLogger, InputError
-from tfcomb.utils import check_columns
-
-import seaborn as sns
+from tfcomb.utils import check_columns, check_type, is_symmetric
 
 #-------------------------------------------------------------------------------#
-#-------------------------- Directionality analysis ----------------------------#
+#---------------------------- Orientation analysis -----------------------------#
 #-------------------------------------------------------------------------------#
 
 def _get_scenario_keys(TF1, TF2, scenario):
-		
-	scenario_keys = {
-					 "scenario1": [(TF1, "+", TF2, "+"), 
-								   (TF2, "-", TF1, "-")],
-					 "scenario2": [(TF2, "+", TF1, "+"), 
-								   (TF1, "-", TF2, "-")],
-					 "scenario3": [(TF1, "+", TF2, "-"), 
-								   (TF2, "+", TF1, "-")],
-					 "scenario4": [(TF1, "-", TF2, "+"), 
-								   (TF2, "-", TF1, "+")]
-					}
+			
+		scenario_keys = {
+						"same" :   [(TF1, "+", TF2, "+"),
+									(TF2, "+", TF1, "+"),
+									(TF1, "-", TF2, "-"),
+									(TF2, "-", TF1, "-")],
+						"opposite": [(TF1, "+", TF2, "-"),
+									(TF1, "-", TF2, "+"),
+									(TF2, "+", TF1, "-"),
+									(TF2, "-", TF1, "+")],
+						"TF1-TF2": [(TF1, "+", TF2, "+"), 
+									(TF2, "-", TF1, "-")],
+						"TF2-TF1": [(TF2, "+", TF1, "+"), 
+									(TF1, "-", TF2, "-")],
+						"convergent": [(TF1, "+", TF2, "-"), 
+									   (TF2, "+", TF1, "-")],
+						"divergent": [(TF1, "-", TF2, "+"), 
+									  (TF2, "-", TF1, "+")]
+						}
 
-	return(scenario_keys[scenario])
+		return(scenario_keys[scenario])
 
-def directionality(rules):
+def get_unique_pairs(pairs):
+
+	#Remove TF2-TF1 duplicates
+	seen = {}
+	for pair in pairs:
+		if pair[::-1] not in seen: #the reverse TF2-TF1 pair has not been seen yet
+			seen[pair] = ""
+	unique = list(seen.keys())
+
+	return(unique)
+
+def orientation(rules, verbosity=1):
 	"""
-	Perform directionality analysis on the TF pairs in a directional / strand-specific table.
+	Perform orientation analysis on the TF pairs in a directional / strand-specific table. The analysis counts different scenarios depending on the input.
+	
+	If the input matrix is symmetric, the analysis contains two scenarios:
+	1. Same:      ⊢—(TF1+)⟶  ⊢—(TF2+)⟶  =  ⊢—(TF2+)⟶  ⊢—(TF1+)⟶  =  ⟵(TF1-)—⊣  ⟵(TF2-)—⊣  =  ⟵(TF2-)—⊣  ⟵(TF1-)—⊣
+	2. Opposite:  ⊢—(TF1+)⟶  ⟵(TF2-)—⊣  =  ⊢—(TF2+)⟶  ⟵(TF1-)—⊣  =  ⟵(TF1-)—⊣  ⊢—(TF2+)⟶  =  ⟵(TF2-)—⊣  ⊢—(TF1+)⟶
 
-	1. TF1-TF2:    |---TF1(+)--->   |---TF2(+)--->   =   <---TF2(-)---|   <---TF1(-)---| 
+	If the input is directional, the analysis contains four different scenarios:
+	1. TF1-TF2:    |-TF1(+)->   |---TF2(+)--->   =   <---TF2(-)---|   <---TF1(-)---| 
 	2. TF2-TF1:    |---TF2(+)--->   |---TF1(+)--->   =   <---TF1(-)---|   <---TF2(-)---|
 	3. convergent: |---TF1(+)--->   <---TF2(-)---|   =   |---TF2(+)--->   <---TF1(-)---| 
 	4. divergent:  <---TF1(-)---|   |---TF2(+)--->   =   <---TF2(-)---|   |---TF1(+)--->
@@ -48,29 +72,35 @@ def directionality(rules):
 	----------
 	rules : pd.DataFrame
 		The .rules output of a CombObj analysis.
+	verbosity : int
+		A value between 0-3 where 0 (only errors), 1 (info), 2 (debug), 3 (spam debug). Default: 1.
 
 	Returns
 	--------
-	pd.DataFrame
-		Percentages of pairs related to each scenario
+	An OrientationAnalysis object (subclass of pd.DataFrame). The table contains frequencies of pairs related to each scenario.
 
-		The dataframe has the following columns:
-			- TF1: name of the first TF in pair
-			- TF2: name of the second TF in pair
-			- TF1_TF2_count: 
-			- scenario1_TF1_TF2
-			- scenario2_TF2_TF1
-			- scenario3_convergent
-			- scenario4_divergent
-			- pvalue
+	The dataframe has the following columns:
+		- TF1: name of the first TF in pair
+		- TF2: name of the second TF in pair
+		- TF1_TF2_count: The total count of TF1-TF2 co-occurring pairs
+		- If symmetric:
+			- Same
+			- Opposite
+		- If directional:
+			- TF1_TF2
+			- TF2_TF1
+			- convergent
+			- divergent
+		- std: Standard deviation of scenario frequencies
+		- pvalue: A chi-square test to test the hypothesis that the scenarios are equally distributed
 
 	"""
-	
-	#TODO: Test input format
-	tfcomb.utils.check_type(rules, pd.DataFrame, "rules")
+	logger = TFcombLogger(verbosity)
 
+	#Check that input is dataframe
+	check_type(rules, pd.DataFrame, "rules")
 	rules = rules.copy() #ensures that rules-table is not changed
-	
+		
 	#Split TF names from strands
 	try:
 		rules[["TF1_name", "TF1_strand"]] = rules["TF1"].str.split("(", expand=True)
@@ -80,7 +110,24 @@ def directionality(rules):
 
 	rules[["TF2_name", "TF2_strand"]] = rules["TF2"].str.split("(", expand=True)
 	rules["TF2_strand"] = rules["TF2_strand"].str.replace(")", "", regex=False)
-	
+
+	#Establish if rules are directional
+	rules_pivot = rules.pivot(index='TF1', columns='TF2', values='TF1_TF2_count')
+	symmetric_bool = is_symmetric(rules_pivot)
+	if symmetric_bool == True: 
+		scenarios = ["same", "opposite"] #2 scenarios
+		logger.info("Rules are symmetric - scenarios counted are: {0}".format(scenarios))
+
+		#Remove duplicated pairs from analysis (TF1-TF2 = TF2-TF1)
+		rules.set_index(["TF1", "TF2"], inplace=True)
+		pairs = rules.index.tolist()
+		unique = get_unique_pairs(pairs)
+		rules = rules.loc[unique,:]
+
+	else:
+		scenarios = ["TF1-TF2", "TF2-TF1", "convergent", "divergent"] #4 scenarios
+		logger.info("Rules are directional - scenarios counted are: {0}".format(scenarios))
+
 	#Setup count dictionary
 	keys = [tuple(x) for x in rules[["TF1_name", "TF1_strand", "TF2_name", "TF2_strand"]].values]
 	counts = rules["TF1_TF2_count"].tolist()
@@ -88,79 +135,105 @@ def directionality(rules):
 	
 	#Get all possible TF1-TF2 pairs
 	pairs = list(zip(rules["TF1_name"], rules["TF2_name"]))
-	pairs = list(set(pairs))
+	pairs = sorted(list(set(pairs)))
+	pairs = get_unique_pairs(pairs)
 
-	#Remove TF2-TF1 duplicates
-	seen = {}
-	for pair in pairs:
-		if pair[::-1] not in seen: #the reverse TF2-TF1 pair has not been seen yet
-			seen[pair] = ""
-	pairs = list(seen.keys())
-
-	scenarios = ["scenario" + str(i) for i in range(1,5)]
-	lines = []
+	#Get counts per scenario
+	counts = {}
 	for (TF1, TF2) in pairs:
 		
-		counts = []
+		counts[(TF1, TF2)] = {} #initialize counts per pair
+
 		for scenario in scenarios:
 			keys = _get_scenario_keys(TF1, TF2, scenario)
+			keys = set(keys) #remove duplicate keys in case of TF1==TF2
 			count = np.sum([count_dict.get(key, 0) for key in keys]) #sum of counts
-			counts.append(count)
-		
-		#Normalize to sum of 1
-		total_counts = np.sum(counts)
 
-		## Collect results in table
-		line = [TF1, TF2, total_counts] + counts
-		lines.append(line)       
+			counts[(TF1, TF2)][scenario] = count
 
-	columns = ["TF1", "TF2", "TF1_TF2_count"] + scenarios
-	frame = pd.DataFrame(lines, columns=columns)
-	
-	#Calculate chisquare
-	unique = frame[scenarios].drop_duplicates()
+	#Create dataframe
+	frame = pd.DataFrame().from_dict(counts, orient="index")
+	frame.index.names = ["TF1", "TF2"]
+	frame.reset_index(inplace=True)
+	frame = frame[frame[scenarios].sum(axis=1) > 0] #remove any scenarios with sum of 0
+
+	#Calculate chisquare p-value (are the scenarios normally distributed?)
+	unique = frame[scenarios].drop_duplicates() #only calculate chi-square once per seen count combination - speeds up calculation
 	mat = unique.to_numpy()
 	rows, cols = mat.shape
 	pvalues = [0]*rows
 	for row in range(rows):
-		n = mat[row,:]
+		n = mat[row,:] #counts per scenario
 		s, p = chisquare(n)
 		pvalues[row] = p
 	unique["pvalue"] = pvalues
-	
+		
 	#Merge unique to frame
 	frame = frame.merge(unique, left_on=scenarios, right_on=scenarios, how="left")
+	frame.index = zip(frame["TF1"], frame["TF2"])
 
 	#Normalize counts to sum of 1
-	n = frame["TF1_TF2_count"].tolist()
+	frame["TF1_TF2_count"] = frame[scenarios].sum(axis=1)
 	for scenario in scenarios:
 		frame[scenario] = frame[scenario] / frame["TF1_TF2_count"]
 		frame[scenario] = frame[scenario].replace(np.inf, 0)
 
 	#Calculate standard deviation
 	frame["std"] = frame[scenarios].std(axis=1)
-	frame = frame[columns + ["std", "pvalue"]] #reorder columns
 
-	#Sort by pvalue and number of co-occurrences found
-	frame["s"] = -frame["TF1_TF2_count"]
-	frame.sort_values(["pvalue", "s"], inplace=True)
-	frame.drop(columns=["s"], inplace=True)
-
-	#Rename scenarios
-	frame.rename(columns={"scenario1": "scenario1_TF1-TF2",
-				  "scenario2": "scenario2_TF2-TF1",
-				  "scenario3": "scenario3_convergent",
-				  "scenario4": "scenario4_divergent"}, inplace=True) 
-
-	#Merge counts for same-TF pairs
-	
+	#Sort by pvalue/count and reorder colums in frame
+	frame.sort_values(["pvalue", "TF1_TF2_count"], ascending=[True, False], inplace=True)
+	frame = frame[["TF1", "TF2", "TF1_TF2_count"] + scenarios + ["std", "pvalue"]]
+	frame = OrientationAnalysis(frame)
 
 	return(frame)
 
-def plot_directionality(table):
-	""" Plot directionality heatmap for the output of 'directionality' """
 
-	scenario_columns = ["scenario1_TF1-TF2", "scenario2_TF2-TF1", "scenario3_convergent", "scenario4_divergent"]
+class OrientationAnalysis(pd.DataFrame):
+	""" Analysis of the orientation of TF co-ocurring pairs """
+	
+	@property
+	def _constructor(self):
+		return OrientationAnalysis
 
-	h = sns.clustermap(table[scenario_columns])
+	def plot_heatmap(self, yticklabels=False, figsize=(6,6), save=None, **kwargs):
+		""" Plot a heatmap of orientation scenarios for the output of the orientation analysis.
+		
+		Parameters
+		-----------
+		yticklabels : bool, optional
+			Show yticklabels (TF-pairs) in plot. Default: False.
+		figsize : tuple
+			The size of the output heatmap. Default: (6,6)
+		save : str, optional
+			Save the plot to the file given in 'save'. Default: None.		 
+		kwargs : arguments
+			Any additional arguments are passed to sns.clustermap.
 
+		Returns
+		--------
+		seaborn.matrix.ClusterGrid
+		"""
+
+		scenarios = [col for col in self.columns if col not in ["TF1", "TF2", "TF1_TF2_count", "std", "pvalue"]]
+
+		g = sns.clustermap(self[scenarios],
+							col_cluster=False,
+							yticklabels=yticklabels,
+							cbar_kws={'label': "Fraction"},
+							figsize=figsize, 
+							**kwargs)
+
+		g.ax_heatmap.set_ylabel('TF-TF pairs')
+
+		if save is not None:
+			plt.savefig(save, dpi=600)
+
+		return(g)
+
+
+def grammar(pairs):
+	""" Uncover correlations between distances and orientation """
+
+
+	pass
