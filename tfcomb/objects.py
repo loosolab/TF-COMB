@@ -991,15 +991,6 @@ class CombObj():
 		ztable_table_long = pd.melt(zscore_table, id_vars=["TF1"], var_name=["TF2"], value_name="zscore")  #long format (TF1, TF2, value)
 		table = table.merge(ztable_table_long)
 
-		#Calculate p-values for the measure(s) given
-		#self.logger.debug("Calculating p-value for {0} rules".format(len(table)))
-		#if threads == 1:
-		#	self.logger.info("Parameter 'threads' is set to '1' - to speed up p-value calculation, please increase the number of threads used.")
-		
-		#for metric in measure:
-		#	self.logger.debug("Calculating p-value for {0}".format(metric))
-		#	tfcomb.utils.tfcomb_pvalue(table, measure=metric, threads=threads, logger=self.logger) #adds pvalue column to table
-
 		#Create internal node table for future network analysis
 		TF1_table = table[["TF1", "TF1_count"]].set_index("TF1", drop=False).drop_duplicates()
 		TF2_table = table[["TF2", "TF2_count"]].set_index("TF2", drop=False).drop_duplicates()
@@ -1205,11 +1196,11 @@ class CombObj():
 		y : str, optional
 			The name of the column within .rules containing the pvalue to be selected on. Default: 'zscore'
 		x_threshold : float, optional
-			A minimum threshold for the measure to be selected. If None, the threshold will be estimated from the data. Default: None.
+			A minimum threshold for the x-axis measure to be selected. If None, the threshold will be estimated from the data. Default: None.
 		x_threshold_percent : float between 0-1, optional
 			If x_threshold is not given, x_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
 		y_threshold : float, optional
-			A p-value threshold for selecting rules. If None, the threshold will be estimated from the data. Default: None.
+			A minimum threshold for the y-axis measure to be selected. If None, the threshold will be estimated from the data. Default: None.
 		y_threshold_percent : float between 0-1, optional
 			If y_threshold is not given, y_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
 		plot : bool, optional
@@ -1672,7 +1663,7 @@ class CombObj():
 		if normalize == True:
 			diff.normalize()
 
-		diff.calculate_foldchanges() #also calculates p-values and writes info
+		diff.calculate_foldchanges()
 
 		return(diff)
 
@@ -1864,16 +1855,14 @@ class DiffCombObj():
 		self.rules.fillna(0, inplace=True)
 		self.rules[nan_bool] = np.nan
 
-	def calculate_foldchanges(self, pseudo=None, threads=1):
-		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
+	def calculate_foldchanges(self, pseudo=None):
+		""" Calculate measure foldchanges  between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
 		----------
 		pseudo : float, optional
 			Set the pseudocount to add to all values before log2-foldchange transformation. Default: None (pseudocount will be estimated per contrast).
-		threads : int, optional
-			The number of threads to use for calculating foldchanges and p-values
-
+	
 		See also
 		--------
 		tfcomb.DiffCombObj.normalize
@@ -1902,10 +1891,6 @@ class DiffCombObj():
 				self.logger.debug("Pseudocount: {0}".format(pseudo))
 
 			self.rules[log2_col] = np.log2((p1_values + pseudo) / (p2_values + pseudo))
-
-			#Calculate p-value of each pair
-			self.logger.debug("Calculating p-value")
-			tfcomb.utils.tfcomb_pvalue(self.rules, measure=log2_col, alternative="two-sided", threads=threads)
 
 		#Sort by first contrast log2fc
 		self.logger.debug("columns: {0}".format(columns))
