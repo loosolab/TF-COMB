@@ -1475,7 +1475,6 @@ class CombObj():
 	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None, threads=4, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
-
 		"""
 		self.create_distObj()
 		self.distObj.set_verbosity(self.verbosity)
@@ -2486,6 +2485,8 @@ class DistObj():
 	#------------------------------- Standard analysis pipeline --------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
+	#def analyze()?
+
 	def _multiprocess_chunks(self, threads, func, datatable):
 		"""
 		Split Data in chunks to multiprocess it. Because of the rather short but numerous calls mp.Pool() creates to much overhead. 
@@ -2537,9 +2538,11 @@ class DistObj():
 		n_names = len(names)
 		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
 
+		
+		# start one chunk per thread
 		jobs = []
-		# start one chunk per thread 
 		for i in range(threads):
+
 			# get name subset for chunk
 			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
 			# subset distance information for names in this chunk
@@ -2672,7 +2675,7 @@ class DistObj():
 		self.logger.info("Done finding distances! Results are found in .distances")
 		self.logger.info("Run .linregress_all() to fit linear regression")
 	
-	def _raw_to_human_readable(self): #, normalize=True):
+	def _raw_to_human_readable(self):
 		""" Get the raw distance in human readable format. Sets the variable '.distances' which is a pd.Dataframe with the columns:
 			TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist).
 
@@ -2742,26 +2745,27 @@ class DistObj():
 		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
 		self.check_min_max_dist()
 		#self.check_corrected()
-		"""
-		if self.shift is not None:
-			self.logger.info("Signal is already shifted! smoothing it again may cause false result. Skipping smoothing.")
-			return
-		"""
-
+	
 		self.smooth_window = window_size
 		self.logger.info(f"Smoothing signals with window size {window_size}")
+
+		distances = self.distances.columns[2:].tolist() #distances counted 
+		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[distances])), window_size), axis=1, result_type="expand")
+
+		#Change columns to windows
+		distances = self.distances.columns[2:].tolist() #distances counted 
+		dist_min = min(distances)
+		dist_max = max(distances)
+		lf = int(np.ceil( (4-1) / 2.0))
+		rf = int(np.floor( (4-1) / 2.0))
+		windows = [(max(dist-lf, dist_min), min(dist+rf, dist_max)) for dist in distances] #get tuples of (from,to) for windows
+		windows_str = ["{0}-{1}".format(d1, d2) for (d1, d2) in windows]
 		
-		static_cols = ["TF1","TF2"]
-		pos_cols = list(self.corrected.columns[2:])
-		if self._collapsed is not None:
-			pos_cols.remove("neg")
-			static_cols.append("neg")
-
-		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[pos_cols])), window_size), axis=1, result_type="expand")
-		smoothed = smoothed.fillna(0) 
-		smoothed.columns = pos_cols
-		self.smoothed = pd.concat((self.corrected[static_cols], smoothed), axis=1)
-
+		#Save to .smoothed
+		smoothed[["TF1", "TF2"]] = self.corrected[["TF1", "TF2"]]
+		smoothed.columns = ["TF1", "TF2"] + windows_str
+		self.smoothed = smoothed
+		self.datasource = self.smoothed
 
 	def is_smoothed(self):
 		""" Return True if data was smoothed during analysis, False otherwise
@@ -2777,18 +2781,17 @@ class DistObj():
 		return True
 
 	#Correct background signal from distance counts
-	def correct_background():
-
+	def correct_background(threads=1):
+		""" """
 
 		#Linregress
-		self.linregress_all()
+		self.linregress_all(threads=threads)
 
 		#Correct signals
-		self.correct_all()
+		self.correct_all(threads=threads)
 
 
-
-	def linregress_all(self, threads=1, n_bins=None, save=None):
+	def linregress_all(self, threads=1):
 		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
 			estimate the background. Proceed with .correct_all()
 			
@@ -2796,9 +2799,6 @@ class DistObj():
 			----------
 			threads : int
 				Number of threads used for fitting linear regression
-			n_bins : int 
-				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
-				Default: None
 			save : str 
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
@@ -2811,31 +2811,25 @@ class DistObj():
 
 		# check input param
 		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_dir(save)
 		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 
 		# sanity checks
 		self.check_distances()
-		self.check_min_max_dist()
+		#self.check_min_max_dist()
 
 		self.logger.info(f"Fitting linear regression. With number of threads: {threads}")
 
 		# hand it over to multiprocess chunks 
-		results = self._multiprocess_chunks(threads, tfcomb.utils.linress_chunks, self.distances)
+		results = self._multiprocess_chunks(threads, tfcomb.utils.linress_chunks, self.datasource)
 
-		# save results
+		# save results to .inres
 		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
 		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
-
-		if save is not None:
-			self.logger.info("Plotting all linear regressions. This may take a while")
-			self._plot_all(save, "linres")
 
 		self.logger.info("Linear regression finished! Results can be found in .linres")
 
 
-	def correct_all(self, threads=1, n_bins=None, save=None):
+	def correct_all(self, threads=1):
 		""" Subtracts the estimated background from the Signal for all rules. 
 			
 			Parameters
@@ -2856,9 +2850,6 @@ class DistObj():
 		"""
 		
 		# check input param
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_dir(save)
 		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 		
 		# sanity checks
@@ -2874,10 +2865,9 @@ class DistObj():
 		columns = self.distances.columns.tolist()
 		self.corrected = pd.DataFrame(result, columns=columns).reset_index(drop=True)
 		self.corrected.index = self.corrected["TF1"] + "-" + self.corrected["TF2"]
-		
-		if save is not None:
-			self.logger.info("Plotting all corrected signals. This may take a while")
-			self._plot_all(save, "corrected")
+
+		#Update datasource
+		self.datasource = self.corrected
 
 		self.logger.info("Background correction finished! Results can be found in .corrected")
 
@@ -3058,46 +3048,6 @@ class DistObj():
 
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
-	def analyze_hubs(self):
-		""" 
-		Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
-
-		Returns
-		--------
-		pd.Series 
-			A panda series with the tf as index and the count as integer
-		"""
-		
-		self.check_peaks()
-
-		occurrences= collections.Counter([x for (x,z) in set(self.peaks.set_index(["TF1","TF2"]).index)])
-		
-		return pd.Series(occurrences)		
-
-	def classify_rules(self):
-		""" 
-		Classify all rules True if at least one peak was found, False otherwise.  
-
-		Returns
-		--------
-		None 
-			adds a column to either .smoothed or .corrected
-		"""
-
-		self.check_peaks()
-
-		self.logger.info("classifying rules")
-
-		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
-		
-		datasource = self._get_datasource()
-
-		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
-
-		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		self._set_datasource(datasource)
-
-		self.logger.info(f"classifcation done")
 
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" 
@@ -3193,6 +3143,47 @@ class DistObj():
 	#-------------------------------------------------------------------------------------------#
 	#------------------- Additional functionality/analysis for distances -----------------------#
 	#-------------------------------------------------------------------------------------------#
+
+	def analyze_hubs(self):
+		""" 
+		Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
+
+		Returns
+		--------
+		pd.Series 
+			A panda series with the tf as index and the count as integer
+		"""
+		
+		self.check_peaks()
+
+		occurrences= collections.Counter([x for (x,z) in set(self.peaks.set_index(["TF1","TF2"]).index)])
+		
+		return pd.Series(occurrences)		
+
+	def classify_rules(self):
+		""" 
+		Classify all rules True if at least one peak was found, False otherwise.  
+
+		Returns
+		--------
+		None 
+			adds a column to either .smoothed or .corrected
+		"""
+
+		self.check_peaks()
+
+		self.logger.info("classifying rules")
+
+		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
+		
+		datasource = self._get_datasource()
+
+		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
+
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+		self._set_datasource(datasource)
+
+		self.logger.info(f"classifcation done")
 
 	def _mean_distance_pair(self, pair):
 		""" Calculate the mean distance for the given pair.
