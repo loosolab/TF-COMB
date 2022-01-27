@@ -2268,7 +2268,7 @@ class DistObj():
 		
 		self.n_bp = 0			     # Predicted number of baskets 
 		self.TFBS = RegionList()     # None RegionList() of TFBS
-		self.smooth_window = 3       # Smoothing window size, 1 = no smoothing
+		self.smooth_window = 1       # Smoothing window size, 1 = no smoothing
 		self.anchor_mode = 0         # Distance measure mode [0,1,2]
 
 		# str <-> int encoding dicts
@@ -2733,37 +2733,27 @@ class DistObj():
 		Parameters
 		----------
 		window_size : int 
-			window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-			(see tobias.utils.signals.fast_rolling_math). Default: 3.
+			Window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
+			To avoid flanking NaN regions the signal is expanded with the first/last value (see tobias.utils.signals.fast_rolling_math). Default: 3.
 
 		Returns
 		--------
 		None 
-			Fills the object variable .smoothed
+			Fills the object variable .smoothed and updates .datasource
 		"""
 		
 		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
-		self.check_min_max_dist()
-		#self.check_corrected()
 	
-		self.smooth_window = window_size
+		if self.is_smoothed() == True:
+			self.logger.warning("Data was already smoothed - beware that smoothing again might produce unwanted results. Please use .reset_signal() to reset the signal.")
+
 		self.logger.info(f"Smoothing signals with window size {window_size}")
+		distances = self.datasource.columns[2:].tolist() #distances counted
+		smoothed = self.datasource[["TF1", "TF2"]]
+		smoothed[distances] = self.datasource.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[distances])), window_size), axis=1, result_type="expand")
 
-		distances = self.distances.columns[2:].tolist() #distances counted 
-		smoothed = self.corrected.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[distances])), window_size), axis=1, result_type="expand")
-
-		#Change columns to windows
-		distances = self.distances.columns[2:].tolist() #distances counted 
-		dist_min = min(distances)
-		dist_max = max(distances)
-		lf = int(np.ceil( (4-1) / 2.0))
-		rf = int(np.floor( (4-1) / 2.0))
-		windows = [(max(dist-lf, dist_min), min(dist+rf, dist_max)) for dist in distances] #get tuples of (from,to) for windows
-		windows_str = ["{0}-{1}".format(d1, d2) for (d1, d2) in windows]
-		
-		#Save to .smoothed
-		smoothed[["TF1", "TF2"]] = self.corrected[["TF1", "TF2"]]
-		smoothed.columns = ["TF1", "TF2"] + windows_str
+		#Save information about smoothing to object
+		self.smooth_window = window_size
 		self.smoothed = smoothed
 		self.datasource = self.smoothed
 
@@ -2954,15 +2944,10 @@ class DistObj():
 		else:
 			tfcomb.utils.check_value(prominence)
 
-		# sanity checks 	
-		self.check_corrected()
+		# sanity checks
+		self.check_distances()
 		self.check_min_max_dist()
 	
-		#Smooth signals with window
-		if smooth_window > 1:
-			self.smooth(smooth_window)
-		self.smooth_window = smooth_window
-		
 		#Shift signal above 0
 		self.shift_signal()
 
