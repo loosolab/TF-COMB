@@ -48,6 +48,8 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 
 	fig, ax = plt.subplots(figsize=figsize) 
 	ax.grid()
+	ax.set_axisbelow(True) #puts the grid behind data points
+
 	with sns.axes_style("whitegrid"):
 		
 		ax = sns.scatterplot(
@@ -152,7 +154,9 @@ def scatter(table, x, y,
 				   y_threshold=None, 
 				   label=None, 
 				   label_fontsize=9, 
-				   save=None):
+				   label_color="black",
+				   save=None, 
+				   **kwargs):
 	"""
 	Plot scatter-plot of x/y values within table. Can also set thresholds and label values within plot.
 
@@ -169,7 +173,12 @@ def scatter(table, x, y,
 	y_threshold : float, tuple of floats or None, optional
 		Gives the option to visualize an y-axis threshold within plot. If None, no measure threshold is set. Default: None.
 	label : str or list, optional
-		If None, no point labels are plotted. If "selection", the . Default: None.
+		If None, no point labels are plotted. If "all", all labels in graph are plotted. If "selection", the . Default: None.
+	label_fontsize :
+	label_color : 
+	kwargs : arguments
+		Any additional arguments are passed to sns.jointplot.
+
 	"""
 
 	check_columns(table, [x, y])
@@ -186,10 +195,10 @@ def scatter(table, x, y,
 			check_value(threshold, name="y_threshold")
 
 	#Plot all data
-	x_finite = table[x][~np.isinf(table[x])]
-	y_finite = table[y][~np.isinf(table[y])]
+	x_finite = table[x][~np.isinf(table[x].astype(float))]
+	y_finite = table[y][~np.isinf(table[y].astype(float))]
 
-	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2, **kwargs) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if x_threshold is not None:
@@ -227,15 +236,30 @@ def scatter(table, x, y,
 
 	#Label given indices
 	if label is not None:
+		print("Adding labels")
 		if isinstance(label, list):
 
 			#Check if labels are within table index
-			
-			pass
+			selection = table.loc[label, :]
 
+			txts = _add_labels(selection, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
 
 		elif label == "selection":
-			_add_labels(selection, x, y, "index", g.ax_joint, color="red", label_fontsize=label_fontsize)
+			txts = _add_labels(selection, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
+
+		elif label == "all":
+			txts = _add_labels(table, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
+
+		#Adjust positions of labels
+		#print(txts)
+		adjust_text(txts, x=table[x].tolist(), 
+						y=table[y].tolist(), 
+						ax=g.ax_joint,
+						#add_objects=[], 
+						text_from_points=True, 
+						arrowprops=dict(arrowstyle='-', color='black', lw=0.5),
+						expand_points=(2,2)
+						)
 
 	#Save plot to file
 	if save is not None:
@@ -244,7 +268,7 @@ def scatter(table, x, y,
 	return(g)
 
 #Add labels to ax
-def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
+def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9):
 	""" Utility to add labels to coordinates 
 
 	Parameters
@@ -255,89 +279,35 @@ def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
 		The name of a column in table containing x coordinates.
 	y : str
 		The name of a column in table containing y cooordinates.
-	label : str
-		Name of column or "index" containing labels to plot.
 	ax : plt axes
-
+		The axis for which to add texts
+	color : str
+		Color of label. Default: "black".
+	label_col : str
+		Name of column containing labels to plot. Default: None (labels are taken from table index).
+	label_fontsize : int
+		Fontsize of labels. Default: 9.
 
 	Returns 
 	--------
-	None 
-		The labels are added to ax in place
+	A list of the text objects which were added to ax.
+
 	"""
 
+	#Collect text label objects
 	txts = []
-	for l in label:
-		coord = [table.loc[l,measure_col], table.loc[l,log_col]]
+	for idx, row in table.iterrows():
+		coord = [row[x], row[y]]
 		
-		ax = g.ax_joint
-		ax.scatter(coord[0], coord[1], color="red")
-	
-		txts.append(ax.text(coord[0], coord[1], l, fontsize=label_fontsize))
-	
-	#Adjust overlapping labels
-	adjust_text(txts, ax=ax, add_objects=[], text_from_points=True, arrowprops=dict(arrowstyle='-', color='black', lw=0.5))  #, expand_text=(0.1,1.2), expand_objects=(0.1,0.1))
+		if label_col is not None:
+			l = row[label_col]
+		else:
+			l = idx
 
+		txts.append(ax.text(coord[0], coord[1], l, color=color, fontsize=label_fontsize))
 
+	return(txts)
 
-
-def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
-	"""
-	Plot a bubble-style plot of GO-enrichment results.
-
-	Parameters
-	--------------
-	table : pandas.DataFrame 
-		The output of tfcomb.analysis.go_enrichment.
-	aspect : str
-		One of ["MF", "BP", "CC"]
-	n_terms : int
-		Maximum number of terms to show in graph. Default: 20
-	threshold : float between 0-1
-		The p-value-threshold to show in plot.
-	save : str, optional
-		Save the plot to the file given in 'save'. Default: None.
-	
-	Returns
-	----------
-	ax
-
-	"""
-	
-	check_string(aspect, ["BP", "CC", "MF"], "aspect")
-	#aspect has to be one of {'BP', 'CC', 'MF'}
-	
-	#Choose aspect
-	aspect_table = table[table["NS"] == aspect]
-	aspect_table.loc[:,"-log(p-value)"] = -np.log(aspect_table["p_fdr_bh"])
-	aspect_table.loc[:,"n_genes"] = aspect_table["study_count"]
-
-	#Sort by pvalue and ngenes
-	aspect_table = aspect_table.sort_values(["-log(p-value)", "p_uncorrected"], ascending=False)
-	aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
-
-	#Plot enriched terms 
-	#todo: size of plot depending on number of terms to show
-	ax = sns.scatterplot(x="-log(p-value)", 
-								y="name",
-								size="n_genes",
-								#sizes=(20,500),
-								#alpha=0.5,
-								hue="-log(p-value)",
-								data=aspect_table, 
-								#ax=this_ax
-								)
-
-	ax.set_title(aspect) #, pad=20, size=15)		
-	ax.axvline(-np.log(threshold), color="red")
-	ax.set_ylabel(aspect)
-	ax.legend(bbox_to_anchor=(1.01, 1), borderaxespad=0)
-	ax.grid()
-
-	if save is not None:
-		plt.savefig(save, dpi=600)
-
-	return(ax)
 
 def _truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 	""" 
