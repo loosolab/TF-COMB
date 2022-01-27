@@ -2377,8 +2377,7 @@ class DistObj():
 		Returns
 		--------
 		None 
-			Resets the object datasource variable to the original distances
-
+			Resets the object datasource variable to the original raw distances
 		"""
 
 		self.logger.info("Resetting signals")
@@ -2482,10 +2481,8 @@ class DistObj():
 
 
 	#-------------------------------------------------------------------------------------------#
-	#------------------------------- Standard analysis pipeline --------------------------------#
+	#------------------------ Running different functions in chunks ----------------------------#
 	#-------------------------------------------------------------------------------------------#
-
-	#def analyze()?
 
 	def _multiprocess_chunks(self, threads, func, datatable):
 		"""
@@ -2683,8 +2680,6 @@ class DistObj():
 			Normalization method is min_max normalization: (x[i] - min(x))/(max(x)-min(x))
 		"""
 
-		#tfcomb.utils.check_type(normalize, bool)
-		
 		#Converting to pandas format 
 		self.logger.debug("Converting raw count data to pretty dataframe")
 
@@ -2753,8 +2748,14 @@ class DistObj():
 		return True
 
 	#Correct background signal from distance counts
-	def correct_background(threads=1):
-		""" """
+	def correct_background(self, threads=1):
+		""" Corrects the background of distances. This is a wrapper to run .linregress_all() and .correct_all().
+		
+		Parameters
+		-------------
+		threads : int, optional
+			Number of threads to use in functions. Default: 1.
+		"""
 
 		#Linregress
 		self.linregress_all(threads=threads)
@@ -2787,14 +2788,13 @@ class DistObj():
 
 		# sanity checks
 		self.check_distances()
-		#self.check_min_max_dist()
 
 		self.logger.info(f"Fitting linear regression. With number of threads: {threads}")
 
 		# hand it over to multiprocess chunks 
 		results = self._multiprocess_chunks(threads, tfcomb.utils.linress_chunks, self.datasource)
 
-		# save results to .inres
+		# save results to .linres
 		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
 		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
 
@@ -2887,9 +2887,6 @@ class DistObj():
 		threads : int
 			Number of threads used
 			Default: 1
-		smooth_window : int 
-			window size for the rolling smoothing window. To avoid flanking NaN regions the signal is expanded with the first/last value
-			Default: 3
 		prominence : number or ndarray or sequence or ["median", "zscore"]
 			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
 			If "median", the median for the pairs is used
@@ -2915,9 +2912,7 @@ class DistObj():
 		tfcomb.utils.fast_rolling_mean
 		"""
 
-		# Check given input
-		tfcomb.utils.check_value(smooth_window, vmin=1, integer=True, name="smooth_window")
-		
+		# Check given input	
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 
@@ -2960,7 +2955,7 @@ class DistObj():
 			means = datasource[distance_cols].mean(axis=1)
 			
 			# Calculate zscore (x-mean)/std
-			zsc = datasource[distance_cols].subtract(means, axis =0).divide(stds, axis =0).fillna(0) 
+			zsc = datasource[distance_cols].subtract(means, axis=0).divide(stds, axis=0).fillna(0) 
 
 			textcols = datasource[['TF1', 'TF2']]
 			zsc = pd.concat((textcols,zsc), axis=1)
@@ -3449,6 +3444,7 @@ class DistObj():
 		if "neg" in source_table.columns:
 			collapsed = True
 
+		#Establish y-values
 		# get y_data
 		y_data = source_table.loc[ind].iloc[2:]
 		if ((method == "signal") or (method == "smoothed")) and zsc:
@@ -3478,6 +3474,10 @@ class DistObj():
 
 		# standard ylbl, replace with specific option if needed
 		ylbl = "Count per Distance"
+
+		#---------------- Start plotting -------------#
+		# start subplot
+		fig, ax = plt.subplots(1, 1)
 
 		# plot according to method
 		if method == "density":
