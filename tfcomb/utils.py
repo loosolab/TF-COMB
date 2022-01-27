@@ -1399,11 +1399,11 @@ def fast_rolling_mean(arr, w):
 	#Expand the array with the first value to the left 
 	arr = np.concatenate((np.repeat(arr[0], lf), arr))
 	#Expand the array with the last value to the right 
-	arr = np.concatenate((arr, np.repeat(arr[0], rf)))
+	arr = np.concatenate((arr, np.repeat(arr[-1], rf)))
 
 	# use fast_rolling_math from tobias.utils.signals
 	roll_arr = fast_rolling_math(arr.astype(float), w, "mean")
-	
+
 
 	#remove nan's ( artifical new flanks)
 	roll_arr = roll_arr[~np.isnan(roll_arr)]
