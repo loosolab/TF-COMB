@@ -105,7 +105,7 @@ def orientation(rules, verbosity=1):
 	try:
 		rules[["TF1_name", "TF1_strand"]] = rules["TF1"].str.split("(", expand=True)
 	except Exception as e:
-		raise InputError("Failed to split TF name from strand. Please ensure that .count_within() was run with '--directionality=True' and '--stranded=True'. Exception was: {0}".format(e.message))
+		raise InputError("Failed to split TF name from strand. Please ensure that .count_within() was run with '--stranded=True' and/or '--directional=True'.")
 	rules["TF1_strand"] = rules["TF1_strand"].str.replace(")", "", regex=False)
 
 	rules[["TF2_name", "TF2_strand"]] = rules["TF2"].str.split("(", expand=True)

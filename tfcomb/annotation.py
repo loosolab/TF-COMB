@@ -286,9 +286,9 @@ def get_annotated_genes(regions, attribute="gene_name"):
 
 class GOAnalysis(pd.DataFrame):
 
-	aspect_translation = {"BP": "Biological process",
-						  "MF": "Molecular function",
-						  "CC": "Cellular component"}
+	aspect_translation = {"BP": "Biological Process",
+						  "MF": "Molecular Function",
+						  "CC": "Cellular Component"}
 	@property
 	def _constructor(self):
 		return GOAnalysis
@@ -326,6 +326,7 @@ class GOAnalysis(pd.DataFrame):
 						organism="hsapiens", 
 						background=None, 
 						propagate_counts=True,
+						min_depth=1, 
 						verbosity=1):
 		"""
 		Perform a GO-term enrichment based on a list of genes. This is a TF-COMB wrapper for goatools.
@@ -338,6 +339,10 @@ class GOAnalysis(pd.DataFrame):
 			The organism of which the gene_ids originate. Defaults to 'hsapiens'.
 		background : list, optional
 			A specific list of background gene ids to use. Default: The list of protein coding genes of the 'organism' given. 
+		propagate_counts : bool
+			Whether to propagate counts up the tree to parent GO's. Default: True.
+		min_depth : int
+			Minimum depth of GO-terms to show in output table. Default: 1.
 		verbosity : int, optional
 			Default: 1.
 
@@ -505,6 +510,9 @@ class GOAnalysis(pd.DataFrame):
 		lines = [[self._fmt_field(res.__dict__[key]) for key in keys_to_use] for res in goea_results_all]
 		table = pd.DataFrame(lines, columns=keys_to_use)
 
+		#Set minimum depth (stop "propagate" from collecting counts to upper aspect categories)
+		table = table[table["depth"] >= min_depth]
+
 		#Convert e (enriched)/p (purified) to increased/decreased
 		translation_dict = {"e": "increased", "p": "decreased"}
 		table.replace({"enrichment": translation_dict}, inplace=True)
@@ -552,6 +560,7 @@ class GOAnalysis(pd.DataFrame):
 
 		#Sort by pvalue and ngenes
 		aspect_table = aspect_table.sort_values(["-log(FDR)", "n_genes"], ascending=False)
+		aspect_table.loc[:,"-log(FDR)"] = np.round(aspect_table.loc[:,"-log(FDR)"], 1) #round to prevent long floats on figure
 		aspect_table = aspect_table.iloc[:n_terms,:] #first n rows
 
 		#Setup plot
@@ -584,7 +593,7 @@ class GOAnalysis(pd.DataFrame):
 			ax.set_title(title)
 
 		if save is not None:
-			plt.savefig(save, dpi=600)
+			plt.savefig(save, dpi=600, bbox_inches="tight")
 
 		return(ax)
 
