@@ -3012,7 +3012,52 @@ class DistObj():
 
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
+	#-------------------------------------------------------------------------------------------#
+	#------------------------- Evaluation and ranking of found distances -----------------------#
+	#-------------------------------------------------------------------------------------------#
 
+	def evaluate_noise(self, threads=1, method="median", height_multiplier=0.75):
+		"""
+		Evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
+
+		Parameters
+		---------
+		threads : int
+			Number of threads used for evaluation.
+			Default: 1
+		method : str
+			Measurement to calculate the noisiness of a signal.
+			One of ["median", "min_max"].
+			Default: "median"
+		height_multiplier : float
+			Height multiplier (percentage) to calculate cut points. Must be between 0 and 1.
+			Default: 0.75
+
+		See also 
+		--------
+		tfcomb.utils.evaluate_noise_chunks
+		"""
+		self.check_peaks()
+
+		if self._collapsed is not None: 
+			raise InputError("Collapsed signals can't be analyzed, see .expand_negative() for more details.")
+
+		self._noise_method = method
+		self._height_multiplier = height_multiplier
+		
+		datasource = self.datasource
+		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
+
+		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks, datasource)
+		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
+
+		# merge noisiness
+		self.peaks = self.peaks.merge(noisiness)
+
+		#res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
+		
+		#self.peaks = res
+	
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" 
 		ranks rules within each column specified. 
@@ -3055,55 +3100,13 @@ class DistObj():
 				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=0)
 			rank_cols.append(rank_col)
 
+		#Add mean rank to peaks
 		if calc_mean:
 			# calculate mean rank (from all column ranks)
 			self.peaks["mean_rank"] = self.peaks[rank_cols].mean(axis=1)
 			# nice to have the best ranks at the top 
 			self.peaks = self.peaks.sort_values(by="mean_rank")
 		
-	def evaluate_noise(self, threads=1, method="median", height_multiplier=0.75):
-		"""
-		Evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
-
-		Parameters
-		---------
-		threads : int
-			Number of threads used for evaluation.
-			Default: 1
-		method : str
-			Measurement to calculate the noisiness of a signal.
-			One of ["median", "min_max"].
-			Default: "median"
-		height_multiplier : float
-			Height multiplier (percentage) to calculate cut points. Must be between 0 and 1.
-			Default: 0.75
-
-		See also 
-		--------
-		tfcomb.utils.evaluate_noise_chunks
-		"""
-		self.check_peaks()
-
-		if self._collapsed is not None: 
-			raise InputError("Collapsed signals can't be analyzed, see .expand_negative() for more details.")
-
-		self._noise_method = method
-		self._height_multiplier = height_multiplier
-		
-		datasource =  self._get_datasource()
-		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
-
-		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks,datasource)
-
-		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
-
-		# merge noisiness
-		self.peaks = self.peaks.merge(noisiness)
-
-		#res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
-		
-		#self.peaks = res
-	
 	#-------------------------------------------------------------------------------------------#
 	#------------------- Additional functionality/analysis for distances -----------------------#
 	#-------------------------------------------------------------------------------------------#
