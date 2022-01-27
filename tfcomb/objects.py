@@ -2973,35 +2973,45 @@ class DistObj():
 			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
 			method = "flat"
 
+		#Collect results from all pairs to pandas dataframe
 		res = pd.concat([pd.DataFrame(pair_res) for pair_res in res]).reset_index(drop=True)
 
 		#Format order of columns
 		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
 		res = res[columns]
-		res.rename(columns= { "peak_heights":"Peak Heights",
-									"prominences": "Prominences"}, inplace=True)
-
+		res["Distance"] = res["Distance"].astype(int) #distances are float - change to int
+		res.rename(columns={"peak_heights":"Peak Heights",
+							"prominences": "Prominences"}, inplace=True)
 		self.peaks = res
-		# TODO: replace Distance + / - lf/rf
-		self.peaks["Distance"] = self.peaks["Distance"].astype(int)
-		
-		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
 
-		# add counts (TF1-TF2)
+		# Add total counts of (TF1-TF2) to each peak
 		self.peaks.index = self.peaks["TF1"] + "-" + self.peaks["TF2"]
-		counts = self._raw[distance_cols].sum(axis=1)
-		counts.name="TF1_TF2_count"
+		counts = self.distances[distance_cols].sum(axis=1)
+		counts.name = "TF1_TF2_count"
 		self.peaks = self.peaks.merge(counts.to_frame(), left_index=True, right_index=True)
 
-		# add distance counts
-		lf = int(np.floor(smooth_window / 2.0))
-		rf = int(np.ceil(smooth_window / 2.0)) 
+		#Define list of distances included in each peak (depending on smooth window)
+		distances = datasource.columns[2:].tolist()
+		dist_min = min(distances)
+		dist_max = max(distances)
+		lf = int(np.floor((self.smooth_window-1) / 2.0))
+		rf = int(np.ceil((self.smooth_window-1) / 2.0)) 
+		self.peaks["dist_list"] = [list(range(max(dist-lf, dist_min), min(dist+rf, dist_max)+1)) for dist in self.peaks["Distance"]]
 
-		self.peaks["Distance_percent"] = self.peaks.apply(lambda row: sum(self._raw.loc[row.name, 
-																						([row[2]-lf if row[2]-lf > self.min_dist else self.min_dist][0]):( [row[2]+rf if row[2]+rf < self.max_dist else self.max_dist][0])]),
-																						axis=1)
+		#Get count per peak depending on smooth window
+		self.peaks["Distance_count"] = [self.distances.loc[idx, dist_list].sum() for idx, dist_list in zip(self.peaks.index, self.peaks["dist_list"])]
+		self.peaks["Distance_percent"] = (self.peaks["Distance_count"] / self.peaks["TF1_TF2_count"]) * 100
+	
+		#Replace Distance + / - lf/rf
+		self.peaks["Distance_window"] = ["[{0};{1}]".format(min(dist), max(dist)) for dist in self.peaks["dist_list"]]
+		
+		#Sort peaks on highest prominences
+		self.peaks = self.peaks.sort_values("Prominences", ascending=False)
+		self.peaks.drop(columns=["dist_list"], inplace=True) #Remove temporary column
 
-		self.peaks["Distance_percent"] = (self.peaks["Distance_percent"] / self.peaks["TF1_TF2_count"]) * 100
+		#----- Save stats on run -----#
+		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
+
 		# QoL safe of threshold and method
 		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
 		self.thresh["method"] = method
