@@ -2702,25 +2702,7 @@ class DistObj():
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
 
 		#Set datasource for future normalization/correction/analysis
-		self._datasource = self.distances
-
-		#Normalize per pair
-		"""
-		self.logger.info("Normalizing data.")
-
-		data_columns = [col for col in columns if col not in ["TF1", "TF2"]] #with or without 'neg' column
-			
-		# normalize to sum=1
-		rowsums = self.distances[data_columns].sum(axis=1)
-		self.distances[data_columns] = self.distances[data_columns].div(rowsums, axis=0) #divide by zero returns NaN
-		
-		# minmax normalization
-		self.distances[data_columns]  = self.distances[data_columns].apply(lambda x:(x.astype(float) - min(x))/(max(x)-min(x)), axis=1)
-		self.distances.fillna(0, inplace=True)
-
-		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
-		#self.normalized = normalize
-		"""
+		self.datasource = self.distances
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------ Process counted distances (correct/smooth)------------------------#
