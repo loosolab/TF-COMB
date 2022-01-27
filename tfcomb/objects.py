@@ -2831,10 +2831,10 @@ class DistObj():
 		self.logger.info(f"Correcting background with {threads} threads.")
 		
 		# hand it over to multiprocess chunks 
-		result = self._multiprocess_chunks(threads, tfcomb.utils.correct_chunks, self.distances)
+		result = self._multiprocess_chunks(threads, tfcomb.utils.correct_chunks, self.datasource)
 
 		#Create dataframe of corrected counts
-		columns = self.distances.columns.tolist()
+		columns = self.datasource.columns.tolist()
 		self.corrected = pd.DataFrame(result, columns=columns).reset_index(drop=True)
 		self.corrected.index = self.corrected["TF1"] + "-" + self.corrected["TF2"]
 
@@ -2854,11 +2854,11 @@ class DistObj():
 		Returns
 		--------
 		None 
-			Fills the object variables .shift and  either .smoothed or .corrected
+			Fills the object variables .shift and either .smoothed or .corrected
 
 		"""
 
-		datasource = self._get_datasource()
+		datasource = self.datasource
 		
 		if self.shift is not None:
 			self.logger.info("Signals already above zero, skipping shift.")
@@ -2874,9 +2874,11 @@ class DistObj():
 		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
 		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
 
+		self.datasource = datasource
+
 		self._set_datasource(datasource)
 
-	def analyze_signal_all(self, threads=1, smooth_window=3, prominence="zscore", stringency=2,  save=None):
+	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2,  save=None):
 		""" 
 		After background correction is done, the signal is analyzed for peaks, 
 		indicating preferred binding distances. There can be more than one peak (more than one preferred binding distance) per 
@@ -2932,11 +2934,11 @@ class DistObj():
 		self.logger.info(f"Analyzing Signal with threads {threads}")
 	
 		# distinguish between median, zscore and flat
-		datasource = self._get_datasource()
+		datasource = self.datasource
 
 		self.stringency = stringency
 		self.prominence = prominence
-		distance_cols = np.array([-1 if dist == "neg" else dist for dist in self.distances.columns[2:].tolist()]) 
+		distance_cols = self.datasource.columns[2:].tolist()
 
 		if (prominence == "median"):
 			# calculate median
@@ -3397,24 +3399,26 @@ class DistObj():
 		# get TF1, TF2 out of pair
 		tf1, tf2 = pair
 		ind = tf1 + "-" + tf2 # construct index
-
-		# start subplot
-		fig, ax = plt.subplots(1, 1)
-
 	
+		#---------------- Setup data to plot ------------#
+
 		# get datasource
 		if method == "corrected":
 			self.check_corrected()
 			source_table = self.corrected	
 		elif method == "signal":
-			source_table = self._get_datasource()
+			source_table = self.datasource
+
 		elif method == "smoothed":
 			self.check_smoothed()
 			source_table = self.smoothed
 		else: 
-			source_table = self.distances
+			if self.is_smoothed():
+				source_table = self.smoothed
+			else:
+				source_table = self.distances
 
-		# calc x-values
+		#Establish x-values
 		if method == "density":
 			param = 0.1
 			if(config is not None):
