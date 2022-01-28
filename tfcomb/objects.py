@@ -14,6 +14,7 @@ import numpy as np
 import copy
 import glob
 import fnmatch
+import dill
 import pickle
 import collections
 import math
@@ -2218,7 +2219,7 @@ class DiffCombObj():
 	# ----------------------------- Save / import object ----------------------------#
 	# -------------------------------------------------------------------------------#
 
-	def to_pickle(self, path):
+	def to_pickle(self, path : str):
 		""" Save the DiffCombObj to a pickle file.
 
 		Parameters
@@ -2232,9 +2233,9 @@ class DiffCombObj():
 		"""
 
 		f_out = open(path, 'wb')
-		pickle.dump(self, f_out)
+		dill.dump(self, f_out)
 
-	def from_pickle(self, path):
+	def from_pickle(self, path : str):
 		"""
 		Import a DiffCombObj from a pickle file.
 
@@ -2254,7 +2255,7 @@ class DiffCombObj():
 		"""
 
 		filehandler = open(path, 'rb')
-		obj = pickle.load(filehandler)
+		obj = dill.load(filehandler)
 
 		# Check if object is CombObj
 		if not isinstance(obj, DiffCombObj):

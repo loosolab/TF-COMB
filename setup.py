@@ -73,7 +73,8 @@ setup(name='TF-COMB',
 			'statsmodels',
 			'goatools',
 			'uropa',
-			'qnorm'
+			'qnorm',
+			'dill'
 		],
 		classifiers=[
 			'License :: OSI Approved :: MIT License',
