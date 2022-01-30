@@ -14,6 +14,7 @@ import numpy as np
 import copy
 import glob
 import fnmatch
+import dill
 import pickle
 import collections
 import math
@@ -2213,6 +2214,58 @@ class DiffCombObj():
 										 verbosity=self.verbosity, **kwargs)
 
 		return(dot)
+
+	# -------------------------------------------------------------------------------#
+	# ----------------------------- Save / import object ----------------------------#
+	# -------------------------------------------------------------------------------#
+
+	def to_pickle(self, path : str):
+		""" Save the DiffCombObj to a pickle file.
+
+		Parameters
+		----------
+		path : str
+			Path to the output pickle file e.g. 'my_diff_comb_obj.pkl'.
+
+		See also
+		---------
+		from_pickle
+		"""
+
+		f_out = open(path, 'wb')
+		dill.dump(self, f_out)
+
+	def from_pickle(self, path : str):
+		"""
+		Import a DiffCombObj from a pickle file.
+
+		Parameters
+		-----------
+		path : str
+			Path to an existing pickle file to read.
+
+		Raises
+		-------
+		InputError
+			If read object is not an instance of DiffCombObj.
+
+		See also
+		----------
+		to_pickle
+		"""
+
+		filehandler = open(path, 'rb')
+		obj = dill.load(filehandler)
+
+		# Check if object is CombObj
+		if not isinstance(obj, DiffCombObj):
+			raise InputError("Object from '{0}' is not a DiffCombObj".format(path))
+
+		# Overwrite self with DiffCombObj
+		self = obj
+		self.set_verbosity(self.verbosity)  # restart logger
+
+		return self
 
 ###################################################################################
 ############################## Distance analysis ##################################
