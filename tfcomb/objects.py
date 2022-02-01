@@ -2742,13 +2742,13 @@ class DistObj():
 			self.logger.warning("Data was already smoothed - beware that smoothing again might produce unwanted results. Please use .reset_signal() to reset the signal.")
 
 		self.logger.info(f"Smoothing signals with window size {window_size}")
-		distances = self.datasource.columns[2:].tolist() #distances counted
-		smoothed = self.datasource[["TF1", "TF2"]]
-		smoothed[distances] = self.datasource.apply(lambda row: tfcomb.utils.fast_rolling_mean(np.array(list(row[distances])), window_size), axis=1, result_type="expand")
+		mat = self.datasource.iloc[:,2:].to_numpy() #distances counted
+		smoothed_mat = np.array([tfcomb.utils.fast_rolling_mean(mat[row,:], window_size) for row in range(len(mat))]) #smooth values per
+		self.smoothed = self.datasource.copy() #create dataframe from datasource
+		self.smoothed.iloc[:,2:] = smoothed_mat 
 
 		#Save information about smoothing to object
 		self.smooth_window = window_size
-		self.smoothed = smoothed
 		self.datasource = self.smoothed
 
 	def is_smoothed(self):
@@ -2899,8 +2899,6 @@ class DistObj():
 
 		self.datasource = datasource
 
-		self._set_datasource(datasource)
-
 	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2,  save=None):
 		""" 
 		After background correction is done, the signal is analyzed for peaks, 
@@ -2950,8 +2948,6 @@ class DistObj():
 		self.check_distances()
 		self.check_min_max_dist()
 	
-		#Shift signal above 0
-		self.shift_signal()
 
 		#----- Find preferred peaks -----#
 		self.logger.info(f"Analyzing Signal with threads {threads}")
@@ -2964,6 +2960,9 @@ class DistObj():
 		distance_cols = self.datasource.columns[2:].tolist()
 
 		if (prominence == "median"):
+
+			self.shift_signal() #shifting only needed for median?
+
 			# calculate median
 			med = datasource.set_index(["TF1", "TF2"]).median(axis=1)
 			med = med.to_frame('median')
@@ -3176,12 +3175,11 @@ class DistObj():
 
 		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
 		
-		datasource = self._get_datasource()
+		datasource = self.datasource
 
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
 		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		self._set_datasource(datasource)
 
 		self.logger.info(f"classifcation done")
 
