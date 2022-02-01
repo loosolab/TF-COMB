@@ -2461,12 +2461,10 @@ class DistObj():
 		#check member size
 		if len(pair) != 2:
 			raise InputError(f'{pair} is not valid. It should contain exactly two TF names per pair. e.g. ("NFYA","NFYB")')
-
 		# check tf names are string
 		tf1,tf2 = pair 
 		tfcomb.utils.check_type(tf1, str, "TF1 from pair")
 		tfcomb.utils.check_type(tf2, str, "TF2 from pair")
-
 		# check rules are filled
 		if self.rules is None:
 			raise InputError(".rules not filled. Please run .fill_rules() first.")
@@ -3329,7 +3327,6 @@ class DistObj():
 		neg = datasource[["TF1","TF2"] + neg_cols]
 
 		self._collapsed_method = method
-
 		#add negative column according to method
 		if method =="max":	
 			neg["neg"] = neg[neg_cols].max(axis=1)
@@ -3460,12 +3457,10 @@ class DistObj():
 					param = config["bwadjust"]
 			tfcomb.utils.check_value(param, vmin=0)
 			x_data = range(self.min_dist, self.max_dist + 1)
-
 		elif method == "signal":
 			zsc = True if self.zscores is not None else False
 			distances = source_table.columns[2:].to_numpy()
 			x_data = distances
-
 		else:
 			param = self.max_dist - self.min_dist + 1
 			if(config is not None):
@@ -3521,7 +3516,6 @@ class DistObj():
 		if method == "density":
 			# kde plot, see seaborn.kdeplot() for more information
 			sns.kdeplot(x_data, weights=y_data, bw_adjust=param, x="distance").set_title(f"{tf1,tf2}")
-
 		elif method == "signal":
 			# plot signal with peaks found
 			self.check_corrected()
