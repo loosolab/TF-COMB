@@ -1472,7 +1472,7 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via combobj.distObj")
 
-	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None, threads=4, **kwargs):
+	def analyze_distances(self, parent_directory=None, threads=4, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
@@ -1493,9 +1493,10 @@ class CombObj():
 			subfolder_corrected = parent_directory
 			subfolder_peaks = parent_directory
 		
-		
-		self.distObj.linregress_all(threads=threads, n_bins=n_bins, save=subfolder_linres)
-		self.distObj.correct_all(threads=threads, n_bins=n_bins, save=subfolder_corrected)
+		#Perform steps in standard workflow
+		self.distObj.smooth(window_size=3)
+		self.distObj.linregress_all(threads=threads, save=subfolder_linres)
+		self.distObj.correct_all(threads=threads, save=subfolder_corrected)
 		self.distObj.analyze_signal_all(threads=threads, save=subfolder_peaks, **kwargs)
 
 		if parent_directory is not None:
@@ -2764,7 +2765,7 @@ class DistObj():
 		self.correct_all(threads=threads)
 
 
-	def linregress_all(self, threads=1):
+	def linregress_all(self, threads=1, save=None):
 		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
 			estimate the background. Proceed with .correct_all()
 			
@@ -2783,7 +2784,6 @@ class DistObj():
 		"""
 
 		# check input param
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
 		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 
 		# sanity checks
@@ -2798,19 +2798,21 @@ class DistObj():
 		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
 		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
 
+		#Plot linregress results
+		if save is not None:
+			self.logger.info("Plotting all linear regressions. This may take a while")
+			self._plot_all(save, "linres")
+
 		self.logger.info("Linear regression finished! Results can be found in .linres")
 
 
-	def correct_all(self, threads=1):
+	def correct_all(self, threads=1, save=None):
 		""" Subtracts the estimated background from the Signal for all rules. 
 			
 			Parameters
 			----------
 			threads : int
 				Number of threads used for fitting linear regression
-			n_bins : int 
-				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
-				Default: None
 			save : str
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
@@ -2840,6 +2842,11 @@ class DistObj():
 
 		#Update datasource
 		self.datasource = self.corrected
+
+		#Save plots for corrected signals
+		if save is not None:
+			self.logger.info("Plotting all corrected signals. This may take a while")
+			self._plot_all(save, "corrected")
 
 		self.logger.info("Background correction finished! Results can be found in .corrected")
 
