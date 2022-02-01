@@ -1478,7 +1478,9 @@ class CombObj():
 		"""
 		self.create_distObj()
 		self.distObj.set_verbosity(self.verbosity)
-		self.distObj.count_distances(normalize=normalize, directional=self.directional)
+		self.distObj.count_distances(directional=self.directional)
+
+		#Ensure that parent directories exist before trying to plot
 		tfcomb.utils.check_type(parent_directory,[type(None),str])
 		if parent_directory is not None:
 			tfcomb.utils.check_dir(parent_directory)
@@ -2697,8 +2699,22 @@ class DistObj():
 		self.distances["TF2"] = [idx_to_name[idx] for idx in self.distances["TF2"]]
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
 
+		# minmax normalization
+		distances_mat = self.distances.iloc[:,2:].to_numpy().astype(float) #float for nan replacement
+		min_count = np.array([distances_mat.min(axis=1)]).T #convert to column vectors
+		max_count = np.array([distances_mat.max(axis=1)]).T #convert to column vectors
+		ranges = max_count - min_count #min-max range per pair
+		ranges[ranges==0] = np.nan
+
+		#Perform scaling and save to self.normalized
+		normalized_mat = (distances_mat - min_count) / ranges
+		normalized_mat = np.nan_to_num(normalized_mat)
+
+		self.normalized = self.distances.copy()
+		self.normalized.iloc[:,2:] = normalized_mat
+
 		#Set datasource for future normalization/correction/analysis
-		self.datasource = self.distances
+		self.datasource = self.normalized
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------ Process counted distances (correct/smooth)------------------------#
