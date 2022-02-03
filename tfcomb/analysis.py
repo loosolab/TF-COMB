@@ -170,7 +170,7 @@ def orientation(rules, verbosity=1):
 		
 	#Merge unique to frame
 	frame = frame.merge(unique, left_on=scenarios, right_on=scenarios, how="left")
-	frame.index = zip(frame["TF1"], frame["TF2"])
+	frame.index = frame["TF1"] + "-" + frame["TF2"]
 
 	#Normalize counts to sum of 1
 	frame["TF1_TF2_count"] = frame[scenarios].sum(axis=1)
