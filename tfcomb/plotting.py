@@ -47,7 +47,7 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	check_type(figsize, tuple, "figsize")
 
 	fig, ax = plt.subplots(figsize=figsize) 
-	ax.grid()
+	
 	with sns.axes_style("whitegrid"):
 		
 		ax = sns.scatterplot(
@@ -61,11 +61,16 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 							edgecolor=".7",
 		)
 
+	#Set legend
+	ax.legend(bbox_to_anchor=(1.02, 0.5), loc='center left', borderaxespad=0)
+
 	# Tweak the figure to finalize
 	labels = list(rules_table.index)
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
 	ax.set_xticks(range(len(labels))) #explicitly set xticks to prevent matplotlib error
 	ax.set_xticklabels(labels, rotation=45, ha="right")
+	ax.grid()
+	ax.set_axisbelow(True) #prevent grid from plotting above points
 
 	if save is not None:
 		plt.savefig(save, dpi=600, bbox_inches="tight")
