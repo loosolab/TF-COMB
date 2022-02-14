@@ -718,11 +718,13 @@ def network(network,
 
 		#Set dpi for output render (not for visualized, as this doesn't work with notebook)
 		dot_render = copy.deepcopy(dot)
-		dot_render.attr(dpi="600")
 
 		splt = os.path.splitext(save)
 		file_prefix = "".join(splt[:-1])
 		fmt = splt[-1].replace(".", "")
+
+		if fmt != ".pdf":
+			dot_render.attr(dpi="600") #for .png's to ensure quality
 		
 		if fmt not in graphviz.FORMATS:
 			logger.warning("File ending .{0} is not supported by graphviz/dot. Network will be saved as .pdf.".format(fmt))
