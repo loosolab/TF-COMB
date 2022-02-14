@@ -62,7 +62,7 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 		)
 
 	#Set legend
-	ax.legend(bbox_to_anchor=(1.02, 0.5), loc='center left', borderaxespad=0)
+	sns.move_legend(ax, "center left", bbox_to_anchor=(1.02, 0.5), borderaxespad=0)
 
 	# Tweak the figure to finalize
 	labels = list(rules_table.index)
