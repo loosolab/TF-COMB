@@ -24,6 +24,7 @@ from tobias.utils.motifs import MotifList
 from tobias.utils.signals import fast_rolling_math
 import pathlib
 import pyBigWig
+import matplotlib.pyplot as plt
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -949,7 +950,7 @@ def calculate_background(sites, min_distance,
 
 #--------------------------------- Thresholding ---------------------------------#
 
-def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
+def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, plot=False):
 	"""
 	Function to get upper/lower threshold(s) based on the distribution of data. The threshold is calculated as the probability of "percent" (upper=1-percent).
 	
@@ -967,7 +968,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 	If which is one of "upper"/"lower", get_threshold returns a float. If "both", get_threshold returns a list of two float thresholds.
 	"""
 	
-	distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace, 
+	distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace,
 					 scipy.stats.expon, scipy.stats.truncnorm, scipy.stats.truncexpon, scipy.stats.wald, scipy.stats.weibull_min]
 	
 	logger = tfcomb.logging.TFcombLogger(verbosity)
@@ -986,7 +987,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 	#Fit data to each distribution
 	distribution_dict = {}
 	for distribution in distributions:
-		logger.debug("Fitting data to '{0}'".format(distribution))
+		
 		params = distribution.fit(data_finite)
 
 		#Test fit using negative loglikelihood function
@@ -996,9 +997,11 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 		distribution_dict[distribution.name] = {"distribution": distribution,
 												"params": params, 
 												"mle": mle}
-
+		logger.spam("Fitted data to '{0}' with mle={1} and params: {2}".format(distribution.name, mle, params))
+	
 	#Get best distribution
 	best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
+	logger.debug("Best fitting distribution was: {0}".format(best_fit_name))
 	parameters = distribution_dict[best_fit_name]["params"]
 	best_distribution = distribution_dict[best_fit_name]["distribution"]
 
@@ -1011,14 +1014,26 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 		final = thresholds[0]
 	elif which == "both":
 		final = tuple(thresholds)
+
+	#Plot fit and threshold
+	if plot == True:
+		plt.hist(data, bins=30, density=True)
+
+		xlims = plt.xlim()
+		ylims = plt.ylim()
+
+		xmin = np.min(data)
+		xmax = np.max(data)
+		x = np.linspace(xmin, xmax, 100)
+		plt.plot(x, best_distribution(*parameters).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
 		
-	#Plot fit and threshol
-	#plt.hist(data, bins=20, density=True)
-	#xmin = np.min(data)
-	#xmax = np.max(data)
-	#x = np.linspace(xmin, xmax, 100)
-	#plt.plot(x, best_distribution(*params).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
-	#plt.legend()
+		thresh_list = [final] if not isinstance(final, tuple) else final
+		for t in thresh_list:
+			plt.axvline(t)
+		plt.legend()
+		plt.xlim(xlims)
+		plt.ylim(ylims)
+		
 	
 	return(final)
 

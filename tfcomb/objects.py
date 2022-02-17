@@ -1708,7 +1708,7 @@ class DiffCombObj():
 		Parameters
 		------------
 		objects : list, optional
-			A list of CombObj instances. If list is empty, an DiffCombObj will be created. Default: [].
+			A list of CombObj instances. If list is empty, an empty DiffCombObj will be created. Default: [].
 		measure : str, optional
 			The measure to compare between objects. Must be a column within .rules for each object. Default: 'cosine'.
 		join : string
@@ -1750,6 +1750,9 @@ class DiffCombObj():
 		self.build_network = lambda : CombObj.build_network(self)
 		self._check_rules = lambda : CombObj._check_rules(self)
 		self.simplify_rules = lambda : CombObj.simplify_rules(self)
+		self.select_TF_rules = lambda *args, **kwargs: CombObj.select_TF_rules(self, *args, **kwargs)
+		self.select_custom_rules = lambda  *args, **kwargs: CombObj.select_custom_rules(self, *args, **kwargs)
+		self.reduce_TFBS = lambda : CombObj.reduce_TFBS(self) #to use in selecting rules
 		self.integrate_data = lambda *args, **kwargs: CombObj.integrate_data(self, *args, **kwargs)
 
 	def __str__(self):
