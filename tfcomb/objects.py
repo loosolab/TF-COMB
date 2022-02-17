@@ -1012,6 +1012,24 @@ class CombObj():
 	#------------------------------ Selecting significant rules ------------------------------#
 	#-----------------------------------------------------------------------------------------#
 
+	def reduce_TFBS(self):
+		""" Reduce TFBS to the TFs present in .rules.
+		
+		Returns
+		--------
+		None - changes .TFBS in place"""
+
+		if hasattr(self, "TFBS"): #This is false for DiffCombObj, which is also using the function
+
+			#Get names from rules
+			self.logger.debug("Getting names")
+			selected_names = list(set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()))
+
+			#Subset TFBS
+			self.logger.debug("Setting TFBS in new object")
+			self.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+
+
 	def simplify_rules(self):
 		""" 
 		Simplify rules so that TF1-TF2 and TF2-TF1 pairs only occur once within .rules. 
@@ -1039,7 +1057,7 @@ class CombObj():
 
 		self.rules = sub_rules #overwrite .rules with simplified rules
 		
-	def select_TF_rules(self, TF_list, TF1=True, TF2=True):
+	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True):
 		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
 		
 		Parameters
@@ -1050,6 +1068,8 @@ class CombObj():
 			Whether to subset the rules containing 'TF_list' TFs within "TF1". Default: True.
 		TF2 : bool, optional
 			Whether to subset the rules containing 'TF_list' TFs within "TF2". Default: True.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 
 		Raises
 		--------
@@ -1106,26 +1126,29 @@ class CombObj():
 		self.logger.info("Creating subset of object")
 		new_obj = self.copy()
 		new_obj.rules = selected
-
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
 		new_obj.network = None
 
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()
+		
 		return(new_obj)
 	
-	def select_custom_rules(self, custom_list):
+	def select_custom_rules(self, custom_list, reduce_TFBS=True):
 		""" Select rules based on a custom list of TF pairs. 
 		
 		Parameters
 		------------
-		TF_list : list
+		custom_list : list
 			List of TF pairs fitting to TF1/TF2 combination within .rules.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 
 		Returns
 		--------
 		tfcomb.objects.CombObj()
 			An object containing a subset of <Combobj>.rules
 		"""
+
 		#Check input
 		self._check_rules()
 		check_type(custom_list, list, name="TF_list")
@@ -1139,14 +1162,14 @@ class CombObj():
 		#Create new object with selected rules
 		new_obj = self.copy()
 		new_obj.rules = selected
-
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
 		new_obj.network = None
+
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()
 
 		return(new_obj)
 
-	def select_top_rules(self, n):
+	def select_top_rules(self, n, reduce_TFBS=True):
 		"""
 		Select the top 'n' rules within .rules. By default, the .rules are sorted for the measure value, so n=100 will select the top 100 highest values for the measure (e.g. cosine).
 
@@ -1154,6 +1177,8 @@ class CombObj():
 		-----------
 		n : int
 			The number of rules to select.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 
 		Returns
 		--------
@@ -1172,10 +1197,10 @@ class CombObj():
 		#Create new object with selected rules
 		new_obj = self.copy()
 		new_obj.rules = selected
-
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
 		new_obj.network = None
+
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()
 
 		return(new_obj)
 
@@ -1185,6 +1210,7 @@ class CombObj():
 										x_threshold_percent=0.05,
 										y_threshold=None,
 										y_threshold_percent=0.05,
+										reduce_TFBS=True,
 										plot=True, 
 										**kwargs):
 		"""
@@ -1204,6 +1230,8 @@ class CombObj():
 			A minimum threshold for the y-axis measure to be selected. If None, the threshold will be estimated from the data. Default: None.
 		y_threshold_percent : float between 0-1, optional
 			If y_threshold is not given, y_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 		plot : bool, optional
 			Whether to show the 'measure vs. pvalue'-plot or not. Default: True.
 		kwargs : arguments
@@ -1257,13 +1285,10 @@ class CombObj():
 		self.logger.debug("Copying old to new object")
 		new_obj = self.copy()
 		new_obj.rules = selected
-
-		self.logger.debug("Getting names")
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-
-		self.logger.debug("Setting TFBS in new object")
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
 		new_obj.network = None
+
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()	
 
 		return(new_obj)
 
