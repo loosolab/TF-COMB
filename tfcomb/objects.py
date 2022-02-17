@@ -1954,7 +1954,7 @@ class DiffCombObj():
 			tfcomb.utils.check_value(mean_threshold, name="mean_threshold")
 
 		tfcomb.utils.check_value(measure_threshold_percent, vmin=0, vmax=1, name="measure_threshold_percent")
-		tfcomb.utils.check_value(mean_threshold_percent, vmin=0, vmax=1, name=" mean_threshold_percent")
+		tfcomb.utils.check_value(mean_threshold_percent, vmin=0, vmax=1, name="mean_threshold_percent")
 
 		#Identify measure to use based on contrast
 		if contrast == None:
@@ -1972,16 +1972,21 @@ class DiffCombObj():
 		measure_cols = [c + "_" + measure for c in contrast]
 		mean_col = "Mean of '{0}' for {1} and {2}".format(measure, contrast[0], contrast[1])
 		table[mean_col] = table[measure_cols].mean(axis=1)
+		to_keep = table[mean_col] > 0 #only keep values with mean measure > 0
 
 		#Find optimal measure threshold
 		if measure_threshold is None:
 			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
-			measure_threshold = tfcomb.utils.get_threshold(table[measure_col], "both", percent=measure_threshold_percent)
+			vals = table[measure_col][to_keep]
+			measure_threshold = tfcomb.utils.get_threshold(vals, "both", percent=measure_threshold_percent, verbosity=self.verbosity)
+			self.logger.debug("Measure threshold is: {0}".format(measure_threshold))
 
 		#Find optimal mean threshold
 		if mean_threshold is None:
 			self.logger.info("mean_threshold is None; trying to calculate optimal threshold")
-			mean_threshold = tfcomb.utils.get_threshold(table[mean_col], "upper", percent=mean_threshold_percent)
+			vals = table[mean_col][to_keep] #remove large influence of 0-means
+			mean_threshold = tfcomb.utils.get_threshold(vals, "upper", percent=mean_threshold_percent, verbosity=self.verbosity)
+			self.logger.debug("Mean threshold is: {0}".format(mean_threshold))
 
 		#Plot the MA-plot if chosen
 		if plot == True:
