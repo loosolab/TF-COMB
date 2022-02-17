@@ -1201,7 +1201,7 @@ class CombObj():
 
 		if reduce_TFBS == True:
 			new_obj.reduce_TFBS()
-
+		
 		return(new_obj)
 
 	def select_significant_rules(self, x="cosine", 
@@ -2040,18 +2040,22 @@ class DiffCombObj():
 		
 		return(new_obj)
 
+
+
 	#-------------------------------------------------------------------------------------------#
 	#----------------------------- Plots for differential analysis -----------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def plot_correlation(self, method="pearson"):
+	def plot_correlation(self, method="pearson", **kwargs):
 		"""
 		Plot correlation of 'measure' between rules across objects.
 
 		Parameters
 		-----------
-		method : str
+		method : str, optional
 			Either 'pearson' or 'spearman'. Default: 'pearson'.
+		kwargs : arguments, optional
+			Additional arguments are passed to sns.clustermap.
 		"""
 
 		#Define columns
@@ -2059,16 +2063,24 @@ class DiffCombObj():
 
 		#Calculate matrix and plot
 		matrix = self.rules[cols].corr(method=method)
-		sns.clustermap(matrix,
-							cbar_kws={'label': method})
-		#todo: rotate x-axis labels
+
+		g = sns.clustermap(matrix,
+							cbar_kws={'label': method.capitalize() + " corr."}, **kwargs)
+
+		#rotate x-axis labels
+		_ = plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, size=15)  # For y axis
+		_ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", size=15) # For x axis
+
+		return(g)
 
 	def plot_rules_heatmap(self):
 		""" Plot a heatmap of size n_rules x n_objects """ 
 
 		cols = [prefix + "_" + self.measure for prefix in self.prefixes]
 
-	
+		data = self.rules[cols]
+		g = sns.clustermap(data)
+		#tfcomb.plotting.heatmap()
 
 
 	#todo: plot_contrast heatmap
