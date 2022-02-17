@@ -1026,13 +1026,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 
 def is_symmetric(matrix):
 	""" Check if a matrix is symmetric around the diagonal """
-
-	s = matrix.shape
-	if s[0] != s[1]:
-		b = False #Not diagonal since rows != cols
-	else:
-		b = np.allclose(matrix, matrix.T, equal_nan=True)
-
+	b = np.allclose(matrix, matrix.T, equal_nan=True)
 	return(b)
 
 def make_symmetric(matrix):
@@ -1085,7 +1079,6 @@ def linress_chunks(pairs, dist_counts, distances):
 	----
 	Constraint: DataFrame with distance counts need to contain a signal for each pair given within pairs. Same for linear regression DataFrame
 	'''
-
 	# make sure index is correct
 	dist_counts = dist_counts.reset_index()
 	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
@@ -1247,9 +1240,9 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 
 		#Get distances from columns
 		peak_distances = [distance_cols[idx] for idx in peaks_idx]
-		
-		# insert tf1,tf2 names number of peaks times
+
 		n_peaks = len(peak_distances)
+		# insert tf1,tf2 names number of peaks times
 		properties["TF1"] = [tf1]*n_peaks
 		properties["TF2"] = [tf2]*n_peaks
 
@@ -1410,6 +1403,7 @@ def fast_rolling_mean(arr, w):
 
 	# use fast_rolling_math from tobias.utils.signals
 	roll_arr = fast_rolling_math(arr.astype(float), w, "mean")
+
 
 	#remove nan's ( artifical new flanks)
 	roll_arr = roll_arr[~np.isnan(roll_arr)]
