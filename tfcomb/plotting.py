@@ -46,8 +46,8 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	check_columns(rules_table, [yaxis, color_by, size_by])	
 	check_type(figsize, tuple, "figsize")
 
-	fig, ax = plt.subplots(figsize=figsize) 
-	
+	fig, ax = plt.subplots(figsize=figsize)
+
 	with sns.axes_style("whitegrid"):
 		
 		ax = sns.scatterplot(
@@ -58,9 +58,9 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 							hue=color_by, 
 							size=size_by,
 							palette="PuBu", 
-							edgecolor=".7",
+							edgecolor=".7",	
 		)
-
+	
 	#Set legend
 	sns.move_legend(ax, "center left", bbox_to_anchor=(1.02, 0.5), borderaxespad=0)
 
@@ -741,6 +741,10 @@ def genome_view(TFBS,
 					window=None,
 					fasta=None,
 					bigwigs=None,
+					bigwigs_sharey=False,
+					TFBS_track_height=4,
+					title=None,
+					highlight=None,
 					save=None,
 					verbosity=1):
 
@@ -748,7 +752,7 @@ def genome_view(TFBS,
 	
 	Parameters
 	--------------
-	TFBS : list or dict of lists
+	TFBS : list
 		A list of OneTFBS objects or any other object containing .chrom, .start, .end and .name variables.
 	window_chrom : str, optional if 'window' is given
 		The chromosome of the window to show. 
@@ -762,6 +766,16 @@ def genome_view(TFBS,
 		The path to a fasta file containing sequence information to show. Default: None.
 	bigwigs : str, list or dict of strings, optional
 		Give the paths to bigwig signals to show within graph. Default: None.
+	bigwigs_sharey : bool or list, optional
+		Whether bigwig signals should share y-axis range. If True, all signals will be shared. 
+		It is also possible to give a list of bigwig indices (starting at 0), which should share y-axis values, e.g. [0,1,3] for the 1st, 2nd and 4th bigwig to share signal.
+		If list of lists, each lists correspond to a grouping, e.g. [[0,2], [1,3]]. Default: False.
+	TFBS_track_height : float, optional
+		Relative track height of TFBS. Default: 4.
+	title : str, optional
+		Title of plot. Default: None.
+	highlight : list, optional
+		A list of OneTFBS objects or any other object containing .chrom, .start, .end and .name variables.
 	save : str, optional
 		Save the plot to the file given in 'save'. Default: None.
 	"""
@@ -820,11 +834,11 @@ def genome_view(TFBS,
 
 	#------------ Create plt subplots ------------#
 
-	height_ratios = [4] + [1]*n_bigwig_tracks
+	height_ratios = [TFBS_track_height] + [1]*n_bigwig_tracks
 
 	fig, axes = plt.subplots(n_tracks, 1, 
 								sharex=True, 
-								figsize=(8,4+n_bigwig_tracks), 
+								figsize=(8,TFBS_track_height+n_bigwig_tracks), 
 								constrained_layout=True,
 								gridspec_kw={"height_ratios": height_ratios}
 								)
@@ -901,6 +915,45 @@ def genome_view(TFBS,
 			#plt.setp(axes[i+1].spines.values(), color="grey")
 			plt.setp([axes[i+1].get_xticklines(), axes[i+1].get_yticklines()], color="grey")
 
+		#Whether to share y across all bigwig tracks
+		if bigwigs_sharey != False:
+
+			#Establish which groups should share y-axis
+			if bigwigs_sharey == True: #share y across all bigwig tracks
+				grouping = [list(range(len(bigwigs)))]
+			elif not isinstance(bigwigs_sharey[0], list):
+				grouping = [bigwigs_sharey] #list of lists - only one group
+			else:
+				grouping = bigwigs_sharey #already list of lists
+
+			#Set ylim across groups
+			for group in grouping:
+				group_ylims = list(zip(*[axes[i+1].get_ylim() for i in group]))
+
+				ymin = min(group_ylims[0])
+				ymax = max(group_ylims[1])
+
+				for i in group:
+					axes[i+1].set_ylim(ymin, ymax)
+
+		#Highlight sites given
+		if highlight != None:
+
+			#Get sites within the window
+			highlight_sites = []
+			for site in highlight:
+				if site.chrom == window.chrom:
+					if max([site.start, site.end]) > window.start and min([site.start, site.end]) < window.end:
+						highlight_sites.append(site)
+
+			#Plot highlight
+			xlim = axes[0].get_xlim()
+			for i in range(bigwigs):
+				pass
+				#axes[i+1].
+
+	if title is not None:
+		axes[0].set_title(title, y=1.05)
 
 	plt.xlabel(window.chrom, color="grey")
 
