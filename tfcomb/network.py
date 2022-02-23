@@ -285,7 +285,7 @@ def build_nx_network(edge_table,
 			G = nx.MultiGraph()
 	else:
 		if directed == True:
-			G = nx.diGraph()
+			G = nx.DiGraph()
 		else:
 			G = nx.Graph()
 
