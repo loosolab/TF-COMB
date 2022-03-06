@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import re
 import numpy as np
-import matplotlib as mpl
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import seaborn as sns
@@ -369,7 +369,15 @@ def _rgb_to_hex(rgb):
 	return '#%02x%02x%02x' % rgb
 
 def _values_to_cmap(values, plt_cmap=None):
-	""" Map values onto a cmap function taking value and returning hex color """
+	""" Map values onto a cmap function taking value and returning hex color.
+	
+	Parameters
+	------------
+	values : list-like object
+		An object containing values to be mapped to colors.
+	plt_cmap : str, optional
+		Name of a matplotlib colormap to use. Default: None (colors are automatically chosen).
+	"""
 
 	#Decide which colormap to use
 	colormap_binary = colors.ListedColormap(['lightblue', 'blue'])
@@ -377,13 +385,14 @@ def _values_to_cmap(values, plt_cmap=None):
 	colormap_blue = _truncate_colormap(plt.cm.Blues_r, minval=0.3, maxval=0.7)
 	colormap_divergent = _truncate_colormap(plt.cm.bwr, minval=0.1, maxval=0.9)
 	colormap_discrete = _truncate_colormap(plt.cm.jet, minval=0.3, maxval=0.7)
+	colormap_custom = copy.copy(matplotlib.cm.get_cmap(plt_cmap))
 	
 	#First, convert values to bool if possible
 	values = _convert_boolean(values)
 
 	#Check if values are strings 
 	if sum([isinstance(s, str) for s in values]) > 0: #values are strings, cmap should be discrete
-		cmap = colormap_discrete
+		cmap = colormap_discrete if plt_cmap is None else colormap_custom
 		cmap.set_bad(color="grey")
 
 		values_unique = list(set(values))
@@ -396,13 +405,10 @@ def _values_to_cmap(values, plt_cmap=None):
 	#Check if values are boolean
 	elif sum([isinstance(s, bool) for s in values]) > 0:
 
-		cmap = colormap_binary
+		cmap = colormap_binary if plt_cmap is None else colormap_custom
 		cmap.set_bad(color="grey") #color for NaN
 
 		color_func = lambda value: _rgb_to_hex(cmap(int(value), bytes=True)[:3])
-
-		#sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
-		#cmap = sm.get_cmap()
 		typ = "bool"
 	
 	#Values are int/float
@@ -415,20 +421,20 @@ def _values_to_cmap(values, plt_cmap=None):
 		vmin, vmax = np.min(clean_values), np.max(clean_values)
 
 		if plt_cmap != None: #plt_cmap is given explicitly
-			pass #todo: check that plt_cmap is a colormap
+			cmap = colormap_custom
 		elif vmin >= 0 and vmax >= 0:
-			plt_cmap = colormap_red
+			cmap = colormap_red 
 		elif vmin < 0 and vmax <= 0:
-			plt_cmap = colormap_blue
+			cmap = colormap_blue
 		elif vmin < 0 and vmax >= 0:
-			plt_cmap = colormap_divergent
+			cmap = colormap_divergent
 			max_abs = max([abs(vmin), abs(vmax)])
 			vmin = -max_abs #make sure that convergent maps are centered at 0
 			vmax = max_abs
 			
 		#Normalize values and create cmap
 		norm_func = plt.Normalize(vmin=vmin, vmax=vmax)
-		sm = plt.cm.ScalarMappable(cmap=plt_cmap, norm=norm_func)
+		sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm_func)
 		cmap = sm.get_cmap()
 		cmap.set_bad(color="grey") #set color for np.nan
 		color_func = lambda value: _rgb_to_hex(cmap(norm_func(value), bytes=True)[:3])
@@ -481,6 +487,9 @@ def network(network,
 				max_node_size=20,
 				legend_size='auto',
 				node_border=False,
+				node_cmap=None,
+				edge_cmap=None,
+				font_color=None,
 				save=None,
 				verbosity=1,
 				):
@@ -515,6 +524,12 @@ def network(network,
 		Fontsize for legend explaining color_node_by/color_edge_by/size_node_by/size_edge_by. Set to 0 to hide legend. Default: 'auto'.
 	node_border : bool, optional
 		Whether to plot border on nodes. Can be useful if the node colors are very light. Default: False.
+	node_cmap : str, optional
+		Name of colormap for node coloring. Default: None (colors are automatically chosen).
+	edge_cmap : str, optional
+		Name of colormap for edge coloring. Default: None (colors are automatically chosen).
+	font_color : str, optional
+		Set a custom color of the node labels. Default: None (automatically chosen). 
 	save : str, optional
 		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
 	verbosity : int, optional
@@ -577,14 +592,14 @@ def network(network,
 	#Node color
 	if color_node_by != None:
 		all_values = [node[-1][color_node_by] for node in node_view]
-		typ, cmap = _values_to_cmap(all_values)
+		typ, cmap = _values_to_cmap(all_values, node_cmap)
 		map_type["node_color"] = typ
 		map_value["node_color"] = cmap
 	
 	#Edge color
 	if color_edge_by != None:
 		all_values = [edge[-1][color_edge_by] for edge in edge_view]
-		typ, cmap = _values_to_cmap(all_values)
+		typ, cmap = _values_to_cmap(all_values, edge_cmap)
 		map_type["edge_color"] = typ
 		map_value["edge_color"] = cmap
 	
@@ -620,12 +635,22 @@ def network(network,
 		if color_node_by != None:
 			value = node_att[color_node_by]
 			attributes["fillcolor"] = map_value["node_color"](value)
+
+			#Adjust label color based on darkness of fill
+			R, G, B = matplotlib.colors.to_rgb(attributes["fillcolor"]) #from hex to rgb
+			luminance = (0.2126*R + 0.7152*G + 0.0722*B)
+			if luminance < 0.5: #if fill is dark, the font should be white
+				attributes["fontcolor"] = "white"
 			
 		#Set node size
 		if size_node_by != None:
 			value = node_att[size_node_by]
 			attributes["fontsize"] = str(map_value["node_size"](value))
 		
+		#Set custom font color
+		if font_color != None:
+			attributes["fontcolor"] = font_color
+
 		#After collecting all attributes; add node with attribute dict
 		logger.spam("Adding node {0}".format(node_name))
 		dot.node(node_name, _attributes=attributes)
