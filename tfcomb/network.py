@@ -344,7 +344,7 @@ def get_degree(G, weight=None):
 	return(df)
 
 #Graph partitioning 
-def partition_louvain(G, weight=None, logger=None):
+def partition_louvain(G, weight=None, attribute_name="partition", logger=None):
 	"""
 	Partition a network using community louvain. Sets the attribute
 
@@ -356,10 +356,12 @@ def partition_louvain(G, weight=None, logger=None):
 		Attribute in graph to use as weight. The higher the weight, the stronger the link. Default: None.
 	attribute_name : str
 		The attribute name to use for saving partition. Default: "partition".
-	logger : 
+	logger : a logger object
+		An instance of a logger. Default: No logging.
 
 	Returns
 	--------
+	None - partition is added to 'G' in place.
 
 	"""
 
@@ -384,7 +386,6 @@ def partition_louvain(G, weight=None, logger=None):
 		while weight in edge_attributes: #if weight was in edge_attributes, get random string
 			weight = tfcomb.utils.random_string()
 		
-
 	else:
 		
 		edge_view = G.edges(data=True)
@@ -401,11 +402,11 @@ def partition_louvain(G, weight=None, logger=None):
 	#Partition network
 	logger.debug("Running community_louvain.best_partition()")
 	partition_dict = community_louvain.best_partition(G, weight=weight, random_state=1) #random_state ensures that results are reproducible
-	partition_dict_fmt = {key: {"partition": str(value + 1)} for key, value in partition_dict.items()}
+	partition_dict_fmt = {key: {attribute_name: str(value + 1)} for key, value in partition_dict.items()}
 
 	#Add partition information to each node
 	for node_i in partition_dict_fmt:
-		G.nodes[node_i]["partition"] = partition_dict_fmt[node_i]["partition"]
+		G.nodes[node_i][attribute_name] = partition_dict_fmt[node_i][attribute_name]
 	#nx.set_node_attributes(G, partition_dict_fmt) #overwrites previous attributes; solved by loop over dict
 
 	#No return - G is changed in place
