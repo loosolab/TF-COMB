@@ -157,6 +157,7 @@ def scatter(table, x, y,
 				   y_threshold=None, 
 				   label=None, 
 				   label_fontsize=9, 
+				   title=None,
 				   save=None):
 	"""
 	Plot scatter-plot of x/y values within table. Can also set thresholds and label values within plot.
@@ -175,6 +176,10 @@ def scatter(table, x, y,
 		Gives the option to visualize an y-axis threshold within plot. If None, no measure threshold is set. Default: None.
 	label : str or list, optional
 		If None, no point labels are plotted. If "selection", the . Default: None.
+	label_fontsize : float, optional
+		Size of labels. Default: 9.
+	title : str, optional
+		Title of plot. Default: None.
 	"""
 
 	check_columns(table, [x, y])
@@ -242,9 +247,12 @@ def scatter(table, x, y,
 		elif label == "selection":
 			_add_labels(selection, x, y, "index", g.ax_joint, color="red", label_fontsize=label_fontsize)
 
+	if title is not None:
+		g.ax_marg_x.set_title(title)
+
 	#Save plot to file
 	if save is not None:
-		plt.savefig(save, dpi=600)
+		plt.savefig(save, dpi=600, bbox_inches="tight")
 
 	return(g)
 
