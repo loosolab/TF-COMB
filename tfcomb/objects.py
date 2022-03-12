@@ -134,8 +134,11 @@ class CombObj():
 		counts = {r.name: "" for r in combined.TFBS}
 		combined.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets		
 
+<<<<<<< HEAD
 		combined._prepare_TFBS() #fill in _sites
 
+=======
+>>>>>>> in-progress
 		return(combined)
 	
 	def copy(self):
@@ -1597,7 +1600,7 @@ class CombObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_nx_network")
-		self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
 		self.logger.info("Finished! The network is found within <CombObj>.network.")
 		
 
@@ -1626,7 +1629,7 @@ class CombObj():
 		elif method == "blockmodel":
 
 			#Create gt network	
-			self._gt_network = tfcomb.network.build_gt_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+			self._gt_network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, tool="graph-tool", verbosity=self.verbosity)
 
 			#Partition network
 			tfcomb.network.partition_blockmodel(self._gt_network)
@@ -1643,7 +1646,7 @@ class CombObj():
 		
 		#Update network attribute for plotting
 		if method == "blockmodel":
-			self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+			self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
 
 		#no return - networks were changed in place
 
@@ -3109,7 +3112,6 @@ class DistObj():
 			method = "median"
 
 		elif (prominence == "zscore"):
-
 			stds = datasource[distance_cols].std(ddof=0, axis=1)
 			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
 			means = datasource[distance_cols].mean(axis=1)
@@ -3596,12 +3598,10 @@ class DistObj():
 					param = config["bwadjust"]
 			tfcomb.utils.check_value(param, vmin=0)
 			x_data = range(self.min_dist, self.max_dist + 1)
-
 		elif method == "signal":
 			zsc = True if self.zscores is not None else False
 			distances = source_table.columns[2:].to_numpy()
 			x_data = distances
-
 		else:
 			param = self.max_dist - self.min_dist + 1
 			if(config is not None):

@@ -158,7 +158,8 @@ def scatter(table, x, y,
 				   label=None, 
 				   label_fontsize=9, 
 				   title=None,
-				   save=None):
+				   save=None,
+				   **kwargs):
 	"""
 	Plot scatter-plot of x/y values within table. Can also set thresholds and label values within plot.
 
@@ -180,6 +181,8 @@ def scatter(table, x, y,
 		Size of labels. Default: 9.
 	title : str, optional
 		Title of plot. Default: None.
+	kwargs : arguments
+		Any additional arguments are passed to sns.jointplot.
 	"""
 
 	check_columns(table, [x, y])
@@ -196,10 +199,10 @@ def scatter(table, x, y,
 			check_value(threshold, name="y_threshold")
 
 	#Plot all data
-	x_finite = table[x][~np.isinf(table[x])]
-	y_finite = table[y][~np.isinf(table[y])]
+	x_finite = table[x][~np.isinf(table[x].astype(float))]
+	y_finite = table[y][~np.isinf(table[y].astype(float))]
 
-	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2) #, joint_kws={"s": 100})
+	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2, **kwargs) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if x_threshold is not None:
@@ -237,15 +240,30 @@ def scatter(table, x, y,
 
 	#Label given indices
 	if label is not None:
+		print("Adding labels")
 		if isinstance(label, list):
 
 			#Check if labels are within table index
-			
-			pass
+			selection = table.loc[label, :]
 
+			txts = _add_labels(selection, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
 
 		elif label == "selection":
-			_add_labels(selection, x, y, "index", g.ax_joint, color="red", label_fontsize=label_fontsize)
+			txts = _add_labels(selection, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
+
+		elif label == "all":
+			txts = _add_labels(table, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
+
+		#Adjust positions of labels
+		#print(txts)
+		adjust_text(txts, x=table[x].tolist(), 
+						y=table[y].tolist(), 
+						ax=g.ax_joint,
+						#add_objects=[], 
+						text_from_points=True, 
+						arrowprops=dict(arrowstyle='-', color='black', lw=0.5),
+						expand_points=(2,2)
+						)
 
 	if title is not None:
 		g.ax_marg_x.set_title(title)
@@ -257,7 +275,7 @@ def scatter(table, x, y,
 	return(g)
 
 #Add labels to ax
-def _add_labels(table, x, y, label, ax, color="black", label_fontsize=9):
+def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9):
 	""" Utility to add labels to coordinates 
 
 	Parameters
@@ -751,6 +769,7 @@ def network(network,
 
 		#Set dpi for output render (not for visualized, as this doesn't work with notebook)
 		dot_render = copy.deepcopy(dot)
+		#dot_render.attr(dpi="600")
 
 		splt = os.path.splitext(save)
 		file_prefix = "".join(splt[:-1])
