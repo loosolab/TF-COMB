@@ -61,6 +61,7 @@ class OneTFBS():
 
 		return(self)
 
+
 class TFBSPair():
 	""" Collects information about a co-occurring pair of TFBS """
 
@@ -72,14 +73,12 @@ class TFBSPair():
 
 		#Calculate orientation scenario
 		if directional == True:
-
 			self.orientation = "TF1-TF2"
 			self.orientation = "TF2-TF1"
 			self.orientation = "divergent"
 			self.orientation = "convergent"
 
 		else:
-
 			if self.site1.strand == self.site2.strand:
 				self.orientation = "same"
 			else:
@@ -94,6 +93,62 @@ class TFBSPair():
 
 	def __repr__(self):
 		return(self.__str__())
+
+
+class TFBSPairList(list):
+	""" Class for collecting and analyzing a list of TFBSPair objects """
+	
+	def as_table(self):
+		""" Table representation of the pairs in the list """
+
+		lines = [[l.site1.chrom, l.site1.start, l.site1.end, l.site1.name, l.site1.strand,
+					l.site2.chrom, l.site2.start, l.site2.end, l.site2.name, l.site2.strand, l.distance, l.orientation] for l in self]
+
+		table = pd.DataFrame(lines)
+		table.columns = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand",
+						"site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand", "site_distance", "site_orientation"]
+
+		return(table)
+	
+	def write_bed(self, outfile, fmt="bed", merge=False):
+		""" 
+		Write the locations of (TF1, TF2) pairs to a bed-file.
+		
+		Parameters
+		------------
+		locations : list
+			The output of get_pair_locations().
+		outfile : str
+			The path which the pair locations should be written to.
+		fmt : str, optional
+			The format of the output file. Must be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites are written individually (see merge option to merge sites). If "bedpe", the sites are written in BEDPE format. Default: "bed".
+		merge : bool, optional
+			If fmt="bed", 'merge' controls how the locations are written out. If True, will be written as one region spanning TF1.start-TF2.end. If False, TF1/TF2 sites are written individually. Default: False.
+		"""
+		
+		tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
+		tfcomb.utils.check_type(merge, bool, "merge")
+
+		#Open output file
+		try:
+			f = open(outfile, "w")
+		except Exception as e:
+			raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
+		
+		#Write locations to file in format 'fmt'
+		if fmt == "bed":
+			if merge == True:
+				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site2.end), l.site1.name + "-" + l.site2.name, str(l.distance), "."]) for l in self]) + "\n"
+			else:
+				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.end), str(l.site1.end), l.site1.name, ".", l.site1.strand]) + "\n" + 
+								"\t".join([l.site2.chrom, str(l.site2.end), str(l.site2.end), l.site2.name, ".", l.site2.strand]) for l in self]) + "\n"
+				
+		elif fmt == "bedpe":
+			s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site1.end),
+										l.site2.chrom, str(l.site2.start), str(l.site2.end), 
+										l.site1.name + "-" + l.site2.name, str(l.distance), l.site1.strand, l.site2.strand]) for l in self]) + "\n"
+		f.write(s)
+		f.close()
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
@@ -714,7 +769,7 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 	#Subset sites to TF1/TF2 sites
 	sites = [site for site in sites if site.name in [TF1, TF2]]
 
-	locations = [] #empty list of regions
+	locations = TFBSPairList() #empty list of regions
 
 	TF1_tup = (TF1, TF1_strand)
 	TF2_tup = (TF2, TF2_strand)
@@ -829,39 +884,6 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 			i += 1
 
 	return(locations)
-
-def locations_to_bed(locations, outfile, fmt="bed"):
-	""" 
-	Write the locations of (TF1, TF2) pairs to a bed-file.
-	
-	Parameters
-	------------
-	locations : list
-		The output of get_pair_locations().
-	outfile : str
-		The path which the pair locations should be written to.
-	fmt : str, optional
-		The format of the output file. Must be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
-	"""
-	
-	tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
-
-	#Open output file
-	try:
-		f = open(outfile, "w")
-	except Exception as e:
-		raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
-	
-	#Write locations to file in format 'fmt'
-	if fmt == "bed":
-		s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site2.end), l.site1.name + "-" + l.site2.name, str(l.distance), "."]) for l in locations]) + "\n"
-
-	elif fmt == "bedpe":
-		s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site1.end),
-									l.site2.chrom, str(l.site2.start), str(l.site2.end), 
-									l.site1.name + "-" + l.site2.name, str(l.distance), l.site1.strand, l.site2.strand]) for l in locations]) + "\n"
-	f.write(s)
-	f.close()
 
 
 #--------------------------------- Background calculation ---------------------------------#
