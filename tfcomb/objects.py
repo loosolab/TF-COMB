@@ -1538,7 +1538,7 @@ class CombObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_nx_network")
-		self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
 		self.logger.info("Finished! The network is found within <CombObj>.network.")
 		
 
@@ -1567,7 +1567,7 @@ class CombObj():
 		elif method == "blockmodel":
 
 			#Create gt network	
-			self._gt_network = tfcomb.network.build_gt_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+			self._gt_network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, tool="graph-tool", verbosity=self.verbosity)
 
 			#Partition network
 			tfcomb.network.partition_blockmodel(self._gt_network)
@@ -1584,7 +1584,7 @@ class CombObj():
 		
 		#Update network attribute for plotting
 		if method == "blockmodel":
-			self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+			self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
 
 		#no return - networks were changed in place
 
@@ -3320,7 +3320,7 @@ class DistObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_nx_network")
-		self.network = tfcomb.network.build_nx_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
 		self.logger.info("Finished! The network is found within <CombObj>.<distObj>.network.")
 
 	def collapse_negative(self, method="max"):
