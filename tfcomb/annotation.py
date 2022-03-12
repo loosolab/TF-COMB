@@ -220,16 +220,21 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 
 	#Convert to pandas table
 	annotations_table = pd.DataFrame(annotations)
-	#print(annotations_table)
+
+	#Merge original sites with annotations
+	if type(regions) == pd.DataFrame:
+		region_columns = regions.columns.tolist()[:6]
+		annotation_columns = ["peak_chr", "peak_start", "peak_end",	"peak_id", "peak_score", "peak_strand"]
+		anno_unique = annotations_table.drop_duplicates()
+		annotations_table = regions.merge(anno_unique, left_on=region_columns, right_on=annotation_columns, how="left")
+		annotations_table.drop(columns=annotation_columns, inplace=True)
 
 	#Add information to .annotation for each peak
 	#for i, region in enumerate(regions):
 	#	region.annotation = best_annotations[i]
+	#logger.info("Attribute '.annotation' was added to each region")
 	
 	return(annotations_table)
-
-	#logger.info("Attribute '.annotation' was added to each region")
-	#Return None; alters peaks in place
 
 def _annotate_peaks_chunk(region_dicts, gtf, cfg_dict):
 	""" Multiprocessing safe function to annotate a chunk of regions """
