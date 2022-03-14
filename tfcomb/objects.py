@@ -919,7 +919,7 @@ class CombObj():
 		locations = tfcomb.utils.get_pair_locations(self.TFBS, TF1, TF2, TF1_strand, TF2_strand, **kwargs)
 
 		if save is not None:
-			tfcomb.utils.locations_to_bed(locations, outfile=save, fmt=fmt)
+			locations.write_bed(outfile=save, fmt=fmt)
 
 		return(locations)
 

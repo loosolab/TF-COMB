@@ -148,7 +148,7 @@ def build_network(edge_table,
 		table = table.loc[list(to_keep.keys())]
 		table.reset_index(inplace=True)
 
-		logger.spam("Subset edges (head): {0}".format(table.head()))
+	logger.spam("Edges table ({0}) head: {1}".format(table.shape, table.head()))
 
 	#########################################
 	####### Setup network attributes ########
@@ -167,8 +167,8 @@ def build_network(edge_table,
 		logger.debug("node2_attributes: {0}".format(node2_attributes))
 
 		#Setup tables for node1 and node2 information
-		node1_table = table[[node1] + node1_attributes].set_index(node1, drop=False) #also includes node1
-		node2_table = table[[node2] + node2_attributes].set_index(node2, drop=False) #also includes node2
+		node1_table = table[[node1] + node1_attributes].drop_duplicates().set_index(node1, drop=False) #also includes node1
+		node2_table = table[[node2] + node2_attributes].drop_duplicates().set_index(node2, drop=False) #also includes node2
 
 		#Merge node information to dict for network
 		node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
@@ -178,7 +178,7 @@ def build_network(edge_table,
 		#TODO: check that node_table fits with node1/node2
 		pass
 
-	logger.spam("node_table head:\n{0}".format(node_table.head()))
+	logger.spam("node_table ({0}) head:\n{1}".format(node_table.shape, node_table.head()))
 	node_attributes = list(node_table.columns)
 	logger.debug("node_attributes: {0}".format(node_attributes))
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
@@ -218,9 +218,10 @@ def build_network(edge_table,
 		#Initialize graph
 		g = graph_tool.all.Graph(directed=directed)
 
+		node_table["_name"] = node_table.index #Add the node table index to the node info
+
 		#Node attributes
-		node_attributes = [node1, node2] + node_attributes
-		#TODO: remove duplicate node_attributes when node1/node2 were already part of attributes
+		node_attributes = set([node1, node2] + node_attributes + ["_name"])
 		dtype_dict = _get_table_dtypes(node_table)
 		for att in node_attributes:
 			eprop = g.new_vertex_property(dtype_dict[att])
@@ -234,19 +235,15 @@ def build_network(edge_table,
 
 		## Add nodes with properties
 		name2idx = {} #TF name to idx
-		#idx2name = {}
-		for i, row in node_table.to_dict(orient="index").items():
+		for name, row in node_table.iterrows(): #.to_dict(orient="index").items():
 			v = g.add_vertex()
 			
-			name = i #index is the name of node (TF)
-			name2idx[name] = v #idx of node
-			#idx2name[int(v)] = name
-			
+			name2idx[name] = v #idx of node			
 			for prop in g.vertex_properties:
 				g.vertex_properties[prop][v] = row[prop]
 
 		## Add edges with properties
-		for i, row in table.to_dict(orient="index").items(): #loop over all edges in table
+		for _, row in table.iterrows(): #loop over all edges in table
 			v1, v2 = name2idx[row[node1]], name2idx[row[node2]]
 			e = g.add_edge(v1, v2)
 			
