@@ -255,7 +255,16 @@ class CombObj():
 		"""
 
 		filehandler = open(path, 'rb') 
-		obj = pickle.load(filehandler)
+
+		try:
+			obj = pickle.load(filehandler)
+		except AttributeError as e:
+			if "new_block" in str(e):
+				s = f"It looks like the CombObj was built with pandas 1.3.x, but the current pandas version is {pd.__version__}."
+				s += " Please rebuild the CombObj with pandas 1.2.x or upgrade pandas to 1.3.x to load the object."
+				raise InputError(s)
+			else: #another error during reading
+				raise e	
 
 		#Check if object is CombObj
 		if not isinstance(obj, CombObj):
