@@ -134,11 +134,8 @@ class CombObj():
 		counts = {r.name: "" for r in combined.TFBS}
 		combined.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets		
 
-<<<<<<< HEAD
 		combined._prepare_TFBS() #fill in _sites
 
-=======
->>>>>>> in-progress
 		return(combined)
 	
 	def copy(self):
