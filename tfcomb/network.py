@@ -14,7 +14,7 @@ import community as community_louvain
 
 import tfcomb.utils
 from tfcomb.logging import TFcombLogger, InputError
-from tfcomb.utils import check_columns, check_type
+from tfcomb.utils import check_columns, check_type, check_string
 
 #-------------------------------------------------------------------------------#
 #------------------------ Build network from table -----------------------------#
@@ -49,9 +49,15 @@ def _establish_node_attributes(table, node):
 
 	sub = table[:100000] #subset in interest of performance
 	factorized = sub.apply(lambda x : pd.factorize(x)[0]) + 1 #factorize to enable correlation
-
+	
 	for attribute in columns_to_assign:
-		p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+		try:
+			p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+		except ValueError: #observed frequencies != expected frequencies
+			p = 0.0 #not correlated
+		except FloatingPointError: #sum of factorized is 0 -> all nan
+			p = 0.0
+
 		if p == 1.0: #columns are fully correlated; save to node attribute
 			node_attributes.append(attribute)
 	
@@ -67,18 +73,20 @@ def _get_table_dtypes(table):
 
 	return(dtype_dict)
 
-def build_gt_network(table, 
+def build_network(edge_table, 
 					node1="TF1", 
 					node2="TF2", 
 					node_table=None,
 					directed=False, 
+					multi=False,
+					tool="networkx",
 					verbosity=1):
-	""" Build graph-tool network from table.
+	""" Build a network object from a table using either 'networkx' or 'graph-tool'.
 	
 	Parameters
 	-----------
-	table : pandas.DataFrame 
-		Edges table including node/edge attributes.
+	edge_table : pd.DataFrame 
+		Table containing rows of edges and edge information between node1/node2.
 	node1 : str, optional
 		The column to use as node1 ID. Default: "TF1".
 	node2 : str, optional
@@ -87,141 +95,50 @@ def build_gt_network(table,
 		A table of attributes to use for nodes. Default: node attributes are estimated from the columns in edge_table.
 	directed : bool, optional
 		Whether edges are directed or not. Default: False.
+	multi : bool, optional
+		Allow multiple edges between two vertices. NOTE: Only valid for tool == 'networkx'. If False, the first occurrence of TF1-TF2/TF2-TF1 in the table is used. Default: False.
+	tool : str, optional
+		Which module to use for generating network. Must be one of 'networkx' or 'graph-tool'. Default: 'networkx'.
 	verbosity : int, optional
 		Verbosity of logging (0/1/2/3). Default: 1.
 
 	Returns
 	--------
-	graph_tool.Graph 
+	if tool is 'networkx': networkx.Graph / networkx.DiGraph / networkx.MultiGraph / networkx.MultiDiGraph - depending on parameters given.
+	if tool is 'graph-tool': graph_tool.Graph 
 	"""
-
-	#check if graph-tool is installed
-	if tfcomb.utils.check_graphtool() == True:
-		import graph_tool
 
 	#TODO: check given input
-	check_type(table, pd.DataFrame, "table")
+	check_type(edge_table, pd.DataFrame, "table")
+	check_string(tool, ["networkx", "graph-tool"], "tool")
 
-
-	#Setup logger
-	logger = TFcombLogger(verbosity)
-
-	#Setup graph
-	g = graph_tool.all.Graph(directed=directed)
-
-	## Setup node table if not given
-	if node_table is None:
-
-		#Establish node attributes
-		node1_attributes = _establish_node_attributes(table, node1)
-		logger.debug("node1_attributes: {0}".format(node1_attributes))
-		
-		node2_attributes = _establish_node_attributes(table, node2)
-		node2_attributes = list(set(node2_attributes) - set(node1_attributes)) #prevent the same columns from being assigned to both TF1 and TF2)
-		logger.debug("node2_attributes: {0}".format(node2_attributes))
-
-		#Setup tables for node1 and node2 information
-		node1_table = table[[node1] + node1_attributes].set_index(node1, drop=False) #also includes node1
-		node2_table = table[[node2] + node2_attributes].set_index(node2, drop=False) #also includes node2
-
-		#Merge node information to dict for network
-		node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
-		#node_table.fillna(0, inplace=True)
-		node_table.drop_duplicates(inplace=True)
-	else:
-		#TODO: check if node_table index fits TF1/TF2
-		pass
-
-	### Setup node/edge attributes ###
-	node_attributes = list(node_table.columns)
-	node_attributes = [node1, node2] + node_attributes
-	#TODO: remove duplicate node_attributes when node1/node2 were already part of attributes
-	dtype_dict = _get_table_dtypes(node_table)
-	logger.debug("Node attributes: {0}".format(node_attributes))
-	for att in node_attributes:
-		eprop = g.new_vertex_property(dtype_dict[att])
-		g.vertex_properties[att] = eprop
-
-	## edge attributes - the remaining columns
-	edge_attributes = list(set(table.columns) - set(node_attributes))
-	dtype_dict = _get_table_dtypes(table[edge_attributes])
-	logger.debug("Edge attributes: {0}".format(edge_attributes))
-	for att in edge_attributes:
-		eprop = g.new_edge_property(dtype_dict[att])
-		g.edge_properties[att] = eprop
-
-	### Build network ###
-
-	## Add nodes with properties
-	name2idx = {} #TF name to idx
-	idx2name = {}
-	for i, row in node_table.to_dict(orient="index").items():
-		v = g.add_vertex()
-		
-		name = i #index is the name of node (TF)
-		name2idx[name] = v #idx of node
-		idx2name[int(v)] = name
-		
-		for prop in g.vertex_properties:
-			g.vertex_properties[prop][v] = row[prop]
-
-	## Add edges with properties
-	for i, row in table.to_dict(orient="index").items(): #loop over all edges in table
-		v1, v2 = name2idx[row[node1]], name2idx[row[node2]]
-		e = g.add_edge(v1, v2)
-		
-		for prop in g.edge_properties:
-			g.edge_properties[prop][e] = row[prop]
-		
-	return(g)
-
-def build_nx_network(edge_table, 
-						node1="TF1", 
-						node2="TF2", 
-						node_table=None,
-						directed=False, 
-						multi=False, 
-						verbosity=1 
-						):
-	""" 
-	Build a networkx network from a table containing node1, node2 and other node/edge attribute columns, e.g. as from CombObj.market_basket() analysis.
-	
-	Parameters
-	----------
-	edge_table : pd.DataFrame 
-		Edge table including node1/node2 attributes.
-	node1 : str, optional
-		The column within edges_table to use as node1 ID. Default: "TF1".
-	node2 : str, optional
-		The column within edges_table to use as node2 ID. Default: "TF2".
-	node_table : pd.DataFrame, optional
-		A table of attributes to use for nodes. Default: node attributes are estimated from the columns in edge_table.
-	directed : bool, optional
-		Whether edges are directed or not. Default: False.
-	multi : bool, optional
-		Allow multiple edges between two vertices. If False, the first occurrence of TF1-TF2/TF2-TF1 in the table is used. Default: False.
-	verbosity : int, optional
-		Verbosity of logging (0/1/2/3). Default: 1.
-
-	Returns
-	---------
-	networkx.Graph / networkx.DiGraph / networkx.MultiGraph / networkx.MultiDiGraph - depending on parameters given
-	"""
-	
-	#Setup logger
-	logger = TFcombLogger(verbosity)
+	if tool == "graph-tool":
+		if tfcomb.utils.check_graphtool() == True: #check if graph-tool is installed
+			import graph_tool
 
 	#Setup table
 	table = edge_table.copy()
 	check_columns(table, [node1, node2])
 
-	# Subset edges based on multi
+	#Setup logger
+	logger = TFcombLogger(verbosity)
+
+	#########################################
+	############# Prepare edges #############
+	#########################################
+
+	if multi == True and tool == "graph-tool":
+		raise InputError("The option 'multi=True' is not compatible with 'tool=graph-tool'. Please adjust parameters.")
+
+	# Subset edges if multi is not allowed
 	if multi == False:
 
-		table.set_index([node1, node2], inplace=True)
-		pairs = table.index
+		#Remove duplicates of the same edge (first occurrence is kept)
+		table = table.drop_duplicates([node1, node2])
 
 		#Collect unique pairs (first occurrence is kept)
+		table.set_index([node1, node2], inplace=True)
+		pairs = table.index
 		to_keep = {}
 		for pair in pairs:
 			if not pair[::-1] in to_keep: #if opposite was not already found
@@ -231,9 +148,12 @@ def build_nx_network(edge_table,
 		table = table.loc[list(to_keep.keys())]
 		table.reset_index(inplace=True)
 
-		logger.spam("Subset edges (head): {0}".format(table.head()))
+	logger.spam("Edges table ({0}) head: {1}".format(table.shape, table.head()))
 
-	######### Setup node attributes #########
+	#########################################
+	####### Setup network attributes ########
+	#########################################
+
 	attribute_columns = [col for col in table.columns if col not in [node1, node2]]
 
 	if node_table is None:
@@ -247,56 +167,101 @@ def build_nx_network(edge_table,
 		logger.debug("node2_attributes: {0}".format(node2_attributes))
 
 		#Setup tables for node1 and node2 information
-		node1_table = table[[node1] + node1_attributes].set_index(node1, drop=False) #also includes node1
-		node2_table = table[[node2] + node2_attributes].set_index(node2, drop=False) #also includes node2
+		node1_table = table[[node1] + node1_attributes].drop_duplicates().set_index(node1, drop=False) #also includes node1
+		node2_table = table[[node2] + node2_attributes].drop_duplicates().set_index(node2, drop=False) #also includes node2
 
 		#Merge node information to dict for network
 		node_table = node1_table.merge(node2_table, left_index=True, right_index=True, how="outer")
-		#node_table.fillna(0, inplace=True)
 		node_table.drop_duplicates(inplace=True)
 	
 	else:
 		#TODO: check that node_table fits with node1/node2
 		pass
 
-	logger.spam("node_table head:\n{0}".format(node_table.head()))
+	logger.spam("node_table ({0}) head:\n{1}".format(node_table.shape, node_table.head()))
 	node_attributes = list(node_table.columns)
 	logger.debug("node_attributes: {0}".format(node_attributes))
 	node_attribute_dict = {i: {att: row[att] for att in node_attributes} for i, row in node_table.iterrows()}
 	logger.spam("node_attribute_dict: {0} (...)".format({i: node_attribute_dict[i] for i in list(node_attribute_dict.keys())[:5]}))
-
+	
 	######## Setup edge attributes #######	
 	edge_attributes = [col for col in attribute_columns if col not in node_attribute_dict]
 	logger.debug("edge_attributes: {0}".format(edge_attributes))
 	edges_list = [(row[node1], row[node2], {att: row[att] for att in edge_attributes}) for i, row in table.iterrows()]
 	logger.spam("edges_list: {0} (...)".format(edges_list[:3]))
 
-	############ Setup Graph ############
-	if multi == True:
-		if directed == True:
-			G = nx.MultiDiGraph()
-		else:
-			G = nx.MultiGraph()
-	else:
-		if directed == True:
-			G = nx.diGraph()
-		else:
-			G = nx.Graph()
+	#########################################
+	############## Build Graph ##############
+	#########################################
 
-	#Add collected edges
-	G.add_edges_from(edges_list)
-	
-	#Add node attributes
-	nx.set_node_attributes(G, node_attribute_dict)
+	if tool == "networkx":
+		if multi == True:
+			if directed == True:
+				G = nx.MultiDiGraph()
+			else:
+				G = nx.MultiGraph()
+		else:
+			if directed == True:
+				G = nx.DiGraph()
+			else:
+				G = nx.Graph()
 
-	return(G)
+		#Add collected edges
+		G.add_edges_from(edges_list)
+		
+		#Add node attributes
+		nx.set_node_attributes(G, node_attribute_dict)
+
+
+	elif tool == "graph-tool":
+
+		#Initialize graph
+		g = graph_tool.all.Graph(directed=directed)
+
+		node_table["_name"] = node_table.index #Add the node table index to the node info
+
+		#Node attributes
+		node_attributes = set([node1, node2] + node_attributes + ["_name"])
+		dtype_dict = _get_table_dtypes(node_table)
+		for att in node_attributes:
+			eprop = g.new_vertex_property(dtype_dict[att])
+			g.vertex_properties[att] = eprop
+
+		#Edge attributes
+		dtype_dict = _get_table_dtypes(table[edge_attributes])
+		for att in edge_attributes:
+			eprop = g.new_edge_property(dtype_dict[att])
+			g.edge_properties[att] = eprop
+
+		## Add nodes with properties
+		name2idx = {} #TF name to idx
+		for name, row in node_table.iterrows(): #.to_dict(orient="index").items():
+			v = g.add_vertex()
+			
+			name2idx[name] = v #idx of node			
+			for prop in g.vertex_properties:
+				g.vertex_properties[prop][v] = row[prop]
+
+		## Add edges with properties
+		for _, row in table.iterrows(): #loop over all edges in table
+			v1, v2 = name2idx[row[node1]], name2idx[row[node2]]
+			e = g.add_edge(v1, v2)
+			
+			for prop in g.edge_properties:
+				g.edge_properties[prop][e] = row[prop]
+
+	#Return finished network
+	if tool == "networkx":
+		return(G)
+	elif tool == "graph-tool":
+		return(g)
 
 
 #-------------------------------------------------------------------------------#
 #------------------------- Network analysis algorithms -------------------------#
 #-------------------------------------------------------------------------------#
 
-def get_degree(G, weight=None):
+def get_degree(G, weight=None, direction="both"):
 	"""
 	Get degree per node in graph. If weight is given, the degree is the sum of weighted edges.
 
@@ -306,6 +271,8 @@ def get_degree(G, weight=None):
 		An instance of networkx.Graph
 	weight : str, optional
 		Name of an edge attribute within network. Default: None.
+	direction : str, optional
+		Which edge direction to use for calculating degrees. Can be one of: ["both", "in", "out"]. Default: 'both'.
 
 	Returns
 	--------
@@ -314,12 +281,21 @@ def get_degree(G, weight=None):
 
 	"""
 
+	#Check input
 	tfcomb.utils.check_type(G, [nx.Graph])
-	tfcomb.utils.check_type(G, [str, type(None)], "weight")
-	
+	tfcomb.utils.check_type(weight, [str, type(None)], "weight")
+	tfcomb.utils.check_string(direction, ["both", "in", "out"], direction)
+
 	
 	if weight is None:
-		unweighted = dict(G.degree())
+
+		if direction == "both":
+			unweighted = dict(G.degree())
+		elif direction == "in":
+			unweighted = dict(G.in_degree())
+		elif direction == "out":
+			unweighted = dict(G.out_degree())
+		
 		df = pd.DataFrame.from_dict(unweighted, orient="index")
 		
 	else:
@@ -327,8 +303,16 @@ def get_degree(G, weight=None):
 
 		edge_attributes = list(list(G.edges(data=True))[0][-1].keys())
 		if weight in edge_attributes:
-			weighted = dict(G.degree(weight=weight))
+
+			if direction == "both":
+				weighted = dict(G.degree(weight=weight))
+			elif direction == "in":
+				weighted = dict(G.in_degree(weight=weight))
+			elif direction == "out":
+				weighted = dict(G.out_degree(weight=weight))
+
 			df = pd.DataFrame.from_dict(weighted, orient="index")
+			
 		else:
 			raise ValueError("Weight '{0}' is not an edge attribute of given network. Available attributes are: {1}".format(weight, edge_attributes))
 	
@@ -338,7 +322,7 @@ def get_degree(G, weight=None):
 	return(df)
 
 #Graph partitioning 
-def partition_louvain(G, weight=None, logger=None):
+def partition_louvain(G, weight=None, attribute_name="partition", logger=None):
 	"""
 	Partition a network using community louvain. Sets the attribute
 
@@ -350,10 +334,12 @@ def partition_louvain(G, weight=None, logger=None):
 		Attribute in graph to use as weight. The higher the weight, the stronger the link. Default: None.
 	attribute_name : str
 		The attribute name to use for saving partition. Default: "partition".
-	logger : 
+	logger : a logger object
+		An instance of a logger. Default: No logging.
 
 	Returns
 	--------
+	None - partition is added to 'G' in place.
 
 	"""
 
@@ -378,7 +364,6 @@ def partition_louvain(G, weight=None, logger=None):
 		while weight in edge_attributes: #if weight was in edge_attributes, get random string
 			weight = tfcomb.utils.random_string()
 		
-
 	else:
 		
 		edge_view = G.edges(data=True)
@@ -395,11 +380,11 @@ def partition_louvain(G, weight=None, logger=None):
 	#Partition network
 	logger.debug("Running community_louvain.best_partition()")
 	partition_dict = community_louvain.best_partition(G, weight=weight, random_state=1) #random_state ensures that results are reproducible
-	partition_dict_fmt = {key: {"partition": str(value + 1)} for key, value in partition_dict.items()}
+	partition_dict_fmt = {key: {attribute_name: str(value + 1)} for key, value in partition_dict.items()}
 
 	#Add partition information to each node
 	for node_i in partition_dict_fmt:
-		G.nodes[node_i]["partition"] = partition_dict_fmt[node_i]["partition"]
+		G.nodes[node_i][attribute_name] = partition_dict_fmt[node_i][attribute_name]
 	#nx.set_node_attributes(G, partition_dict_fmt) #overwrites previous attributes; solved by loop over dict
 
 	#No return - G is changed in place

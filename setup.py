@@ -59,6 +59,7 @@ setup(name='TF-COMB',
 		packages=find_packages(),
 		ext_modules=ext_modules,
 		cmdclass=cmdclass,
+		python_requires='>=3',
 		setup_requires=["numpy"],
 		install_requires=[
 			'numpy',
@@ -73,7 +74,8 @@ setup(name='TF-COMB',
 			'statsmodels',
 			'goatools',
 			'uropa',
-			'qnorm'
+			'qnorm',
+			'dill'
 		],
 		classifiers=[
 			'License :: OSI Approved :: MIT License',

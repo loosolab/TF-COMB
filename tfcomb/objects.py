@@ -14,24 +14,26 @@ import numpy as np
 import copy
 import glob
 import fnmatch
+import dill
 import pickle
 import collections
+import math
 
 #Statistics
 import qnorm #quantile normalization
 from scipy.stats import linregress
-from scipy.signal import find_peaks
 from kneed import KneeLocator
 
 #Modules for plotting
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tfcomb import utils
 
 #Utilities from TOBIAS
 import tobias
 from tobias.utils.motifs import MotifList
 from tobias.utils.regions import OneRegion, RegionList
-from tobias.utils.signals import fast_rolling_math
+#from tobias.utils.signals import fast_rolling_math
 
 #TF-comb modules
 import tfcomb
@@ -126,11 +128,13 @@ class CombObj():
 		#Merge TFBS
 		combined.TFBS = RegionList(self.TFBS + obj.TFBS)
 		combined.TFBS.loc_sort() 				#sort TFBS by coordinates
-		combined.TFBS = tfcomb.utils.remove_duplicates(combined.TFBS) #remove duplicated sites 
+		combined.TFBS = combined.TFBS.remove_duplicates() #remove duplicated sites 
 
 		#Set .TF_names of the new list
 		counts = {r.name: "" for r in combined.TFBS}
 		combined.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets		
+
+		combined._prepare_TFBS() #fill in _sites
 
 		return(combined)
 	
@@ -173,7 +177,7 @@ class CombObj():
 		""" Internal check whether the .TFBS was already filled. Raises InputError when .TFBS is not available."""
 
 		#Check that TFBS exist and that it is RegionList
-		if self.TFBS is None or not isinstance(self.TFBS, RegionList):
+		if self.TFBS is None or (not isinstance(self.TFBS, list) and not isinstance(self.TFBS, RegionList)):
 			raise InputError("No TFBS available in '.TFBS'. The TFBS are set either using .TFBS_from_motifs, .TFBS_from_bed or TFBS_from_TOBIAS.")
 
 	def _check_counts(self):
@@ -205,11 +209,11 @@ class CombObj():
 					raise InputError(err)
 
 	def _check_rules(self):
-		""" Internal check whether .rules were. Raises InputError when .rules are not available. """
+		""" Internal check whether .rules were filled. Raises InputError when .rules are not available. """
 
 		if self.rules is None or not isinstance(self.rules, pd.DataFrame):
 			raise InputError("No market basket rules found in .rules. The rules are found by running .market_basket().")
-
+	
 	#-------------------------------------------------------------------------------#
 	#----------------------------- Save / import object ----------------------------#
 	#-------------------------------------------------------------------------------#
@@ -243,7 +247,7 @@ class CombObj():
 		Raises
 		-------
 		InputError
-			If read object is not an instance of CombObj .
+			If read object is not an instance of CombObj.
 		
 		See also
 		----------
@@ -263,8 +267,6 @@ class CombObj():
 		
 		return(self)
 
-		return(self)
-
 	#-------------------------------------------------------------------------------#
 	#-------------------------- Setting up the .TFBS list --------------------------#
 	#-------------------------------------------------------------------------------#
@@ -272,10 +274,10 @@ class CombObj():
 	def TFBS_from_motifs(self, regions, 
 								motifs, 
 								genome,
-								motif_pvalue=0.0001,
+								motif_pvalue=1e-05,
 								motif_naming="name",
 								gc=0.5, 
-								keep_overlaps=False, 
+								resolve_overlapping="merge", 
 								threads=1, 
 								overwrite=False,
 								_suffix=""): #suffix to add to output motif names
@@ -292,13 +294,14 @@ class CombObj():
 		genome : str
 			Path to the genome fasta-file to use for scan.
 		motif_pvalue : float, optional
-			The pvalue threshold for the motif search. Default: 0.0001.
+			The pvalue threshold for the motif search. Default: 1e-05.
 		motif_naming : str, optional
 			How to name TFs based on input motifs. Must be one of: 'name', 'id', 'name_id' or 'id_name'. Default: "name".
 		gc : float between 0-1, optional
 			Set GC-content for the motif background model. Default: 0.5.
-		keep_overlaps : bool, optional
-			Whether to keep overlapping occurrences of the same TFBS. Setting 'False' removes overlapping TFBS keeping the TFBS with the highest match score. Default: False.
+		resolve_overlapping : str
+			Control how to treat overlapping occurrences of the same TF. Must be one of "merge", "highest_scoring" or "off". If "highest_score", the highest scoring overlapping site is kept.
+			If "merge", the sites are merged, keeping the information of the first site. If "off", overlapping TFBS are kept. Default: "merge".
 		threads : int, optional
 			How many threads to use for multiprocessing. Default: 1. 
 		overwrite : boolean
@@ -319,7 +322,7 @@ class CombObj():
 		check_value(motif_pvalue, vmin=0, vmax=1, name="motif_pvalue")
 		check_string(motif_naming, allowed_motif_naming, "motif_naming")
 		check_value(gc, vmin=0, vmax=1, name="gc")
-		check_type(keep_overlaps, bool, "keep_overlap")
+		check_string(resolve_overlapping, ["off", "merge", "highest_score"], "resolve_overlapping")
 		check_value(threads, vmin=1, name="threads")
 		check_type(overwrite, bool, "overwrite")
 		
@@ -344,8 +347,13 @@ class CombObj():
 			motifs = tfcomb.utils.prepare_motifs(motifs_f, motif_pvalue, motif_naming)
 			self.logger.debug("Read {0} motifs from '{1}'".format(len(motifs), motifs_f))
 		else:
+			
+			#set gc for motifs
+			#bg = 
+
 			_ = [motif.get_threshold(motif_pvalue) for motif in motifs]
 			_ = [motif.set_prefix(motif_naming) for motif in motifs]
+
 
 		#Set suffix to motif names
 		for motif in motifs:
@@ -368,7 +376,7 @@ class CombObj():
 			TFBS = RegionList([])	#initialize empty list	
 			for region_chunk in chunks:
 
-				region_TFBS = tfcomb.utils.calculate_TFBS(region_chunk, motifs, genome_obj)
+				region_TFBS = tfcomb.utils.calculate_TFBS(region_chunk, motifs, genome_obj, resolve_overlapping)
 				TFBS += region_TFBS
 
 				#Update progress
@@ -385,7 +393,7 @@ class CombObj():
 			jobs = []
 			for region_chunk in chunks:
 				self.logger.spam("Starting job for region_chunk of length: {0}".format(len(region_chunk)))
-				jobs.append(pool.apply_async(tfcomb.utils.calculate_TFBS, (region_chunk, motifs, genome, )))
+				jobs.append(pool.apply_async(tfcomb.utils.calculate_TFBS, (region_chunk, motifs, genome, resolve_overlapping)))
 			pool.close()
 			
 			log_progress(jobs, self.logger) #only exits when the jobs are complete
@@ -396,12 +404,7 @@ class CombObj():
 			#Join all TFBS to one list
 			TFBS = RegionList(sum(results, []))
 
-		self.logger.info("Formatting scanned TFBS")
-
-		#Resolve overlaps
-		if keep_overlaps == False:
-			self.logger.debug("keep_overlaps == False; Resolving overlaps for TFBS")
-			TFBS = tfcomb.utils.resolve_overlapping(TFBS)
+		self.logger.info("Processing scanned TFBS")
 
 		#Join and process TFBS
 		self.TFBS += TFBS
@@ -409,11 +412,16 @@ class CombObj():
 		TF_names = unique_region_names(TFBS)
 		self.TF_names = sorted(list(set(self.TF_names + TF_names)))
 
+		#Resolve any leftover overlaps between jobs
+		if resolve_overlapping != "off":
+			TFBS = tfcomb.utils.resolve_overlaps(TFBS, how=resolve_overlapping)
+
+		self._prepare_TFBS()
+
 		#Final info log
 		self.logger.info("Identified {0} TFBS ({1} unique names) within given regions".format(len(TFBS), len(TF_names)))
 		if initialized == 0: #if sites were added, log the updated
 			self.logger.info("The attribute .TFBS now contains {0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)))
-		
 
 	def TFBS_from_bed(self, bed_file, overwrite=False):
 		"""
@@ -453,6 +461,8 @@ class CombObj():
 		self.TFBS.loc_sort()
 		read_TF_names = unique_region_names(read_TFBS)
 		self.TF_names = sorted(list(set(self.TF_names + read_TF_names)))
+
+		self._prepare_TFBS()
 
 		#Final info log
 		self.logger.info("Read {0} sites ({1} unique names)".format(len(read_TFBS), len(read_TF_names)))
@@ -519,6 +529,8 @@ class CombObj():
 		self.TFBS.loc_sort()
 		read_TF_names = unique_region_names(TFBS)
 		self.TF_names = sorted(list(set(self.TF_names + read_TF_names)))
+
+		self._prepare_TFBS()
 
 		self.logger.info("Read {0} sites ({1} unique names) from condition '{2}'".format(len(TFBS), len(read_TF_names), condition))
 		if initialized == 0:
@@ -587,6 +599,9 @@ class CombObj():
 		n_names_orig = len(self.TF_names) 				#number of unique names before clustering
 		self.TF_names = unique_region_names(self.TFBS)	#unique names after clustering
 		n_names_clustered = len(self.TF_names)
+
+		self._prepare_TFBS()
+
 		self.logger.info("TFBS were clustered from {0} to {1} unique names. The new TF names can be seen in <CombObj>.TFBS and <CombObj>.TF_names.",format(n_names_orig, n_names_clustered))
 
 
@@ -645,6 +660,9 @@ class CombObj():
 				raise InputError("No overlap found between 'names' and names from <CombObj>.TFBS. Please select names of TFs within the data.")
 
 			self.TFBS = RegionList([site for site in self.TFBS if site.name in in_TFBS])
+			self.TF_names = unique_region_names(self.TFBS)	#unique names after clustering
+
+		self._prepare_TFBS()
 
 		self.logger.info("Subset finished! The attribute .TFBS now contains {0} sites.".format(len(self.TFBS)))
 
@@ -663,8 +681,18 @@ class CombObj():
 		check_writeability(path)
 
 		#Call the .write_bed utility from tobias
-		self.TFBS.write_bed(path)
+		f = open(path, "w")
+		s = "\n".join([str(site) for site in self.TFBS]) + "\n"
+		f.write(s)
+		f.close()
 
+	def _prepare_TFBS(self):
+		""" Prepare the TFBS for internal counting within count_within. Sets the internal ._sites attribute. """
+
+		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
+		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
+		name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)} 
+		self._sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, name_to_idx[site.name]) for site in self.TFBS]) #numpy integer array
 
 	#-------------------------------------------------------------------------------------------------------------#
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
@@ -730,22 +758,30 @@ class CombObj():
 		tfcomb.utils.check_string(anchor, list(anchor_str_to_int.keys()), "anchor")
 
 		self.logger.info("Setting up binding sites for counting")
-	
+		sites = self._sites #sites still points to ._sites
+
 		#Should strand be taken into account?
-		TFBS = copy.deepcopy(self.TFBS)
 		if stranded == True:
-			for site in TFBS:
-				site.name = "{0}({1})".format(site.name, site.strand)
-			TF_names = unique_region_names(TFBS)
+			sites = self._sites.copy() #don't change self._sites
+
+			name_to_idx = {}
+			TF_names = [] #names in order of idx
+			current_idx = -1
+
+			for i, site in enumerate(self.TFBS):
+				name = "{0}({1})".format(site.name, site.strand)
+				if name not in name_to_idx:
+					TF_names.append(name)
+					current_idx = current_idx + 1
+					name_to_idx[name] = current_idx
+				sites[0][-1] = name_to_idx[name] #set new idx based on stranded name
 		else:
 			TF_names = self.TF_names
 		self.logger.spam("TF_names: {0}".format(TF_names))
 
-		#Convert TFBS to internal numpy integer format
-		chromosomes = {site.chrom:"" for site in TFBS}.keys()
-		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
-		name_to_idx = {name: idx for idx, name in enumerate(TF_names)}
-		sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, name_to_idx[site.name]) for site in TFBS]) #numpy integer array
+		#Sort sites by mid if anchor is center:
+		if anchor == "center": 
+			sites = np.array(sorted(sites, key=lambda site: int((site[1] + site[2]) / 2)))
 
 		#---------- Count co-occurrences within TFBS ---------#
 		self.logger.info("Counting co-occurrences within sites")
@@ -765,54 +801,60 @@ class CombObj():
 		self.pair_counts = pair_counts
 
 		#---------- Count co-occurrences within shuffled background ---------#
-		self.logger.info("Counting co-occurrence within background")
-		args = (min_distance, max_distance,	max_overlap, binary, anchor_int, n_TFs, directional)
 
-		#setup multiprocessing
-		if threads == 1:
-			l = [] #list of background pair_counts
+		if n_background > 0:
+			self.logger.info("Counting co-occurrence within background")
+			args = (min_distance, max_distance,	max_overlap, binary, anchor_int, n_TFs, directional)
 
-			self.logger.info("Running with multiprocessing threads == 1. To change this, give 'threads' in the parameter of the function.")
-			p = Progress(n_background, 10, self.logger) #Setup progress object
-			for i in range(n_background):
-				all_args = (sites,) + args + (i,)
-				l.append(tfcomb.utils.calculate_background(*all_args))
-				p.write_progress(i)
+			#setup multiprocessing
+			if threads == 1:
+				l = [] #list of background pair_counts
+
+				self.logger.info("Running with multiprocessing threads == 1. To change this, give 'threads' in the parameter of the function.")
+				p = Progress(n_background, 10, self.logger) #Setup progress object
+				for i in range(n_background):
+					all_args = (sites,) + args + (i,)
+					l.append(tfcomb.utils.calculate_background(*all_args))
+					p.write_progress(i)
+
+			else:
+				#Setup pool
+				pool = mp.Pool(threads)
+
+				#Add job per background iteration
+				jobs = []
+				for i in range(n_background):
+					self.logger.spam("Adding job for i = {0}".format(i))
+					all_args = (sites,) + args + (i,)
+					job = pool.apply_async(tfcomb.utils.calculate_background, all_args)
+					jobs.append(job)
+				pool.close()
+				
+				log_progress(jobs, self.logger) #only exits when the jobs are complete
+				
+				self.logger.debug("Fetching jobs from pool")
+				l = [job.get() for job in jobs]
+				pool.join()
+
+			#Calculate z-score per pair
+			stacked = np.stack(l) #3-dimensional array of stacked pair_counts from background
+			stds = np.std(stacked, axis=0)
+			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
+			means = np.mean(stacked, axis=0)
+			z = (pair_counts - means)/stds	#pair_counts are the true osberved co-occurrences
+
+			#Handle NaNs introduced in zscore calculation
+			z[np.isnan(z) & (pair_counts == means)] = 0
+			z[np.isnan(z) & (pair_counts > means)] = np.inf
+			z[np.isnan(z) & (pair_counts < means)] = -np.inf
+			self.zscore = z
 
 		else:
-			#Setup pool
-			pool = mp.Pool(threads)
-
-			#Add job per background iteration
-			jobs = []
-			for i in range(n_background):
-				self.logger.spam("Adding job for i = {0}".format(i))
-				all_args = (sites,) + args + (i,)
-				job = pool.apply_async(tfcomb.utils.calculate_background, all_args)
-				jobs.append(job)
-			pool.close()
-			
-			log_progress(jobs, self.logger) #only exits when the jobs are complete
-			
-			self.logger.debug("Fetching jobs from pool")
-			l = [job.get() for job in jobs]
-			pool.join()
-
-		#Calculate z-score per pair
-		stacked = np.stack(l) #3-dimensional array of stacked pair_counts from background
-		stds = np.std(stacked, axis=0)
-		stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
-		means = np.mean(stacked, axis=0)
-		z = (pair_counts - means)/stds	#pair_counts are the true osberved co-occurrences
-
-		#Handle NaNs introduced in zscore calculation
-		z[np.isnan(z) & (pair_counts == means)] = 0
-		z[np.isnan(z) & (pair_counts > means)] = np.inf
-		z[np.isnan(z) & (pair_counts < means)] = -np.inf
-		self.zscore = z
+			self.logger.info("n_background is set to 0; z-score calculation will be skipped")
 
 		#Update object variables
 		self.rules = None 	#Remove .rules if market_basket() was previously run
+		self.n_TFBS = len(self.TFBS)	#number of TFBS counted
 		self.min_distance = min_distance
 		self.max_distance = max_distance
 		self.stranded = stranded
@@ -858,8 +900,7 @@ class CombObj():
 		See also
 		---------
 		tfcomb.utils.get_pair_results
-		tfcomb.CombObj.count_within
-
+		tfcomb.CombObj.count_withinmo
 		"""
 		
 		#Check input parameters
@@ -878,7 +919,7 @@ class CombObj():
 		locations = tfcomb.utils.get_pair_locations(self.TFBS, TF1, TF2, TF1_strand, TF2_strand, **kwargs)
 
 		if save is not None:
-			tfcomb.utils.locations_to_bed(locations, outfile=save, fmt=fmt)
+			locations.write_bed(outfile=save, fmt=fmt)
 
 		return(locations)
 
@@ -888,6 +929,8 @@ class CombObj():
 
 	def market_basket(self, measure="cosine", 
 							threads=1,
+							keep_zero=False,
+							n_baskets=1e6,
 							_show_columns=["TF1_TF2_count", "TF1_count", "TF2_count"]):
 		"""
 		Runs market basket analysis on the TF1-TF2 counts. Requires prior run of .count_within().
@@ -898,6 +941,10 @@ class CombObj():
 			The measure(s) to use for market basket analysis. Can be any of: ["cosine", "confidence", "lift", "jaccard"]. Default: 'cosine'.
 		threads : int, optional
 			Threads to use for multiprocessing. This is passed to .count_within() in case the <CombObj> does not contain any counts yet. Default: 1.
+		keep_zero : bool, optional
+			Whether to keep rules with 0 occurrences in .rules table. Default: False (remove 0-rules).
+		n_baskets : int, optional
+			The number of baskets used for calculating market basket measures. Default: 1e6.
 
 		Raises
 		-------
@@ -927,9 +974,7 @@ class CombObj():
 			tfcomb.utils.check_string(col, available)
 
 		##### Calculate market basket analysis #####
-		
-		n_baskets = len(self.TFBS) #number of baskets is the number of TFBS
-
+	
 		#Convert pair counts to table and convert to long format
 		pair_counts_table = pd.DataFrame(self.pair_counts, index=self.count_names, columns=self.count_names) #size n x n TFs
 		pair_counts_table["TF1"] = pair_counts_table.index
@@ -965,10 +1010,11 @@ class CombObj():
 				raise InputError("Measure '{0}' is invalid. The measure must be one of: {1}".format(metric, available_measures))
 		
 		#Remove rows with TF1_TF2_count == 0
-		table = table[table["TF1_TF2_count"] != 0]
+		if keep_zero == False:
+			table = table[table["TF1_TF2_count"] != 0]
 
 		#Sort for highest measure pairs
-		table.sort_values(measure, ascending=False, inplace=True)
+		table.sort_values([measure[0], "TF1"], ascending=[False, True], inplace=True) #if two pairs have equal measure, sort by TF1 name
 		table.reset_index(inplace=True, drop=True)
 
 		#Add z-score per pair
@@ -976,15 +1022,6 @@ class CombObj():
 		zscore_table["TF1"] = zscore_table.index
 		ztable_table_long = pd.melt(zscore_table, id_vars=["TF1"], var_name=["TF2"], value_name="zscore")  #long format (TF1, TF2, value)
 		table = table.merge(ztable_table_long)
-
-		#Calculate p-values for the measure(s) given
-		#self.logger.debug("Calculating p-value for {0} rules".format(len(table)))
-		#if threads == 1:
-		#	self.logger.info("Parameter 'threads' is set to '1' - to speed up p-value calculation, please increase the number of threads used.")
-		
-		#for metric in measure:
-		#	self.logger.debug("Calculating p-value for {0}".format(metric))
-		#	tfcomb.utils.tfcomb_pvalue(table, measure=metric, threads=threads, logger=self.logger) #adds pvalue column to table
 
 		#Create internal node table for future network analysis
 		TF1_table = table[["TF1", "TF1_count"]].set_index("TF1", drop=False).drop_duplicates()
@@ -1005,6 +1042,24 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 	#------------------------------ Selecting significant rules ------------------------------#
 	#-----------------------------------------------------------------------------------------#
+
+	def reduce_TFBS(self):
+		""" Reduce TFBS to the TFs present in .rules.
+		
+		Returns
+		--------
+		None - changes .TFBS in place"""
+
+		if hasattr(self, "TFBS"): #This is false for DiffCombObj, which is also using the function
+
+			#Get names from rules
+			self.logger.debug("Getting names")
+			selected_names = list(set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()))
+
+			#Subset TFBS
+			self.logger.debug("Setting TFBS in new object")
+			self.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+
 
 	def simplify_rules(self):
 		""" 
@@ -1033,8 +1088,8 @@ class CombObj():
 
 		self.rules = sub_rules #overwrite .rules with simplified rules
 		
-	def select_TF_rules(self, TF_list, TF1=True, TF2=True):
-		""" Select rules based on a list of TF names. 
+	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True):
+		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
 		
 		Parameters
 		------------
@@ -1044,11 +1099,18 @@ class CombObj():
 			Whether to subset the rules containing 'TF_list' TFs within "TF1". Default: True.
 		TF2 : bool, optional
 			Whether to subset the rules containing 'TF_list' TFs within "TF2". Default: True.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
+
+		Raises
+		--------
+		InputError
+			If both TF1 and TF2 are False or if no rules were selected based on input.
 
 		Returns
 		--------
 		tfcomb.objects.CombObj()
-			An object containing a subset of <Combobj>.rules
+			An object containing a subset of <Combobj>.rules.
 		"""
 
 		#Check input
@@ -1058,34 +1120,87 @@ class CombObj():
 		check_type(TF2, bool, "TF2")
 
 		#Create selected subset
-		selected = self.rules.copy()
+		selected = self.rules
 
-		if TF1 == True:
-			selected_bool = selected["TF1"].isin(TF_list)
-			if sum(selected_bool) == 0:
-				self.logger.warning("")
-			else:
-				selected = selected[selected_bool]
-		
-		if TF2 == True:
-			selected_bool = selected["TF2"].isin(TF_list)
-			if sum(selected_bool) == 0:
-				self.logger.warning("")
-			else:
-				selected = selected[selected_bool]
+		if TF1 == False and TF2 == False:
+			raise InputError("Either TF1 or TF2 must be True in order to create a selection.")
+
+		#Create selections for TF1/TF2
+		selections = []
+		for (TF_bool, TF_col) in zip([TF1, TF2], ["TF1", "TF2"]):
+
+			if TF_bool == True:
+
+				#Write out any TFs from TF_list not in TF_col names
+				not_found = set(TF_list) - set(self.rules[TF_col])
+				if len(not_found) > 0:
+					self.logger.warning("{0}/{1} names in 'TF_list' were not found within '{2}' names: {3}".format(len(not_found), len(TF_list), TF_col, list(not_found)))
+
+				#Create selection
+				selected_bool = self.rules[TF_col].isin(TF_list)
+				selected = self.rules[selected_bool]
+				selections.append(selected)
+
+		#Join selections from TF1 and TF2
+		if len(selections) > 1:
+			selected = selections[0].merge(selections[1]) #inner merge
+		else:
+			selected = selections[0]
+
+		#Stop if no rules were able to be selected
+		if len(selected) == 0:
+			raise InputError("No rules could be selected - please adjust TF_list and/or TF1/TF2 parameters.")
+
 		self.logger.info("Selected {0} rules".format(len(selected)))
 
 		#Create new object with selected rules
 		self.logger.info("Creating subset of object")
 		new_obj = self.copy()
 		new_obj.rules = selected
+		new_obj.network = None
 
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()
+		
+		return(new_obj)
+	
+	def select_custom_rules(self, custom_list, reduce_TFBS=True):
+		""" Select rules based on a custom list of TF pairs. 
+		
+		Parameters
+		------------
+		custom_list : list
+			List of TF pairs fitting to TF1/TF2 combination within .rules.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
+
+		Returns
+		--------
+		tfcomb.objects.CombObj()
+			An object containing a subset of <Combobj>.rules
+		"""
+
+		#Check input
+		self._check_rules()
+		check_type(custom_list, list, name="TF_list")
+		#check_type(custom_list[0], [tuple, list], name="Pairs")
+
+		#Create selected subset
+		selected = self.rules.copy()
+
+		selected = selected.loc[custom_list]
+
+		#Create new object with selected rules
+		new_obj = self.copy()
+		new_obj.rules = selected
+		new_obj.network = None
+
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()
 
 		return(new_obj)
 
-	def select_top_rules(self, n):
+	def select_top_rules(self, n, reduce_TFBS=True):
 		"""
 		Select the top 'n' rules within .rules. By default, the .rules are sorted for the measure value, so n=100 will select the top 100 highest values for the measure (e.g. cosine).
 
@@ -1093,6 +1208,8 @@ class CombObj():
 		-----------
 		n : int
 			The number of rules to select.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 
 		Returns
 		--------
@@ -1111,16 +1228,20 @@ class CombObj():
 		#Create new object with selected rules
 		new_obj = self.copy()
 		new_obj.rules = selected
+		new_obj.network = None
 
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
-
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()
+		
 		return(new_obj)
 
 	def select_significant_rules(self, x="cosine", 
 										y="zscore", 
 										x_threshold=None,
+										x_threshold_percent=0.05,
 										y_threshold=None,
+										y_threshold_percent=0.05,
+										reduce_TFBS=True,
 										plot=True, 
 										**kwargs):
 		"""
@@ -1133,9 +1254,15 @@ class CombObj():
 		y : str, optional
 			The name of the column within .rules containing the pvalue to be selected on. Default: 'zscore'
 		x_threshold : float, optional
-			A minimum threshold for the measure to be selected. If None, the threshold will be estimated from the data. Default: None.
+			A minimum threshold for the x-axis measure to be selected. If None, the threshold will be estimated from the data. Default: None.
+		x_threshold_percent : float between 0-1, optional
+			If x_threshold is not given, x_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
 		y_threshold : float, optional
-			A p-value threshold for selecting rules. If None, the threshold will be estimated from the data. Default: None.
+			A minimum threshold for the y-axis measure to be selected. If None, the threshold will be estimated from the data. Default: None.
+		y_threshold_percent : float between 0-1, optional
+			If y_threshold is not given, y_threshold_percent controls the strictness of the automatic threshold selection. Default: 0.05.
+		reduce_TFBS : bool, optional
+			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 		plot : bool, optional
 			Whether to show the 'measure vs. pvalue'-plot or not. Default: True.
 		kwargs : arguments
@@ -1157,6 +1284,8 @@ class CombObj():
 			check_value(x_threshold)
 		if y_threshold is not None:
 			check_value(y_threshold)
+		tfcomb.utils.check_value(y_threshold_percent, vmin=0, vmax=1, name="y_threshold_percent")
+		tfcomb.utils.check_value(x_threshold_percent, vmin=0, vmax=1, name="x_threshold_percent")	
 
 		#Check if measure are in columns
 		if x not in self.rules.columns:
@@ -1165,11 +1294,11 @@ class CombObj():
 		#If measure_threshold is None; try to calculate optimal threshold via knee-plot
 		if x_threshold is None:
 			self.logger.info("x_threshold is None; trying to calculate optimal threshold")
-			x_threshold = tfcomb.utils.get_threshold(self.rules[x])
+			x_threshold = tfcomb.utils.get_threshold(self.rules[x], percent=x_threshold_percent)
 
 		if y_threshold is None:
 			self.logger.info("y_threshold is None; trying to calculate optimal threshold")
-			y_threshold = tfcomb.utils.get_threshold(self.rules[y])
+			y_threshold = tfcomb.utils.get_threshold(self.rules[y], percent=y_threshold_percent)
 
 		#Set threshold on table
 		selected = self.rules.copy()
@@ -1187,12 +1316,10 @@ class CombObj():
 		self.logger.debug("Copying old to new object")
 		new_obj = self.copy()
 		new_obj.rules = selected
+		new_obj.network = None
 
-		self.logger.debug("Getting names")
-		selected_names = list(set(selected["TF1"].tolist() + selected["TF2"].tolist()))
-
-		self.logger.debug("Setting TFBS in new object")
-		new_obj.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+		if reduce_TFBS == True:
+			new_obj.reduce_TFBS()	
 
 		return(new_obj)
 
@@ -1259,6 +1386,9 @@ class CombObj():
 			check_columns(table, [TF1_col, TF2_col])
 			self.rules = self.rules.merge(table, left_on=["TF1", "TF2"], right_on=[TF1_col, TF2_col], how="left")
 		
+		#Set name of index for table
+		self.rules.index = self.rules["TF1"] + "-" + self.rules["TF2"]
+
 		#If data was integrated, .network must be recalculated	
 		self.network = None
 		
@@ -1266,6 +1396,23 @@ class CombObj():
 	#-----------------------------------------------------------------------------------------#
 	#-------------------------------- Plotting functionality  --------------------------------#
 	#-----------------------------------------------------------------------------------------#
+
+	def plot_TFBS(self, **kwargs):
+		"""
+		This is a wrapper for the plotting function `tfcomb.plotting.genome_view`
+
+		Parameters
+		------------
+		kwargs : arguments
+			All arguments are passed to `tfcomb.plotting.genome_view`. Please see the documentation for input parameters.
+		
+		"""
+
+		self._check_TFBS() #Requires TFBS
+
+		#Plot TFBS via genome view
+		tfcomb.plotting.genome_view(self.TFBS, **kwargs)
+
 
 	def plot_heatmap(self, n_rules=20, color_by="cosine", sort_by=None, **kwargs):
 		"""
@@ -1382,13 +1529,15 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via combobj.distObj")
 
-	def analyze_distances(self, normalize=True, n_bins=None, parent_directory=None, **kwargs):
+	def analyze_distances(self, parent_directory=None, threads=4, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
 		self.create_distObj()
 		self.distObj.set_verbosity(self.verbosity)
-		self.distObj.count_distances(normalize=normalize, directional=self.directional)
+		self.distObj.count_distances(directional=self.directional)
+
+		#Ensure that parent directories exist before trying to plot
 		tfcomb.utils.check_type(parent_directory,[type(None),str])
 		if parent_directory is not None:
 			tfcomb.utils.check_dir(parent_directory)
@@ -1403,15 +1552,34 @@ class CombObj():
 			subfolder_corrected = parent_directory
 			subfolder_peaks = parent_directory
 		
-		
-		self.distObj.linregress_all(n_bins=n_bins, save=subfolder_linres)
-		self.distObj.correct_all(n_bins=n_bins, save=subfolder_corrected)
-		self.distObj.analyze_signal_all(**kwargs, save=subfolder_peaks)
+		#Perform steps in standard workflow
+		self.distObj.smooth(window_size=3)
+		self.distObj.linregress_all(threads=threads, save=subfolder_linres)
+		self.distObj.correct_all(threads=threads, save=subfolder_corrected)
+		self.distObj.analyze_signal_all(threads=threads, save=subfolder_peaks, **kwargs)
 
 		if parent_directory is not None:
 			for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 				self.plot_analyzed_signal((tf1, tf2), only_peaking=True, save=os.path.join(parent_directory, "peaks", f"{tf1}_{tf2}.png"))
 		
+
+	def analyze_orientation(self):
+		""" Analyze preferred orientation of sites in .TFBS. This is a wrapper for tfcomb.analysis.orientation().
+		
+		Returns: 
+		--------
+		pd.DataFrame
+		
+		See also:
+		----------
+		tfcomb.analysis.orientation
+		"""
+
+		self._check_rules() #market basket must be run.
+
+		table = tfcomb.analysis.orientation(self.rules) 
+
+		return(table)
 
 	#-------------------------------------------------------------------------------------------#
 	#------------------------------------ Network analysis -------------------------------------#
@@ -1429,7 +1597,7 @@ class CombObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_nx_network")
-		self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
 		self.logger.info("Finished! The network is found within <CombObj>.network.")
 		
 
@@ -1458,7 +1626,7 @@ class CombObj():
 		elif method == "blockmodel":
 
 			#Create gt network	
-			self._gt_network = tfcomb.network.build_gt_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+			self._gt_network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, tool="graph-tool", verbosity=self.verbosity)
 
 			#Partition network
 			tfcomb.network.partition_blockmodel(self._gt_network)
@@ -1475,7 +1643,7 @@ class CombObj():
 		
 		#Update network attribute for plotting
 		if method == "blockmodel":
-			self.network = tfcomb.network.build_nx_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+			self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
 
 		#no return - networks were changed in place
 
@@ -1554,7 +1722,7 @@ class CombObj():
 		if normalize == True:
 			diff.normalize()
 
-		diff.calculate_foldchanges() #also calculates p-values and writes info
+		diff.calculate_foldchanges()
 
 		return(diff)
 
@@ -1567,18 +1735,21 @@ class CombObj():
 
 class DiffCombObj():
 
-	def __init__(self, objects=[], measure='cosine', join="inner", verbosity=1):
+	def __init__(self, objects=[], measure='cosine', join="inner", fillna=True, verbosity=1):
 		""" Initializes a DiffCombObj object for doing differential analysis between CombObj's.
 
 		Parameters
 		------------
 		objects : list, optional
-			A list of CombObj instances. If list is empty, an DiffCombObj will be created. Default: [].
+			A list of CombObj instances. If list is empty, an empty DiffCombObj will be created. Default: [].
 		measure : str, optional
 			The measure to compare between objects. Must be a column within .rules for each object. Default: 'cosine'.
 		join : string
 			How to join the TF names of the two objects. Must be one of "inner" or "outer". If "inner", only TFs present in both objects are retained. 
 			If "outer", TFs from both objects are used, and any missing counts are set to 0. Default: "inner".
+		fillna : True
+			If "join" == "outer", there can be missing counts for individual rules. If fillna == True, these counts are set to 0. Else, the counts are NA. 
+			Default: True.
 		verbosity : int, optional
 			The verbosity of the output logging. Default: 1.
 
@@ -1599,7 +1770,7 @@ class DiffCombObj():
 
 		#Add objects one-by-one
 		for obj in objects:
-			self.add_object(obj, join=join)
+			self.add_object(obj, join=join, fillna=fillna)
 
 		#Use functions from CombObj
 		self._set_combobj_functions()
@@ -1612,12 +1783,17 @@ class DiffCombObj():
 		self.build_network = lambda : CombObj.build_network(self)
 		self._check_rules = lambda : CombObj._check_rules(self)
 		self.simplify_rules = lambda : CombObj.simplify_rules(self)
+		self.select_TF_rules = lambda *args, **kwargs: CombObj.select_TF_rules(self, *args, **kwargs)
+		self.select_custom_rules = lambda  *args, **kwargs: CombObj.select_custom_rules(self, *args, **kwargs)
+		self.reduce_TFBS = lambda : CombObj.reduce_TFBS(self) #to use in selecting rules
 		self.integrate_data = lambda *args, **kwargs: CombObj.integrate_data(self, *args, **kwargs)
 
 	def __str__(self):
 		pass
 		
-	def add_object(self, obj, join="inner"):
+	def add_object(self, obj, join="inner", 
+							 fillna=True
+							  ):
 		"""
 		Add one CombObj to the DiffCombObj.
 
@@ -1628,7 +1804,10 @@ class DiffCombObj():
 		join : string
 			How to join the TF names of the two objects. Must be one of "inner" or "outer". If "inner", only TFs present in both objects are retained. 
 			If "outer", TFs from both objects are used, and any missing counts are set to 0. Default: "inner".
-		
+		fillna : True
+			If "join" == "outer", there can be missing counts for individual rules. If fillna == True, these counts are set to 0. Else, the counts are NA. 
+			Default: True.
+
 		Returns
 		--------
 		None
@@ -1666,7 +1845,7 @@ class DiffCombObj():
 		columns_to_keep = ["TF1", "TF2"] + [self.measure]
 		
 		obj_table = obj.rules[columns_to_keep] #only keep necessary columns
-		obj_table.rename(columns={self.measure: str(prefix) + "_" + self.measure}, inplace=True) #rename column to <prefix>_<measure>
+		obj_table.columns = [str(prefix) + "_" + col if col not in ["TF1", "TF2"] else col for col in obj_table.columns] #add prefix to all columns besides TF1/TF2
 
 		obj_TF_table = obj.TF_table.copy()
 		obj_TF_table.columns = [str(prefix) + "_" + col for col in obj_TF_table.columns]
@@ -1698,7 +1877,9 @@ class DiffCombObj():
 
 			else: #join is outer
 				self.rules = self.rules.merge(obj_table, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"], how="outer")
-				self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
+
+				if fillna == True:
+					self.rules = self.rules.fillna(0) #Fill NA with null (happens if TF1/TF2 pairs are different between objects)
 
 			#Merge TF tables
 			self.TF_table = self.TF_table.merge(obj_TF_table, left_index=True, right_index=True)
@@ -1722,24 +1903,28 @@ class DiffCombObj():
 		#Establish input/output columns
 		measure_columns = [prefix + "_" + self.measure for prefix in self.prefixes]
 		zero_bool = self.rules[measure_columns] == 0
+		nan_bool = self.rules[measure_columns].isnull()
+
+		#Fill na with 0
+		data = self.rules[measure_columns]
+		data[nan_bool] = 0
 
 		#Normalize values
-		self.rules[measure_columns] = qnorm.quantile_normalize(self.rules[measure_columns], axis=1)
+		self.rules[measure_columns] = qnorm.quantile_normalize(data, axis=1)
 		
-		#Ensure that original 0 values are kept at 0
+		#Ensure that original 0 values are kept at 0, and original nan kept at nan
 		self.rules[zero_bool] = np.nan
 		self.rules.fillna(0, inplace=True)
+		self.rules[nan_bool] = np.nan
 
-	def calculate_foldchanges(self, pseudo=None, threads=1):
-		""" Calculate measure foldchanges and p-values between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
+	def calculate_foldchanges(self, pseudo=None):
+		""" Calculate measure foldchanges  between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
 		----------
 		pseudo : float, optional
 			Set the pseudocount to add to all values before log2-foldchange transformation. Default: None (pseudocount will be estimated per contrast).
-		threads : int, optional
-			The number of threads to use for calculating foldchanges and p-values
-
+	
 		See also
 		--------
 		tfcomb.DiffCombObj.normalize
@@ -1754,7 +1939,7 @@ class DiffCombObj():
 
 		columns = [] #collect the log2fc columns per contrast
 		for (p1, p2) in self.contrasts:
-			self.logger.info("Calculating contrast: {0} / {1}".format(p1, p2))
+			self.logger.info("Calculating foldchange for contrast: {0} / {1}".format(p1, p2))
 			log2_col = "{0}/{1}_{2}_log2fc".format(p1, p2, measure)
 			columns.append(log2_col)
 
@@ -1768,10 +1953,6 @@ class DiffCombObj():
 				self.logger.debug("Pseudocount: {0}".format(pseudo))
 
 			self.rules[log2_col] = np.log2((p1_values + pseudo) / (p2_values + pseudo))
-
-			#Calculate p-value of each pair
-			self.logger.debug("Calculating p-value")
-			tfcomb.utils.tfcomb_pvalue(self.rules, measure=log2_col, alternative="two-sided", threads=threads)
 
 		#Sort by first contrast log2fc
 		self.logger.debug("columns: {0}".format(columns))
@@ -1787,12 +1968,14 @@ class DiffCombObj():
 	def select_rules(self, contrast=None,
 						   measure="cosine", 
 						   measure_threshold=None,
-						   pvalue_threshold=0.05,
+						   measure_threshold_percent=0.05,
+						   mean_threshold=None,
+						   mean_threshold_percent=0.05,
 						   plot = True, 
 						   **kwargs):
 		"""
-		Select differentially regulated rules on the basis of measure and pvalue.
-
+		Select differentially regulated rules using a MA-plot on the basis of measure and mean of measures per contrast.
+		
 		Parameters
 		-----------
 		contrast : tuple
@@ -1800,11 +1983,17 @@ class DiffCombObj():
 		measure : str, optional
 			The measure to use for selecting rules. Default: "cosine" (internally converted to <prefix1>/<prefix2>_<measure>_log2fc).
 		measure_threshold : tuple, optional
-			Threshold for 'measure' for selecting rules. Default: None (the measure is estimated automatically) 
-		pvalue_threshold : float, optional
-			The p-value threshold for selecting rules. Default: 0.05.
+			Threshold for 'measure' for selecting rules. Default: None (the threshold is estimated automatically) 
+		measure_threshold_percent : float between 0-1
+			If measure_threshold is not set, measure_threshold_percent controls the strictness of the automatic threshold. If you increase this value, more differential rules will be found and vice versa. Default: 0.05.  
+		mean_threshold : float, optional
+			Threshold for 'mean' for selecting rules. Default: None (the threshold is estimated automatically) 
+		mean_threshold_percent : float between 0-1
+			if mean_threshold is not set, mean_threshold_percent controls the strictness of the automatic threshold. If you increase this value, more differential rules will be found and vice versa. Default: 0.05.  
 		plot : boolean, optional
 			Whether to plot the volcano plot. Default: True.
+		kwargs : arguments, optional
+			Additional arguments are passed to tfcomb.plotting.scatter.
 
 		Returns
 		----------
@@ -1816,6 +2005,18 @@ class DiffCombObj():
 		tfcomb.plotting.volcano
 		"""
 		
+		table = self.rules.copy() #make sure not to change self.rules
+
+		#Check input
+		if measure_threshold is not None:
+			tfcomb.utils.check_type(measure_threshold, tuple, name="measure_threshold")
+			measure_threshold = tuple(sorted(measure_threshold)) #ensure that lower threshold is first in tuple
+		if mean_threshold is not None:
+			tfcomb.utils.check_value(mean_threshold, name="mean_threshold")
+
+		tfcomb.utils.check_value(measure_threshold_percent, vmin=0, vmax=1, name="measure_threshold_percent")
+		tfcomb.utils.check_value(mean_threshold_percent, vmin=0, vmax=1, name="mean_threshold_percent")
+
 		#Identify measure to use based on contrast
 		if contrast == None:
 			contrast = self.contrasts[0]
@@ -1828,56 +2029,66 @@ class DiffCombObj():
 		measure_col = "{0}/{1}_{2}_log2fc".format(contrast[0], contrast[1], measure)
 		self.logger.debug("Measure column is: {0}".format(measure_col))
 
-		#Calculate pvalue for measure
-		pvalue_col = measure_col + "_pvalue"
-		if pvalue_col not in self.rules.columns:
-			self.logger.warning("pvalue column given ('{0}') is not in .rules".format(pvalue_col))
-			self.logger.warning("Calculating pvalues from measure '{0}'".format(measure_col))
-			tfcomb.utils.tfcomb_pvalue(self.rules, measure=measure_col, alternative="two-sided")
-	
+		#Calculate mean of measures
+		measure_cols = [c + "_" + measure for c in contrast]
+		mean_col = "Mean of '{0}' for {1} and {2}".format(measure, contrast[0], contrast[1])
+		table[mean_col] = table[measure_cols].mean(axis=1)
+		to_keep = table[mean_col] > 0 #only keep values with mean measure > 0
+
 		#Find optimal measure threshold
 		if measure_threshold is None:
 			self.logger.info("measure_threshold is None; trying to calculate optimal threshold")
-			measure_threshold = tfcomb.utils.get_threshold(self.rules[measure_col], "both")
+			vals = table[measure_col][to_keep]
+			measure_threshold = tfcomb.utils.get_threshold(vals, "both", percent=measure_threshold_percent, verbosity=self.verbosity)
+			self.logger.debug("Measure threshold is: {0}".format(measure_threshold))
 
+		#Find optimal mean threshold
+		if mean_threshold is None:
+			self.logger.info("mean_threshold is None; trying to calculate optimal threshold")
+			vals = table[mean_col][to_keep] #remove large influence of 0-means
+			mean_threshold = tfcomb.utils.get_threshold(vals, "upper", percent=mean_threshold_percent, verbosity=self.verbosity)
+			self.logger.debug("Mean threshold is: {0}".format(mean_threshold))
+
+		#Plot the MA-plot if chosen
 		if plot == True:
-			cp = self.rules.copy() #ensures that -log10 col is not added to self.rules
-			log_col = "-log10({0})".format(pvalue_col)
-			cp[log_col] = -np.log10(self.rules[pvalue_col])
-			log_threshold = -np.log10(pvalue_threshold)
-			
-			tfcomb.plotting.scatter(cp, 
-									x=measure_col, 
-									y=log_col, 
-									x_threshold=measure_threshold,
-									y_threshold=log_threshold,
+	
+			tfcomb.plotting.scatter(table, 
+									x=mean_col, 
+									y=measure_col, 
+									x_threshold=mean_threshold,
+									y_threshold=measure_threshold,
 									**kwargs)
-		
+
 		#Set threshold on rules
 		selected = self.rules.copy()
 		selected = selected[((selected[measure_col] <= measure_threshold[0]) | (selected[measure_col] >= measure_threshold[1])) &
-							(selected[pvalue_col] <= pvalue_threshold)]
+							(table[mean_col] >= mean_threshold)]
 
 		#Create a DiffCombObj with the subset of  rules
 		self.logger.info("Creating subset of rules using thresholds")
 		new_obj = self.copy()
 		new_obj._set_combobj_functions() #set combobj functions for new object; else they point to self
 		new_obj.rules = selected
-
+		new_obj.network = None
+		
 		return(new_obj)
+
+
 
 	#-------------------------------------------------------------------------------------------#
 	#----------------------------- Plots for differential analysis -----------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def plot_correlation(self, method="pearson"):
+	def plot_correlation(self, method="pearson", **kwargs):
 		"""
 		Plot correlation of 'measure' between rules across objects.
 
 		Parameters
 		-----------
-		method : str
+		method : str, optional
 			Either 'pearson' or 'spearman'. Default: 'pearson'.
+		kwargs : arguments, optional
+			Additional arguments are passed to sns.clustermap.
 		"""
 
 		#Define columns
@@ -1885,16 +2096,34 @@ class DiffCombObj():
 
 		#Calculate matrix and plot
 		matrix = self.rules[cols].corr(method=method)
-		sns.clustermap(matrix,
-							cbar_kws={'label': method})
 
+		g = sns.clustermap(matrix,
+							cbar_kws={'label': method.capitalize() + " corr."}, **kwargs)
+
+		#rotate x-axis labels
+		_ = plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, size=15)  # For y axis
+		_ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", size=15) # For x axis
+
+		return(g)
+
+	def plot_rules_heatmap(self):
+		""" Plot a heatmap of size n_rules x n_objects """ 
+
+		cols = [prefix + "_" + self.measure for prefix in self.prefixes]
+
+		data = self.rules[cols]
+		g = sns.clustermap(data)
+		#tfcomb.plotting.heatmap()
+
+
+	#todo: plot_contrast heatmap
 	def plot_heatmap(self, contrast=None, 
 						   n_rules=10, 
 						   color_by="cosine_log2fc", 
 						   sort_by=None, 
 						   **kwargs):
 		"""
-		Functionality to plot a heatmap of differentially co-occurring TF pairs. 
+		Functionality to plot a heatmap of differentially co-occurring TF pairs for a certain contrast. 
 
 		Parameters
 		------------
@@ -1914,6 +2143,7 @@ class DiffCombObj():
 		tfcomb.plotting.heatmap
 		"""
 
+		#todo: requires log2fcs to be calculated
 		contrast = tfcomb.utils.set_contrast(contrast, self.contrasts)
 
 		#Decide columns based on color_by / sort_by
@@ -2063,6 +2293,58 @@ class DiffCombObj():
 
 		return(dot)
 
+	# -------------------------------------------------------------------------------#
+	# ----------------------------- Save / import object ----------------------------#
+	# -------------------------------------------------------------------------------#
+
+	def to_pickle(self, path : str):
+		""" Save the DiffCombObj to a pickle file.
+
+		Parameters
+		----------
+		path : str
+			Path to the output pickle file e.g. 'my_diff_comb_obj.pkl'.
+
+		See also
+		---------
+		from_pickle
+		"""
+
+		f_out = open(path, 'wb')
+		dill.dump(self, f_out)
+
+	def from_pickle(self, path : str):
+		"""
+		Import a DiffCombObj from a pickle file.
+
+		Parameters
+		-----------
+		path : str
+			Path to an existing pickle file to read.
+
+		Raises
+		-------
+		InputError
+			If read object is not an instance of DiffCombObj.
+
+		See also
+		----------
+		to_pickle
+		"""
+
+		filehandler = open(path, 'rb')
+		obj = dill.load(filehandler)
+
+		# Check if object is CombObj
+		if not isinstance(obj, DiffCombObj):
+			raise InputError("Object from '{0}' is not a DiffCombObj".format(path))
+
+		# Overwrite self with DiffCombObj
+		self = obj
+		self.set_verbosity(self.verbosity)  # restart logger
+
+		return self
+
 ###################################################################################
 ############################## Distance analysis ##################################
 ###################################################################################
@@ -2094,7 +2376,9 @@ class DistObj():
 		#Variables for storing data
 		self.rules = None  		     # Filled in by .fill_rules()
 		self.TF_names = []		     # List of TF names
+		self.TF_table = None		 # List of all TF counts
 		self._raw = None             # Raw distance data [Pandas DataFrame of size n_pairs x maxDist]
+		self.network = None			 # Network obj
 
 		self.distances = None 	     # Pandas DataFrame of size n_pairs x maxDist
 		self.corrected = None        # Pandas DataFrame of size n_pairs x maxDist
@@ -2105,11 +2389,18 @@ class DistObj():
 		self.peaks = None 	         # Pandas DataFrame of size n_pairs x n_preferredDistance 
 
 		self.peaking_count = None    # Number of pairs with at least one peak 
+		self.zscores = None			 # calculated zscores
+		self.stringency = None       # stringency param
+		self.prominence = None       # zscore, median or array of flat values
+		self._noise_method = None 	 # private storage noise_method
+		self._height_multiplier = None # private storage height_mulitplier
+		self._collapsed = None 		#stores the negative values to be able to expand negative section again
+		self._collapsed_peaks = None #stores the negative peaks to be able to expand negative section again
 	
 		
 		self.n_bp = 0			     # Predicted number of baskets 
 		self.TFBS = RegionList()     # None RegionList() of TFBS
-		self.smooth_window = 3       # Smoothing window size, 1 = no smoothing
+		self.smooth_window = 1       # Smoothing window size, 1 = no smoothing
 		self.anchor_mode = 0         # Distance measure mode [0,1,2]
 
 		# str <-> int encoding dicts
@@ -2123,7 +2414,7 @@ class DistObj():
 		self.directional = None      # True if direction is taken into account, false otherwise 
    
 		# private constants
-		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tProminence Threshold\tCount\n"
+		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tThreshold\tCount\n"
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
 		self._XLBL_FONTSIZE = 10    # label fontsize adjustment for plotting x labels
 
@@ -2139,7 +2430,7 @@ class DistObj():
 			A value between 0-3 where 0 (only errors), 1 (info), 2 (debug), 3 (spam debug). 
 		
 		Returns
-		----------
+		-------
 		None 
 			Sets the verbosity level for the Logger inplace
 		"""
@@ -2153,11 +2444,11 @@ class DistObj():
 
 		Parameters
 		----------
-		comb_obj: tfcomb.objects
+		comb_obj : tfcomb.objects
 			Object from which the rules and parameters should be copied from
 
 		Returns
-		----------
+		-------
 		None 
 			Copies values and parameters from a combObj or diffCombObj.
 		
@@ -2179,7 +2470,9 @@ class DistObj():
 		self.directional = comb_obj.directional
 		self.max_overlap = comb_obj.max_overlap
 		self.stranded = comb_obj.stranded
-		#self.anchor = comb_obj.anchor
+		self.TF_table = comb_obj.TF_table
+
+		self.set_anchor(comb_obj.anchor) #sets anchor_mode integer from 0-2
 
 	def set_anchor(self, anchor):
 		""" set anchor for distance measure mode
@@ -2193,7 +2486,7 @@ class DistObj():
 			one of ["inner","outer","center"] or [0,1,2]
 
 		Returns
-		----------
+		-------
 		None 
 			Sets anchor mode inplace
 		"""
@@ -2209,163 +2502,22 @@ class DistObj():
 			tfcomb.utils.check_value(anchor, vmin=0, vmax=2, integer=True)
 			self.anchor_mode = anchor
 
-	def smooth(self, window_size=3):
-		""" Helper function for smoothing all rules with a given window size. The function .correct_all() is required to be run beforehand.
-			
-			Parameters
-			----------
-			window_size: int 
-				window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-				(see tobias.utils.signals.fast_rolling_math) 
-				Default: 3
-
-			Returns:
-			----------
-			None 
-				Fills the object variable .smoothed
-		"""
-		
-		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
-		self.check_min_max_dist()
-
-		if self.shift is not None:
-			self.logger.info("Signal is already shifted! smoothing it again may cause false result. Skipping smoothing.")
-			return
-
-		if self.corrected is None:
-			self.logger.error("Background is not yet corrected. Please try .correct_all() first.")
-			sys.exit(0)
-		
-		self.smooth_window = window_size
-		self.logger.info(f"Smoothing signals with window size {window_size}")
- 
-		smoothed = self.corrected.apply(lambda row: fast_rolling_math(np.array(list(row[2:])), 3, "mean"), axis=1)
-		smoothed = smoothed.apply(lambda row: np.nan_to_num(row))
-		smoothed = pd.DataFrame.from_dict(dict(zip(smoothed.index, smoothed.values)), orient="index", columns=self.corrected.columns[2:])
-		
-		self.smoothed = pd.concat((self.corrected[["TF1","TF2"]],smoothed), axis=1)
-
-	def is_smoothed(self):
-		""" Return True if data was smoothed during analysis, False otherwise
-			
-			Returns:
-			----------
-			bool 
-				True if smoothed, False otherwiese
-		"""
-		
-		if (self.smoothed is None) or (self.smooth_window <= 1): 
-			return False
-		return True
-
-	def shift_signal(self):
-		""" Shifts the signal above zero. 
-
-		Returns:
-		----------
-		None 
-			Fills the object variables .shift and  either .smoothed or .corrected
-
-		"""
-		smoothed = self.is_smoothed()
-
-		datasource = self._get_datasource()
-		
-		if self.shift is not None:
-			self.logger.info("Signals already above zero, skipping shift.")
-			return
-
-		self.logger.info("Shifting signals above zero")
-
-		datasource = datasource.set_index(["TF1", "TF2"])
-		min_values = datasource.min(axis=1).abs()
-		datasource = datasource.add(min_values, axis=0)
-		datasource = datasource.reset_index()
-		self.shift = min_values.reset_index()
-		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
-
-		self._set_datasource(datasource)	
-
-	def reset_signal(self, smoothed):
+	
+	def reset_signal(self):
 		""" Resets the signals to their original state. 
 
-		Parameters
-		----------
-		smoothed: bool 
-			True if the signal was smoothed beforehand, false otherwise
-
-		Returns:
-		----------
+		Returns
+		--------
 		None 
-			Resets the object variables .shift and fills either .smoothed or .corrected
-
+			Resets the object datasource variable to the original raw distances
 		"""
-
-		datasource = self._get_datasource()
-		
-		if self.shift is None:
-			self.logger.info("Signals already in original state.")
-			return
 
 		self.logger.info("Resetting signals")
-
-		datasource = datasource.set_index(["TF1", "TF2"])
-		self.shift = self.shift.set_index(["TF1", "TF2"])
-		shift_values = self.shift[0]
-		datasource = datasource.subtract(shift_values, axis=0)
-		datasource = datasource.reset_index()
-		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-
-		#save the min values to reset the signals
-		self.shift = None
-
-		self.self._set_datasource(datasource)	
-		
-	def _get_datasource(self):
-		""" Determines whether .corrected or .smoothed should be used
-		and returns the base columns for this
-
-		Returns:
-		----------
-		pandas.DataFrame 
-			Either .smoothed or .corrected
-
-		"""
-		if self.is_smoothed():
-			self.check_smoothed()
-			datasource = self.smoothed
-		else:    
-			self.check_corrected()
-			datasource = self.corrected
-
-		self.check_min_max_dist()
-		tfcomb.utils.check_value(self.max_overlap, vmin=0.0, vmax=1.0, name=".max_overlap")
-
-		text_cols = ["TF1", "TF2"]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			text_cols += ["neg"]
-			
-		base_columns =  text_cols +  [str(x) for x in range(self.max_dist + 1)]
-
-		try:	 
-			return datasource[base_columns]
-		except KeyError:
-			raise InputError(f"columns: {list(set(base_columns) - set(datasource.columns))} ")
-
-	def _set_datasource(self, datasource):
-		""" Sets datasource
-		"""
-		if self.is_smoothed():
-			self.smoothed = datasource
-		else:    
-			self.corrected = datasource
-		
+		self._datasource = self.distances
 
 	#-------------------------------------------------------------------------------------------#
-	#----------------------------------------- Checks ------------------------------------------#
+	#---------------------------------- Checks on variables-------------------------------------#
 	#-------------------------------------------------------------------------------------------#
-
 
 	def check_distances(self):
 		""" Utility function to check if distances were set. If not, InputError is raised. """
@@ -2378,6 +2530,7 @@ class DistObj():
 	
 	def check_linres(self):
 		""" Utility function to check if linear regressions were set. If not, InputError is raised. """
+
 		if self.linres is None:
 			raise InputError("Linear regression not fitted yet. Please run .linregress_all() first.")
 			
@@ -2455,17 +2608,115 @@ class DistObj():
 		
 		if len(self.rules.loc[((self.rules["TF1"] == tf1) & (self.rules["TF2"] == tf2))]) == 0:
 			raise InputError(f"No rules for pair {tf1} - {tf2} found.")
-	
-	def get_pair_count(self, pair):
-		
-		self.check_pair(pair)
-		tf1, tf2 = pair
 
-		return self._raw.loc[[f"{tf1}-{tf2}"]].iloc[0,2:].sum()
 
-		
 	#-------------------------------------------------------------------------------------------#
-	#---------------------------------------- Counting -----------------------------------------#
+	#------------------------ Running different functions in chunks ----------------------------#
+	#-------------------------------------------------------------------------------------------#
+
+	def _multiprocess_chunks(self, threads, func, datatable):
+		"""
+		Split Data in chunks to multiprocess it. Because of the rather short but numerous calls mp.Pool() creates to much overhead. 
+		So instead utilize chunks. 
+		Following functions can be multiprocessed: 
+		["linress", "correct background", "analyze_signal", "evaluate_noise"]
+
+		Parameters
+		----------
+		threads : int
+			Number of threads used
+		func : tfcomb.utils.*_chunks function
+			Related chunk process function from tfcomb.utils
+		datatable: pd.DataFrame
+			Datatable to operate on (e.g. .distances)
+
+		See also
+		-------
+		tfcomb.utils.linress_chunks 
+		tfcomb.utils.correct_chunks 
+		tfcomb.utils.analyze_signal_chunks
+		tfcomb.utils.evaluate_noise_chunks
+
+		"""
+		
+		# check function is supported
+		if not callable(func):
+			raise InputError(f"Input {func} not callable. Please provide a function")
+		check_string(func.__name__,["linress_chunks", 
+									"correct_chunks", 
+									"analyze_signal_chunks", 
+									"evaluate_noise_chunks"], name="function")
+
+		self.logger.debug(f"Multiprocessing chunks for {func}")
+		# open Pool for multiprocessing
+		pool = mp.Pool(threads)
+
+		# get valid distance columns
+		distances = self.distances.columns[2:].tolist()
+		
+		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
+		if func == tfcomb.utils.evaluate_noise_chunks:
+			# list all TF pairs based on distances
+			names = list(zip(list(self.peaks.TF1.values), list(self.peaks.TF2.values)))
+		else:
+			# list all TF pairs based on distances
+			names = datatable.index #list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values)))
+
+		names = list(set(names))
+		n_names = len(names)
+		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
+
+		
+		# start one chunk per thread
+		jobs = []
+		for i in range(threads):
+
+			# get name subset for chunk
+			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
+			# subset distance information for names in this chunk
+			counts = datatable.set_index(['TF1','TF2']).sort_index().loc[subset]
+
+			if func == tfcomb.utils.linress_chunks:
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, distances, ))
+
+			elif func == tfcomb.utils.correct_chunks:
+				# subset linres information for names in this chunk
+				linres = self.linres.set_index(['TF1','TF2']).sort_index().loc[subset]
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, distances, linres, ))
+			
+			elif func == tfcomb.utils.analyze_signal_chunks:
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, distances, self.stringency, self.prominence, ))
+
+			elif func == tfcomb.utils.evaluate_noise_chunks:
+				# subset peaks
+				peaks = self.peaks.set_index(['TF1','TF2']).sort_index().loc[subset]
+				# apply function with params
+				job = pool.apply_async(func, args=(subset, counts, peaks, distances, self._noise_method, self._height_multiplier, ))
+			jobs.append(job)
+
+		# accept no new jobs
+		pool.close()
+			
+		# log_progress(jobs, self.logger) # doesn't work with chunks (TODO)
+		
+		# get results from jobs
+		results = []
+		for job in jobs:
+			results += job.get()
+		# wait for all jobs to be finished and tidy up pools
+		pool.join()
+
+		# convert to numpy 
+		results = np.array(results, dtype=object) # prevent convert float to str 
+		return results
+			
+
+
+	#-------------------------------------------------------------------------------------------#
+	#---------------------------- Counting distances between TFs -------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
 	def count_distances(self, normalize=True, directional=None, stranded=None):
@@ -2475,36 +2726,38 @@ class DistObj():
 		Parameters
 		----------
 		normalize : bool
-			True if data should be normalized, False otherwise. Normalization is done as followed:
-			(number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
+			True if data should be normalized, False otherwise. Normalization is done with min_max normalization
 			Default: True
-		directional : bool
+		directional : bool or None
 			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
 			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). If directional is None, self.directional will be used.
 			Default: None.
+		stranded : bool or None
+			Whether to take strand of TFBS into account when counting distances. If stranded is None, self.stranded will be used. 
+			Default: None
 		
 		Returns
-		----------
+		--------
 		None 
 			Fills the object variable .distances.
 
 		"""
 
+		#Replace directional/stranded with internal values
+		directional = self.directional if directional is None else directional
+		stranded = self.stranded if stranded is None else stranded
+
+		#Check input types
 		tfcomb.utils.check_type(normalize, [bool], "normalize")
 		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
+		tfcomb.utils.check_type(directional, [bool], "directional")
+		tfcomb.utils.check_type(stranded, bool, "stranded")
 		self.check_min_max_dist()
-
-		if directional is None:
-			tfcomb.utils.check_type(self.directional, [bool], "self.directional")
-			directional = self.directional
-		else:
-			tfcomb.utils.check_type(directional, [bool], "directional")
-
-		if stranded == None:
-			stranded = self.stranded
-		else:
-			tfcomb.utils.check_type(stranded, bool, "stranded")
 		
+		#Check if overlapping is allowed:
+		if self.anchor_mode == 1 and self.min_dist <= 0 and self.max_overlap == 0:
+			self.logger.warning("'min_dist' is below 0, but max_overlap is set to 0. Please set max_overlap > 0 in order to count overlapping pairs with negative distances.")
+
 		#Should strand be taken into account?
 		TFBS = copy.deepcopy(self.TFBS)
 		if stranded == True:
@@ -2514,17 +2767,17 @@ class DistObj():
 		else:
 			TFBS = self.TFBS
 			TF_names = self.TF_names
+		self.logger.spam("TF_names: {0}".format(TF_names))
 
 		# encode chromosome,pairs and name to int representation
-		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
+		chromosomes = {site.chrom: "" for site in self.TFBS}.keys()
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
 		self.name_to_idx = {name: idx for idx, name in enumerate(TF_names)}
 		#self.logger.debug("name_to_idx: {0}".format(self.name_to_idx))
 
-		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) 
-				  for site in TFBS] #numpy integer array
-		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, 
-							 (tf1,tf2) in enumerate(self.rules[(["TF1", "TF2"])].values.tolist())}
+		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) for site in TFBS] #numpy integer array
+		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, (tf1, tf2) 
+								in enumerate(self.rules[["TF1", "TF2"]].values)}
 		
 		#Sort sites by mid if anchor == 2 (center):
 		if self.anchor_mode == 2: 
@@ -2539,486 +2792,499 @@ class DistObj():
 									self.min_dist,
 									self.max_dist,
 									self.max_overlap,
-									self.anchor_mode)
-		
-		# Unify (directional) counts 
-		if not directional:
-			self.logger.info("Directionality is not taken into account")
-			for i in range(0, self._raw.shape[0]-1):
-				if (self._raw[i,0] == self._raw[i+1,1]) and (self._raw[i,1] == self._raw[i+1,0]):
-					s = self._raw[i,2:] + self._raw[i+1,2:]
-					self._raw[i,2:] = s
-					self._raw[i+1,2:] = s
-		else:
-			self.logger.info("Directionality is taken into account; counts for TF1-TF2 and TF2-TF1 are kept separate")
-		self.directional = directional
+									self.anchor_mode,
+									directional,
+									)
 
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
-		self._raw_to_human_readable(normalize)
+		#fills in .distances
+		self._raw_to_human_readable()
 
 		self.logger.info("Done finding distances! Results are found in .distances")
 		self.logger.info("Run .linregress_all() to fit linear regression")
 	
-	def _raw_to_human_readable(self, normalize=True):
+	def _raw_to_human_readable(self):
 		""" Get the raw distance in human readable format. Sets the variable '.distances' which is a pd.Dataframe with the columns:
-			TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist)
-			
-			Parameters
-			-------------
-			normalize : bool
-			True if data should be normalized, False otherwise. Normalization is done as followed:
-			(number of counted occurrences for a given pair at a given distance) / (Total amount of occurrences for the given pair)
-			Default: True
+			TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist).
 
+			Note: 
+			Normalization method is min_max normalization: (x[i] - min(x))/(max(x)-min(x))
 		"""
 
-		tfcomb.utils.check_type(normalize, bool)
-		# check min_max distance
+		#Converting to pandas format 
 		self.logger.debug("Converting raw count data to pretty dataframe")
+
+		columns = ['TF1', 'TF2'] + list(range(self.min_dist, self.max_dist + 1))
+		self.distances = pd.DataFrame(self._raw, columns=columns)
 		
+		#Convert integers to TF names
 		# get names from int encoding
 		idx_to_name = {}
-		for k,v in self.name_to_idx.items():
-			idx_to_name[v] = k 
-		
-		#Converting to pandas format 
-		if self.min_dist == 0:    
-			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range(self.min_dist, self.max_dist + 1)]
-		else:
-			columns = ['TF1', 'TF2'] + [str(x) for x in range(self.min_dist, self.max_dist + 1)]
+		for name, idx in self.name_to_idx.items():
+			idx_to_name[idx] = name 
 
-		self.distances = pd.DataFrame(self._raw, columns=columns)
 		self.distances["TF1"] = [idx_to_name[idx] for idx in self.distances["TF1"]]
 		self.distances["TF2"] = [idx_to_name[idx] for idx in self.distances["TF2"]]
-		#Normalize
-		if normalize:
-			self.logger.info("Normalizing data.")
-
-			data_columns = [col for col in columns if col not in ["TF1", "TF2"]] #with or without 'neg' column
-			rowsums = self.distances[data_columns].sum(axis=1)
-			self.distances[data_columns] = self.distances[data_columns].div(rowsums, axis=0) #divide by zero returns NaN
-			self.distances.fillna(0, inplace=True)
-
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
-		self.normalized = normalize
 
-		# Transform _raw ro DataFrame
-		self._raw = pd.DataFrame(self._raw, columns=columns)
-		self._raw["TF1"] = [idx_to_name[idx] for idx in self._raw["TF1"]]
-		self._raw["TF2"] = [idx_to_name[idx] for idx in self._raw["TF2"]]
-		self._raw.index = self._raw["TF1"] + "-" + self._raw["TF2"]
+		# minmax normalization
+		distances_mat = self.distances.iloc[:,2:].to_numpy().astype(float) #float for nan replacement
+		min_count = np.array([distances_mat.min(axis=1)]).T #convert to column vectors
+		max_count = np.array([distances_mat.max(axis=1)]).T #convert to column vectors
+		ranges = max_count - min_count #min-max range per pair
+		ranges[ranges==0] = np.nan
+
+		#Perform scaling and save to self.normalized
+		normalized_mat = (distances_mat - min_count) / ranges
+		normalized_mat = np.nan_to_num(normalized_mat)
+
+		self.normalized = self.distances.copy()
+		self.normalized.iloc[:,2:] = normalized_mat
+
+		#Set datasource for future normalization/correction/analysis
+		self.datasource = self.normalized
 
 	#-------------------------------------------------------------------------------------------#
-	#------------------------------------ Analysis steps ---------------------------------------#
+	#------------------------ Process counted distances (correct/smooth)------------------------#
 	#-------------------------------------------------------------------------------------------#
-	
 
-	def _linregress_pair(self, pair):
-		""" Fits a linear Regression to distance count data for a given pair. The linear regression is used to 
-			estimate the background. Proceed with ._correct_pair()
+	#Smooth signals
+	def smooth(self, window_size=3):
+		""" Helper function for smoothing all rules with a given window size.
 			
-			Parameters
-			----------
-			pair : tuple(str,str)
-				TF names for which the linear regression should be performed. e.g. ("NFYA","NFYB")
+		Parameters
+		----------
+		window_size : int 
+			Window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
+			To avoid flanking NaN regions the signal is expanded with the first/last value (see tobias.utils.signals.fast_rolling_math). Default: 3.
 
-			Returns:
-			----------
-			scipy.stats._stats_mstats_common.LinregressResult Object
+		Returns
+		--------
+		None 
+			Fills the object variable .smoothed and updates .datasource
 		"""
-		self.check_distances()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-
-		self.logger.debug(f"Fitting linear regression for pair: {pair}")
 		
-		ind = tf1 + "-" + tf2
-		data = self.distances.loc[ind].iloc[2:]
-		n_data = len(data)
-		linres = linregress(range(0, n_data), np.array(data, dtype=float))
-
-		return linres
+		tfcomb.utils.check_value(window_size, vmin=0, integer=True, name="window size")
 	
-	def linregress_all(self, n_bins=None, save=None):
+		if self.is_smoothed() == True:
+			self.logger.warning("Data was already smoothed - beware that smoothing again might produce unwanted results. Please use .reset_signal() to reset the signal.")
+
+		self.logger.info(f"Smoothing signals with window size {window_size}")
+		mat = self.datasource.iloc[:,2:].to_numpy() #distances counted
+		smoothed_mat = np.array([tfcomb.utils.fast_rolling_mean(mat[row,:], window_size) for row in range(len(mat))]) #smooth values per
+		self.smoothed = self.datasource.copy() #create dataframe from datasource
+		self.smoothed.iloc[:,2:] = smoothed_mat 
+
+		#Save information about smoothing to object
+		self.smooth_window = window_size
+		self.datasource = self.smoothed
+
+	def is_smoothed(self):
+		""" Return True if data was smoothed during analysis, False otherwise
+			
+		Returns
+		--------
+		bool 
+			True if smoothed, False otherwiese
+		"""
+		
+		if (self.smoothed is None) or (self.smooth_window <= 1): 
+			return False
+		return True
+
+	#Correct background signal from distance counts
+	def correct_background(self, threads=1):
+		""" Corrects the background of distances. This is a wrapper to run .linregress_all() and .correct_all().
+		
+		Parameters
+		-------------
+		threads : int, optional
+			Number of threads to use in functions. Default: 1.
+		"""
+
+		#Linregress
+		self.linregress_all(threads=threads)
+
+		#Correct signals
+		self.correct_all(threads=threads)
+
+
+	def linregress_all(self, threads=1, save=None):
 		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
 			estimate the background. Proceed with .correct_all()
 			
 			Parameters
 			----------
-			n_bins: int 
-				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
-				Default: None
-			save: str 
+			threads : int
+				Number of threads used for fitting linear regression
+			save : str 
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
 
-			Returns:
-			----------
+			Returns
+			-----
 			None
 				Fills the object variable .linres
 		"""
 
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_dir(save)
+		# check input param
+		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 
+		# sanity checks
 		self.check_distances()
 
-		self.logger.info("Fitting linear regression.")
-		linres = {}
-		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
-			res = self._linregress_pair((tf1, tf2))
-			linres[tf1, tf2] = [tf1, tf2, res]
-		
-		self.linres = pd.DataFrame.from_dict(linres, orient="index",
-											 columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
+		self.logger.info(f"Fitting linear regression. With number of threads: {threads}")
+
+		# hand it over to multiprocess chunks 
+		results = self._multiprocess_chunks(threads, tfcomb.utils.linress_chunks, self.datasource)
+
+		# save results to .linres
+		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
 		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
-		
+
+		#Plot linregress results
 		if save is not None:
 			self.logger.info("Plotting all linear regressions. This may take a while")
-			self._plot_all(n_bins, save, self.plot_linres)
+			self._plot_all(save, "linres")
 
 		self.logger.info("Linear regression finished! Results can be found in .linres")
-	
-	def _correct_pair(self, pair, linres):
-		""" Subtracts the estimated background from the Signal for a given pair. 
-			
-			Parameters
-			----------
-			pair : tuple(str,str)
-				TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
-			linres: scipy.stats._stats_mstats_common.LinregressResult 
-				Fitted linear regression for the given pair
-
-			Returns:
-			----------
-			list 
-				Corrected values for the given pair
-		"""
 
 
-		self.check_distances()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-
-		if linres is None:
-			self.logger.error("Please fit a linear regression first. [see ._linregress_pair()]")
-			sys.exit(0)
-
-		self.logger.debug(f"Correcting background for pair {pair}")
-
-		ind = tf1 + "-" + tf2
-		data = self.distances.loc[ind].iloc[2:]
-		corrected = []
-		x_val = 0
-		
-		for dist in data:
-			# subtract background from signal
-			corrected.append(dist - (linres.intercept + linres.slope * x_val))
-			x_val += 1
-		
-		return corrected
-	
-	def correct_all(self, n_bins=None, save=None):
+	def correct_all(self, threads=1, save=None):
 		""" Subtracts the estimated background from the Signal for all rules. 
 			
 			Parameters
 			----------
-			n_bins: int 
-				Number of bins used for plotting. If n_bins is none, binning resolution is one bin per data point. 
-				Default: None
-			save: str
+			threads : int
+				Number of threads used for fitting linear regression
+			save : str
 				Path to save the plots to. If save is None plots won't be plotted. 
 				Default: None
 
-			Returns:
-			----------
+			Returns
+			--------
 			None 
 				Fills the object variable .corrected
 		"""
 		
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_dir(save)
+		# check input param
+		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 		
+		# sanity checks
 		self.check_linres()
 		self.check_min_max_dist()
 
-		self.logger.info(f"Correcting background")
-		corrected = {}
+		self.logger.info(f"Correcting background with {threads} threads.")
 		
-		for idx,row in self.linres.iterrows():
-			tf1, tf2, linres = row
-			res = self._correct_pair((tf1, tf2), linres)
-			corrected[tf1, tf2] = [tf1, tf2] + res
-		
-		if self.min_dist == 0:    
-			columns = ['TF1', 'TF2', 'neg'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		else:
-			columns = ['TF1', 'TF2'] + [str(x) for x in range (self.min_dist, self.max_dist + 1)]
-		self.corrected = pd.DataFrame.from_dict(corrected, orient="index", columns=columns).reset_index(drop=True)
+		# hand it over to multiprocess chunks 
+		result = self._multiprocess_chunks(threads, tfcomb.utils.correct_chunks, self.datasource)
+
+		#Create dataframe of corrected counts
+		columns = self.datasource.columns.tolist()
+		self.corrected = pd.DataFrame(result, columns=columns).reset_index(drop=True)
 		self.corrected.index = self.corrected["TF1"] + "-" + self.corrected["TF2"]
-		
+
+		#Update datasource
+		self.datasource = self.corrected
+
+		#Save plots for corrected signals
 		if save is not None:
 			self.logger.info("Plotting all corrected signals. This may take a while")
-			self._plot_all(n_bins, save, self.plot_corrected)
+			self._plot_all(save, "corrected")
 
 		self.logger.info("Background correction finished! Results can be found in .corrected")
-		
-	def _plot_all(self, n_bins, save_path, plot_func):
 
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		self.check_min_max_dist()
-		self.check_distances
-		tfcomb.utils.check_dir(save_path)
+	
+	#-------------------------------------------------------------------------------------------#
+	#--------------------------- Analysis to get preferred distances ---------------------------#
+	#-------------------------------------------------------------------------------------------#
 
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
+	def shift_signal(self):
+		""" Shifts the signal above zero. 
 
-		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
-			plot_func((tf1, tf2), n_bins=n_bins, save=os.path.join(save_path,f"{tf1}_{tf2}.png"))
+		Returns
+		--------
+		None 
+			Fills the object variables .shift and either .smoothed or .corrected
 
-	# TODO: Check if kwargs is better suited tham height & prominence
-	def _analyze_signal_pair(self, pair, datatable, smooth_window=3, prominence=0, stringency=2, save=None, new_file=True):
-		""" After background correction is done (see ._correct_pair() or .correct_all()), the signal is analyzed for peaks, 
-			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
-			Signal. Peaks are called with scipy.signal.find_peaks().
-			
-			Parameters
-			----------
-			pair : tuple(str,str)
-				TF names for which the background correction should be performed. e.g. ("NFYA","NFYB")
-			datatable: list 
-				corrected value for the given pair
-			smooth_window: int 
-				window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-				(see tobias.utils.signals.fast_rolling_math) 
-				Default: 3
-			height: number or ndarray or sequence
-				height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-				Zero means only positive peaks are called.
-				Default: 0
-			prominence: number or ndarray or sequence
-				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
-				Default: 0
-			stringency: number
-				stringency the prominence threshold should be multiplied with. Default: 2
-			save: str
-				Path to save the plots to. If save is None plots won't be plotted. 
-				Default: None
-			new_file: boolean
-				True means results are written to a new file (overwrites already existing results), False means results are appended if 
-				file already exists.
-				Default: True
-
-			Returns:
-			----------
-			list 
-				list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
 		"""
+
+		datasource = self.datasource
 		
-		#Check input parameters
-		tfcomb.utils.check_type(smooth_window, [int], "smooth_window")
-		tfcomb.utils.check_type(datatable, [list, pd.core.series.Series], "corrected")
+		if self.shift is not None:
+			self.logger.info("Signals already above zero, skipping shift.")
+			return
+
+		self.logger.info("Shifting signals above zero")
+
+		datasource = datasource.set_index(["TF1", "TF2"])
+		min_values = datasource.min(axis=1).abs()
+		datasource = datasource.add(min_values, axis=0)
+		datasource = datasource.reset_index()
+		self.shift = min_values.reset_index()
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
+
+		self.datasource = datasource
+
+	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2, min_count=11, save=None):
+		""" 
+		After background correction is done, the signal is analyzed for peaks, 
+		indicating preferred binding distances. There can be more than one peak (more than one preferred binding distance) per 
+		Signal. Peaks are called with scipy.signal.find_peaks().
+		
+		Parameters
+		----------
+		threads : int
+			Number of threads used
+			Default: 1
+		prominence : number or ndarray or sequence or ["median", "zscore"]
+			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
+			If "median", the median for the pairs is used
+			If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
+			Attention, this also changes the scale and output column names.
+			If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
+			Default: "zscore"
+		stringency : float
+			stringency the prominence threshold should be multiplied with. 
+			Default: 2
+		min_count : int
+			Minimum count of TF1-TF2 occurrences for a preferred distance to be called. Default: 1 (all occurrences are considered).
+		save : str
+			Path to save the plots to. If save is None plots won't be plotted. 
+			Default: None
+
+		Returns
+		-------
+		None 
+			Fills the object variable self.peaks, self.smooth_window, self.peaking_count
+		
+		See also
+		--------
+		tfcomb.objects.correct_all
+		tfcomb.utils.fast_rolling_mean
+		"""
+
+		# Check given input	
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
-		
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		#Smooth the signal
-		tf1, tf2 = pair
-		peaks = []
-		if(smooth_window != 1):
-			if smooth_window < 0 :
-				self.logger.error("Window size need to be positive or zero.")
-				sys.exit(0)
-			smoothed = fast_rolling_math(np.array(list(datatable)), smooth_window, "mean")
-			x = np.nan_to_num(smoothed)
-		else:
-			x = datatable
-		
-		# signal.find_peaks() will not find peaks on first and last position without having 
-		# an other number left and right. 
-		x = [0] + list(x) + [0]
-		threshold = prominence * stringency
-
-		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
-		
-		# subtract the position added above (first zero) 
-		peaks_idx = peaks_idx - 1 
-
-		# compensate the "neg" position
-		if self.min_dist == 0: 
-			peaks_idx = peaks_idx - 1 
-
-		self.logger.debug(f"{len(peaks_idx)} Peaks found")
-		if (save is not None):
-			if new_file:
-				outfile = open(save,'w') 
-				outfile.write(self._PEAK_HEADER)
-			else:
-				outfile = open(save,'a') 
-
-		if (len(peaks_idx) > 0):
-			for i in range(len(peaks_idx)):
-				peak = [tf1, tf2, peaks_idx[i], round(properties["peak_heights"][i], 4),
-				        round(properties["prominences"][i], 4), round(threshold, 4),
-						self.get_pair_count((tf1,tf2))]
-				peaks.append(peak)
-				if (save is not None):
-					outfile.write('\t'.join(str(x) for x in peak) + '\n')
-		
-		if (save is not None):
-			outfile.close()
-
-		return peaks, threshold
-
-	def analyze_signal_all(self, smooth_window=3, prominence="zscore", stringency=2,  save=None):
-		""" After background correction is done (see .correct_all()), the signal is analyzed for peaks, 
-			indicating prefered binding distances. There can be more than one peak (more than one prefered binding distance) per 
-			Signal. Peaks are called with scipy.signal.find_peaks().
-			
-			Parameters
-			----------
-			smooth_window: int 
-				window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-				(see tobias.utils.signals.fast_rolling_math) 
-				Default: 3
-			height: number or ndarray or sequence
-				height parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-				Zero means only positive peaks are called.
-				Default: 0
-			prominence: number or ndarray or sequence or ["median", "zscore"]
-				prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-				If "median", the median for the pairs is used
-				If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
-				Attention, this also changes the scale and output column names.
-				If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
-				Default: "zscore"
-			stringency: number
-				stringency the prominence threshold should be multiplied with. Default: 2
-			save: str
-				Path to save the plots to. If save is None plots won't be plotted. 
-				Default: None
-			new_file: boolean
-				True means results are written to a new file (overwrites already existing results), False means results are appended if 
-				file already exists.
-				Default: True
-
-			Returns:
-			----------
-			None 
-				Fills the object variable self.peaks, self.smooth_window, self.peaking_count
-		"""
-		# checks
-		tfcomb.utils.check_value(smooth_window, vmin=0, integer=True, name="smooth_window")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-		
-		self.check_corrected()
 
 		if isinstance(prominence, str):
-			tfcomb.utils.check_string(prominence, ["median","zscore"])
+			tfcomb.utils.check_string(prominence, ["median", "zscore"])
 		else:
-			tfcomb.utils.check_value()
+			tfcomb.utils.check_value(prominence)
+
+		# sanity checks
+		self.check_distances()
+		self.check_min_max_dist()
 	
-		if smooth_window > 1:
-			if smooth_window < 0 :
-				self.logger.error("Window size need to be positive or zero.")
-				sys.exit(0)
-			self.smooth(smooth_window)
-		
-		self.shift_signal()
 
-		self.logger.info(f"Analyzing Signal")
-		all_peaks = []
-
-		if save is not None:
-			outfile = open(save, 'w')
-			outfile.write(self._PEAK_HEADER)
-
-		
-
-		thresholds = {}
-		peaking_count = 0
-
-
+		#----- Find preferred peaks -----#
+		self.logger.info(f"Analyzing Signal with threads {threads}")
+	
 		# distinguish between median, zscore and flat
-		datasource = self._get_datasource()
+		datasource = self.datasource
+		distance_cols = datasource.columns[2:].tolist()
+
+		#Set threshold on the number of sites
+		if min_count > 1:
+			counts = self.distances[distance_cols].sum(axis=1)
+			datasource = datasource.loc[counts >= min_count, :]
+
+		self.stringency = stringency
+		self.prominence = prominence
+
 		if (prominence == "median"):
+
+			self.shift_signal() #shifting only needed for median?
+
+			# calculate median
 			med = datasource.set_index(["TF1", "TF2"]).median(axis=1)
 			med = med.to_frame('median')
-			combined = pd.concat((datasource.set_index(["TF1", "TF2"]), med) , axis=1, ignore_index=False)
+			# combine median into datasoure
+			combined = pd.concat((datasource.set_index(["TF1", "TF2"]), med), axis=1, ignore_index=False)
 			combined = combined.reset_index().set_index(["TF1", "TF2"], drop=False)
-			res = combined.apply(lambda row: self._analyze_signal_pair((str(row[0]), str(row[1])),
-																		row[2:-1],
-																		smooth_window=1,
-																		prominence=row[-1],
-																		stringency=stringency,
-																		save=None), axis=1)
+
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, combined)
 			method = "median"
 
 		elif (prominence == "zscore"):
-			stds = np.std(datasource, axis=1)
+			stds = datasource[distance_cols].std(ddof=0, axis=1)
 			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
-			means = np.mean(datasource, axis=1)
-			# zscore (x-mean)/std
+			means = datasource[distance_cols].mean(axis=1)
+			
+			# Calculate zscore (x-mean)/std
+			zsc = datasource[distance_cols].subtract(means, axis=0).divide(stds, axis=0).fillna(0) 
+
 			textcols = datasource[['TF1', 'TF2']]
-			zsc = datasource.drop(['TF1', 'TF2'], axis=1).subtract(means, axis =0).divide(stds, axis =0).fillna(0) 
-			zsc = pd.concat((textcols,zsc), axis=1)
-			zsc = zsc.reset_index(drop=True).set_index(["TF1", "TF2"], drop=False)
-			res = zsc.apply(lambda row: self._analyze_signal_pair((str(row[0]), str(row[1])),
-																	row[2:],
-																	smooth_window=1,
-																	prominence=1, # for zscore threshold is given via stringency
-																	stringency=stringency,
-																	save=None), axis=1)
+			zsc = pd.concat((textcols, zsc), axis=1)
+
+			zsc = zsc.set_index(["TF1", "TF2"], drop=False)
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, zsc)
+			zsc.index = zsc["TF1"] + "-" + zsc["TF2"]
+			self.zscores = zsc
 			method = "zscore"
+
 		else:
-			res = datasource.apply(lambda row: self._analyze_signal_pair((str(row[0]),str(row[1])),
-																								    row[2:],
-																									smooth_window=1,
-																									prominence=prominence, # for zscore threshold is given via stringency
-																									stringency=stringency,
-																									save=None), axis=1)
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
 			method = "flat"
 
+		#Collect results from all pairs to pandas dataframe
+		res = pd.concat([pd.DataFrame(pair_res) for pair_res in res]).reset_index(drop=True)
 
-		for index, value in res.items():
-			tf1, tf2 = index
-			peaks, thresh = value
-			thresholds[tf1,tf2] = [tf1, tf2, thresh, method]
-			
-			if len(peaks)>0:
-				for peak in peaks:
-					all_peaks.append(peak)
-					if save is not None:    
-						outfile.write('\t'.join(str(x) for x in peak) + '\n')
-				peaking_count += 1
+		#Format order of columns
+		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
+		res = res[columns]
+		res["Distance"] = res["Distance"].astype(int) #distances are float - change to int
+		res.rename(columns={"peak_heights":"Peak Heights",
+							"prominences": "Prominences"}, inplace=True)
+		self.peaks = res
 
-		self.peaks = pd.DataFrame(all_peaks, columns=self._PEAK_HEADER.strip().split("\t"))
-		self.smooth_window = smooth_window
-		self.peaking_count = peaking_count
+		# Add total counts of (TF1-TF2) to each peak
+		self.peaks.index = self.peaks["TF1"] + "-" + self.peaks["TF2"]
+		counts = self.distances[distance_cols].sum(axis=1)
+		counts.name = "TF1_TF2_count"
+		self.peaks = self.peaks.merge(counts.to_frame(), left_index=True, right_index=True)
 
-		self.thresh = pd.DataFrame.from_dict(thresholds, orient="index",
-											 columns=['TF1', 'TF2', 'Threshold', "method"]).reset_index(drop=True) 
+		#Define list of distances included in each peak (depending on smooth window)
+		distances = datasource.columns[2:].tolist()
+		dist_min = min(distances)
+		dist_max = max(distances)
+		lf = int(np.floor((self.smooth_window-1) / 2.0))
+		rf = int(np.ceil((self.smooth_window-1) / 2.0)) 
+		self.peaks["dist_list"] = [list(range(max(dist-lf, dist_min), min(dist+rf, dist_max)+1)) for dist in self.peaks["Distance"]]
 
-		if save is not None:
-			outfile.close()
+		#Get count per peak depending on smooth window
+		self.peaks["Distance_count"] = [self.distances.loc[idx, dist_list].sum() for idx, dist_list in zip(self.peaks.index, self.peaks["dist_list"])]
+		self.peaks["Distance_percent"] = (self.peaks["Distance_count"] / self.peaks["TF1_TF2_count"]) * 100
+	
+		#Replace Distance + / - lf/rf
+		self.peaks["Distance_window"] = ["[{0};{1}]".format(min(dist), max(dist)) for dist in self.peaks["dist_list"]]
 		
+		#Sort peaks on highest prominences
+		self.peaks = self.peaks.sort_values("Prominences", ascending=False)
+		self.peaks.drop(columns=["dist_list"], inplace=True) #Remove temporary column
+
+		#----- Save stats on run -----#
+		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
+
+		# QoL safe of threshold and method
+		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
+		self.thresh["method"] = method
+
+		# Save dataframe
+		if save is not None:
+			self.peaks.to_csv(save)
+
 		self.logger.info("Done analyzing signal. Results are found in .peaks")	
 
-	def analyze_hubs(self):
-		""" Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
+	#-------------------------------------------------------------------------------------------#
+	#------------------------- Evaluation and ranking of found distances -----------------------#
+	#-------------------------------------------------------------------------------------------#
 
-			Returns:
-			----------
-			pd.Series 
-				A panda series with the tf as index and the count as integer
+	def evaluate_noise(self, threads=1, method="median", height_multiplier=0.75):
+		"""
+		Evaluates the noisiness of the signal. Therefore the peaks are cut out and the remaining signal is analyzed.
+
+		Parameters
+		---------
+		threads : int
+			Number of threads used for evaluation.
+			Default: 1
+		method : str
+			Measurement to calculate the noisiness of a signal.
+			One of ["median", "min_max"].
+			Default: "median"
+		height_multiplier : float
+			Height multiplier (percentage) to calculate cut points. Must be between 0 and 1.
+			Default: 0.75
+
+		See also 
+		--------
+		tfcomb.utils.evaluate_noise_chunks
+		"""
+		self.check_peaks()
+
+		if self._collapsed is not None: 
+			raise InputError("Collapsed signals can't be analyzed, see .expand_negative() for more details.")
+
+		self._noise_method = method
+		self._height_multiplier = height_multiplier
+		
+		datasource = self.datasource
+		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
+
+		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks, datasource)
+		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
+
+		# merge noisiness
+		self.peaks = self.peaks.merge(noisiness)
+
+		#res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
+		
+		#self.peaks = res
+	
+	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
+		""" 
+		ranks rules within each column specified. 
+
+		Parameters
+		----------
+		by : list of strings
+			Columns for wich the rules should be ranked
+			Default: ["Distance_percent", "Peak Heights", "Noisiness"]
+		calc_mean : bool
+			True if an extra column should be calculated containing the mean rank, false otherwise
+			Default: True
+			
+		Raises
+		-------
+		InputError
+			If columns selection (parameter: by) is not valid.
+
+		Returns
+		-------
+		None 
+			adds a rank column for each criteria given plus one for the mean if set to True
+		"""
+
+		# check peaks are calculated + by are only valid columns
+		self.check_peaks()
+		if (not set(by).issubset(self.peaks.columns)):
+			raise InputError(f"Column selection not valid. Possible column names to rank by: {self.peaks.columns.values}")
+
+		# save col names for mean_rank
+		rank_cols = []
+		# rank all given columns
+		for col in by:
+			# new column name
+			rank_col = "rank_" + col
+			# decide if biggest number = rank 1 or rank n
+			if col =="Noisiness":
+				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=1) 
+			else:
+				self.peaks[rank_col] = self.peaks[col].rank(method="dense", ascending=0)
+			rank_cols.append(rank_col)
+
+		#Add mean rank to peaks
+		if calc_mean:
+			# calculate mean rank (from all column ranks)
+			self.peaks["mean_rank"] = self.peaks[rank_cols].mean(axis=1)
+			# nice to have the best ranks at the top 
+			self.peaks = self.peaks.sort_values(by="mean_rank")
+		
+	#-------------------------------------------------------------------------------------------#
+	#------------------- Additional functionality/analysis for distances -----------------------#
+	#-------------------------------------------------------------------------------------------#
+
+	def analyze_hubs(self):
+		""" 
+		Counts the number of different partners each transcription factor forms a peak with, **with at least one peak**.
+
+		Returns
+		--------
+		pd.Series 
+			A panda series with the tf as index and the count as integer
 		"""
 		
 		self.check_peaks()
@@ -3028,497 +3294,426 @@ class DistObj():
 		return pd.Series(occurrences)		
 
 	def classify_rules(self):
-		""" Classify all rulesm True if at least one peak was found, False otherwise.  
+		""" 
+		Classify all rules True if at least one peak was found, False otherwise.  
 
-			Returns:
-			----------
-			None adds a column to either .smoothed or .corrected
+		Returns
+		--------
+		None 
+			adds a column to either .smoothed or .corrected
 		"""
 
 		self.check_peaks()
 
+		self.logger.info("classifying rules")
+
 		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
 		
-		datasource = self._get_datasource()
+		datasource = self.datasource
 
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
-		self._set_datasource(datasource)
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+
+		self.logger.info(f"classifcation done")
+
+	def _mean_distance_pair(self, pair):
+		""" Calculate the mean distance for the given pair.
+		
+		Parameters
+		----------
+		pair : tuple(str,str)
+			TF names for which to calculate the mean distance e.g. ("NFYA","NFYB")
+		
+		Returns
+		------
+		float
+			numpy average
+		
+		See also
+		--------
+		numpy.average
+		"""
+
+		self.check_pair(pair)
+		key = "-".join(pair)
+
+		#Calculate weighted average using distances/counts
+		distances = range(self.min_dist, self.max_dist + 1) #without negative distances
+		counts = self.distances.loc[key, distances].values
+
+		avg = np.average(distances, weights=counts)
+
+		return(avg)
+
+	def mean_distance_all(self):
+		""" 
+		Calculates the mean distance (numpy average) for all pairs in <distObj>.
+		
+		Returns
+		---------
+		pd.DataFrame containing pairs and mean distances based on the raw distance information
+
+
+		See also
+		--------
+		numpy.average
+
+		"""
+
+		self.mean_distances = pd.DataFrame(index=self.distances.index, columns=["mean_distance"])
+		for pair in zip(self.distances.TF1, self.distances.TF2):
+			key = "-".join(pair)
+			self.mean_distances.loc[key, "mean_distance"] = self._mean_distance_pair(pair)
 
 	def check_periodicity(self):
-		""" checks periodicity of distances (like 10 bp indicating DNA full turn)
+		"""
+		checks periodicity of distances (like 10 bp indicating DNA full turn)
 			- placeholder for functionality upgrade - 
 		"""
 		pass
 
+
+	def build_network(self):
+		""" 
+		Builds a TF-TF co-occurrence network for the rules within object.
+			 
+		Returns
+		-------
+		None 
+			fills the .network attribute of the `CombObj` with a networkx.Graph object
+
+		See also
+		-------
+		tfcomb.network.build_nx_network
+		"""
+
+		#Build network
+		self.logger.debug("Building network using tfcomb.network.build_nx_network")
+		self.network = tfcomb.network.build_nx_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
+		self.logger.info("Finished! The network is found within <CombObj>.<distObj>.network.")
+	
+
 	#-------------------------------------------------------------------------------------------------------------#
-	#---------------------------------------------- plotting -----------------------------------------------------#
+	#---------------------------------------------- Plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 	
-	def _plot_distribution(self, 
-							pair, 
-							style="hist",
-							n_bins=None,
-							bwadjust=0.1, 
-							show_bg=True,
-							show_peaks=True,
-							corrected=False,
-							save=None):
+	def _plot_all(self, save_path, method):
 		"""
-		WORK IN PROGRESS: Plots distribution of TFBS distances for the given TF-TF pair.
-
+		Plots all pairs.
+		
 		Parameters
 		----------
-		pair : tuple(str,str)
-			Pair to create plot for.
-		style : str,
-			Style of the plot. One of "hist" (histogram) or "kde". 
-		n_bins: int
-			Number of bins of style == "hist". Default: None (Binning is done automatically)
-		bwadjust: float
-			Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. See kdeplot() from seaborn. Default: 0.1
-		show_bg : bool
-			Default: True.
-		show_peaks : bool 
-			Default: True.
+		save_path : str
+			Directory path to save plots to. Filename will be created with "{method}_{tf1}_{tf2}.png".
+			e.g. save_path/linres_NFYA_NFYB.png
+		method : str
+			Plotting style	
+
+		See also
+		----------
+		tfcomb.objects.DistObj.plot
+
 		"""
 
-		#Check input parameter validity
-		tfcomb.utils.check_string(style, ["hist", "kde"], "style")
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-		self.check_distances()
 		self.check_min_max_dist()
-
-		#Invalid combinations
-
-
-		#Define input data
-		self.check_pair(pair)
-		tf1, tf2 = pair
-		ind = tf1 + "-" + tf2
-
-		if corrected == False:
-			source_table = self.distances
-		else: 
-			source_table = self.corrected
-
-		#data_start_i = 2 if 	
-		distances = source_table.columns[2:].tolist() #names of distances counted (includes "neg")
-		weights = np.array(source_table.loc[ind].iloc[2:])
-
-		#Decide how to deal with negative values
-		negative = False
-		if (self.min_dist == 0) and (self.max_overlap > 0): #negative values can occur
-			negative = True
-			offset_neg = -4
-			distances[distances.index("neg")] = offset_neg #replace "neg" with a value
-		else:
-			weights = weights[1:] #remove "neg" column
-			distances = distances[1:]
-
-		distances = np.array([int(dist) for dist in distances]) #convert column-name strings to int
-
-		#Setup plot
-		fig, ax = plt.subplots(1, 1)
-
-		if style == "hist":
-			if n_bins is None:
-				n_bins = np.max(distances) - np.min(distances) #as many bins as 'bp' between min/max distance
-
-			ax.hist(distances, weights=weights, bins=n_bins, color='tab:blue', label="counts")
-			ax.set_ylabel('Count per distance')
-
-		elif style == "kde":
-			sns.kdeplot(distances, weights=weights, bw_adjust=bwadjust, x="distance", ax=ax)
-			ax.set_ylabel('Count per distance')
-
-		#Handle xtick labels for negative distances 
-		xt = ax.get_xticks() 
-		xtl = xt.tolist() #labels
-		if negative == True:
-			xt[0] = offset_neg
-			xtl[0] = "neg"
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-
-		#Handle xlimit to be equal padding left/right
-		xmin, _ = ax.get_xlim()
-		pad_left = xmin - xt[0] #padding between xlim and first label
-		ax.set_xlim(xmin, xt[-1]+pad_left)
-
-		#Add flavors to plot
-		if show_bg:
-			if self.linres is not None:
-				linres = self.linres.loc[ind, "Linear Regression"]
-				plt.plot(distances, linres.intercept + linres.slope * distances, 'r', label='fitted line')
-			else:
-				self.logger.warning("show_bw == True, but there was no linres available")
-
-		if show_peaks:
-			if self.peaks is not None:
-				peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-										(self.peaks["TF2"] == tf2))].Distance.to_numpy()
-				
-				#Establish x-axis
-
-				if (len(peaks) > 0):
-					plt.plot(crosses, x[(crosses)], "x")
-			else:
-				self.logger.warning("")
-
-		#Pretty plot; legends, labels, titles
-		ax.set_xlabel('Distance in bp')
-		plt.title(f"{tf1} - {tf2}")
-		plt.legend()
-
-		#Save final plot to file
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-
-
-	def plot_hist(self, pair, n_bins=None, save=None):
-		""" Histograms for a list of TF-pairs
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			n_bins: int
-				Number of bins. Default: None (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
 		self.check_distances()
-		self.check_pair(pair)
-		self.check_min_max_dist()
+		self.check
+		tfcomb.utils.check_dir(save_path)
 
-		source_table = self.distances
-		tf1, tf2 = pair
+		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
+			self.plot((tf1, tf2), method=method, save=os.path.join(save_path,f"{method}_{tf1}_{tf2}.png"))
+
+	def collapse_negative(self, method="max"):
+		"""
+		Method to collapse negative coulmns(-min distance to 0). e.g. columns [-3, -2, -1] will ne summarized as "neg".
 		
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
+		Parameters
+		-----------
+		method : str, optional
+			Summarization Method. One of ["max","min","mean","sum"].
+			e.g. with "max" 2.3 is chosen from [1.2, 2.3, 1.5], for sum: "neg" would be 5 
+			Default: max
 
-		ind = tf1 + "-" + tf2
-		weights = source_table.loc[ind].iloc[2:]
-		
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-		
+		Notes
+		--------
+		This method is intended to alter the plots produced, not to run analysis on it. Although it is possible 
+		with most of the functions, we recommend not to use collapsed data for analysis steps.  
+		To revert collapsing, use .expand_negative().
 
-		fig, ax = plt.subplots(1, 1)
-
-		x_data = range(0, len(weights))
-
-		plt.hist(x_data, bins=n_bins, weights=weights, color='tab:blue')
-		plt.xlabel('Distance in bp')
-		
-		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt[0] = -1
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-
-		plt.ylabel('Count per distance')
-		plt.title(pair)
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-
-	def plot_dens(self, pair, bwadjust=0.1, save=None):
-		""" KDE Plots for a list of TF-pairs
-
-			Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			bwadjust: float
-				Factor that multiplicatively scales the value chosen using bw_method. Increasing will make the curve smoother. 
-				See kdeplot() from seaborn. Default: 0.1
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
+		See also
+		--------
+		tfcomb.objects.expand_negative
 		"""
 
-		tfcomb.utils.check_type(pair, tuple, "pair")
-		tfcomb.utils.check_value(bwadjust, vmin=0)
+		# check method
+		tfcomb.utils.check_string(method, ["max","min","mean","sum"])
+		# check if negative positions possible
+		if self.min_dist >= 0:
+			raise InputError("Data must contain negative position to collapse")
+		# check  if already collapsed
+		if self._collapsed is not None:
+			raise InputError("Data is already collapsed")
+		# get datasource (either corrected or smoothed)
+		datasource = self._get_datasource()
+		# create negative columns 
+		neg_cols = neg_cols = [ x for x in range(self.min_dist,0)]
 		
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
+		#select negative part
+		neg = datasource[["TF1","TF2"] + neg_cols]
 
+		self._collapsed_method = method
+		#add negative column according to method
+		if method =="max":	
+			neg["neg"] = neg[neg_cols].max(axis=1)
+		elif method=="min":
+			neg["neg"] = neg[neg_cols].min(axis=1)
+		elif method=="mean":
+			neg["neg"] = neg[neg_cols].mean(axis=1)
+		elif method=="sum":
+			neg["neg"] = neg[neg_cols].sum(axis=1)
 
-		self.check_distances()
-		self.check_pair(pair)
+		# remove negative columns from df
+		datasource = datasource.drop(neg_cols, axis=1)
+		try:
+			# try inserting collapsed negative value
+			datasource.insert(2, "neg", neg["neg"])
+		except ValueError:
+			raise InputError("Datasource already contains a negative column")
+		# save collapsed data
+		self._collapsed = neg.drop("neg",  axis=1)
+		# update datasource
+		self._set_datasource(datasource)
 
-		source_table = self.distances
-		tf1, tf2 = pair
+		if self.peaks is not None:
+			# save negative peaks
+			self._collapsed_peaks = self.peaks.copy()
+			# replace every negative position with "neg"
+			[self.peaks["Distance"].replace(x,"neg", inplace=True) for x in range(self.min_dist,0)]
 
-		ind = tf1 + "-" + tf2
-		weights = list(source_table.loc[ind].iloc[2:])
-		
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-
-		fig, ax = plt.subplots(1, 1)
-
-		sns.kdeplot(range(0, len(weights)), weights=weights, bw_adjust=bwadjust, x="distance").set_title(f"{tf1} - {tf2}")
-
-		xt = ax.get_xticks() 
-		if negative:
-			sns.kdeplot([offset_neg], bw_adjust=bwadjust, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-
-		plt.xlabel('Distance in bp')
-
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-	
-	def plot_corrected(self, pair, n_bins=None, save=None):
-		""" Plots corrected signal
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			nbins: int
-				Number of bins. Default: None (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
+	def expand_negative(self):
 		"""
+		Method to expand negative coulmns back to -min distance to 0. \n
+		e.g. "neg" column will be expanded back to [-3,-2,-1].
 
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-
-		self.check_distances()
-		self.check_corrected()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-
-		weights = self.corrected.loc[ind].iloc[2:]
-
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
-
-		fig, ax = plt.subplots(1, 1)
-
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-
-		n_data = len(weights)
-		x_data = np.linspace(0, n_data, n_bins)
-		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=False, alpha=0.6, color='tab:blue')
-		linres = linregress(range(0, n_data), np.array(weights, dtype=float))
-		plt.plot(x_data, linres.intercept + linres.slope*x_data, 'r', label='fitted line')
-		plt.xlabel('Distance in bp')
-		plt.ylabel('Corrected count per distance')
-
-		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-			ax.legend(["negative", "positive"])
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-		plt.title(f"{tf1} - {tf2}")
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-		
-	
-	def plot_linres(self, pair, n_bins=None, save=None):
-		""" Plots linear regression line into original signal
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			nbins: int
-				Number of bins. Default: None (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
+		See also
+		--------
+		tfcomb.objects.collapse_negative
 		"""
-
-		tfcomb.utils.check_type(n_bins, [int, type(None)], "n_bins")
-		if save is not None:
-			tfcomb.utils.check_writeability(save)
-
-		self.check_distances()
-		self.check_linres()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-		weights = self.distances.loc[ind].iloc[2:]
-		linres = self.linres.loc[ind].iloc[2]
-
-		if n_bins is None:
-			n_bins = self.max_dist - self.min_dist + 1
-		
-		negative = False
-		neg = weights[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			weights = weights[1:]
-			offset_neg = -4
-		
-		n_data = len(weights)
-		
-		x = np.linspace(self.min_dist, self.max_dist + 1, n_bins)
-
-		fig, ax = plt.subplots(1, 1)
-
-		plt.hist(range(0, n_data), weights=weights, bins=n_bins, density=True, alpha=0.6)
-		plt.plot(x, linres.intercept + linres.slope * x, 'r', label='fitted line')
-		plt.xlabel('Distance in bp')
-		plt.ylabel('Counts per distance')
-
-		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
-			xt[0] = offset_neg
-			xt[0] = -1
-			xt=xt[:-1]
-			xtl=xt.tolist()
-			xtl[0]="neg"
-		else:
-			xt=xt[1:-1]
-			xtl=xt.tolist()
-		ax.set_xticks(xt)
-		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-		title = f"{tf1} - {tf2}" 
-		plt.title(title)
-		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
-
-	def plot_analyzed_signal(self, pair, only_peaking=True, save=None):
-		""" Plots the analyzed signal
-
-		 Parameters
-			----------
-			pair : tuple(str,str)
-				Pair to create plot for.
-			only_peaking: bool
-				True if only those plots should be produced in which at least one peak was found, False otherwise.
-				Default: True (Binning is done automatically)
-			save:
-				Output file to write results to.
-				Default: None (results will not be saved)
-
-		"""
-
-		self.check_corrected()
-		self.check_peaks()
-		self.check_min_max_dist()
-		self.check_pair(pair)
-
-		tf1, tf2 = pair
-
-		ind = tf1 + "-" + tf2
-		peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-		                        (self.peaks["TF2"] == tf2))].Distance.to_numpy()
-		thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-		                        (self.thresh["TF2"] == tf2))].iloc[0,2]
-		method = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-		                        (self.thresh["TF2"] == tf2))].iloc[0,3]
-
 
 		datasource = self._get_datasource()
-		
-		x = datasource.loc[ind].iloc[2:].to_numpy()
-		
-		negative = False
-		neg = x[0]
-		if (self.min_dist == 0) and (self.max_overlap > 0):
-			negative = True
-			x = x[1:]
-			offset_neg = -4
-		
-		# if data is classified, exclude class from plotting
-		if (type(x[-1]) is np.bool_) or (type(x[-1]) is bool):
-			x = x[:-1]
-		
-		if (method =="zscore"):
-			x = (x - x.mean())/x.std()
-		
+		#check if collapsed
+		if "neg" not in datasource.columns:
+			raise InputError("Datasource must contain a negative column")
 
-		if (only_peaking) and (len(peaks) == 0):
-			self.logger.debug(f"Only plots for pairs with at least one peak should be plotted. {tf1}-{tf2} has no peak.")
-			return
+		#remove neg column
+		datasource = datasource.drop("neg", axis=1)
+		# merge datasource into collapsed (to preserve order TFNames - neg - pos)
+		datasource = self._collapsed.merge(datasource)
 
-		fig, ax = plt.subplots(1, 1)
-		plt.plot(x)
-		if self.min_dist == 0 :
-			crosses = peaks + 1 
+		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+		# reset self._collapsed
+		self._collapsed = None 
+		# update datasource
+		self._set_datasource(datasource)
+
+		if self._collapsed_peaks is not None:
+			self.peaks = self._collapsed_peaks
+			self._collapsed_peaks = None
+
+	def plot(self, pair, method="signal", save=None, config=None):
+		"""
+		Produces different plots.
+		
+		Parameters
+		-----------
+		pair : tuple(str, str)
+			TF names to plot. e.g. ("NFYA","NFYB")
+		method : str, optional
+			Plotting Method. One of ["hist", "corrected", "density", "linres", "signal", "smoothed"].
+			Default: signal
+		save: str, optional
+			Path to save the plots to. If save is None plots won't be plotted. 
+			Default: None
+		config : dict, optional
+			Config for some plotting methods. \n
+			e.g. {"nbins":100} for histogram like plots or {"bwadjust":0.1} for kde (densitiy) plot. \n
+			If set to *None*, below mentioned default parameters are used.\n
+			possible parameters: \n
+			[hist, linres, corrected, smoothed]: n_bins, Default: self.max_dist - self.min_dist + 1 \n
+			[density]: bwadjust, Default: 0.1 (see seaborn.kdeplot()) \n
+			[signal]: None \n
+			Default: None
+		"""
+
+		# checks
+		self.check_distances()
+		self.check_pair(pair)
+		self.check_min_max_dist()
+
+		# check method given is supported
+		tfcomb.utils.check_type(method, [str], "method")
+		supported = ["hist", "corrected", "density", "linres", "signal", "smoothed"]
+		tfcomb.utils.check_string(method, supported)
+
+		# check config is dict 
+		tfcomb.utils.check_type(config, [dict, type(None)], "config")
+
+		# check save is writeable
+		if save is not None:
+			tfcomb.utils.check_writeability(save)
+		
+		# get TF1, TF2 out of pair
+		tf1, tf2 = pair
+		ind = tf1 + "-" + tf2 # construct index
+	
+		#---------------- Setup data to plot ------------#
+
+		# get datasource
+		if method == "corrected":
+			self.check_corrected()
+			source_table = self.corrected	
+
+		elif method == "signal":
+			source_table = self.datasource
+
+		elif method == "smoothed":
+			self.check_smoothed()
+			source_table = self.smoothed
+
+		else: 
+			if self.is_smoothed():
+				source_table = self.smoothed
+			else:
+				source_table = self.distances
+
+		#Establish x-values
+		if method == "density":
+			param = 0.1
+			if(config is not None):
+				if "bwadjust" in config.keys():
+					param = config["bwadjust"]
+			tfcomb.utils.check_value(param, vmin=0)
+			x_data = range(self.min_dist, self.max_dist + 1)
+		elif method == "signal":
+			zsc = True if self.zscores is not None else False
+			distances = source_table.columns[2:].to_numpy()
+			x_data = distances
 		else:
-			crosses = peaks
-		if(len(peaks) > 0):
-			plt.plot(crosses, x[(crosses)], "x")
-		plt.plot([thresh] * len(x), "--", color="gray")
-		plt.xlabel('Distance in bp')
-		plt.ylabel('Corrected count per distance')
+			param = self.max_dist - self.min_dist + 1
+			if(config is not None):
+				if "n_bins" in config.keys():
+					param = config["n_bins"]
+			tfcomb.utils.check_type(param, [int], "n_bins")
+			if method == "smoothed":
+				zsc = True if self.zscores is not None else False
+			x_data = np.linspace(self.min_dist, self.max_dist + 1, param)
 		
+		# check whether data is collapsed or not see .collapse_negative() for more information
+		collapsed = False
+		offset_neg = None
+		if "neg" in source_table.columns:
+			collapsed = True
+
+		#Establish y-values
+		# get y_data
+		y_data = source_table.loc[ind].iloc[2:]
+		if ((method == "signal") or (method == "smoothed")) and zsc:
+			y_data = self.zscores.loc[ind].iloc[2:]
+
+		# remove negative data if collapsed
+		if collapsed:
+			neg = y_data[0]
+			if zsc:
+				if self._collapsed_method == "max":	
+					neg = y_data[:(-self.min_dist)+1].max()
+				elif self._collapsed_method == "min":
+					neg = y_data[:(-self.min_dist)+1].min()
+				elif self._collapsed_method == "mean":
+					neg = y_data[:(-self.min_dist)+1].mean()
+				elif self._collapsed_method == "sum":
+					neg = y_data[:(-self.min_dist)+1].sum()
+				y_data = y_data[-self.min_dist:]
+			else:
+				y_data = y_data[1:]
+			offset_neg = -4	
+			
+			if method =="smoothed":
+				x_data = x_data[-self.min_dist:]
+			else:
+				x_data = x_data[1:]
+
+		# standard ylbl, replace with specific option if needed
+		ylbl = "Count per Distance"
+
+		#---------------- Start plotting -------------#
+		# start subplot
+		fig, ax = plt.subplots(1, 1)
+
+		# plot according to method
+		if method == "density":
+			# kde plot, see seaborn.kdeplot() for more information
+			sns.kdeplot(x_data, weights=y_data, bw_adjust=param, x="distance").set_title(f"{tf1,tf2}")
+
+		elif method == "signal":
+			# plot signal with peaks found
+			#self.check_corrected()
+			self.check_peaks()
+				
+			peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
+									(self.peaks["TF2"] == tf2))].Distance.to_numpy()
+			thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
+									(self.thresh["TF2"] == tf2))].iloc[0,2]
+
+			y_data = y_data.to_numpy()
+
+			# if data is classified, exclude class from plotting
+			if (type(y_data[-1]) is np.bool_) or (type(y_data[-1]) is bool):
+				y_data = y_data[:-1]
+				x_data = x_data[:-1]
+			
+			plt.plot(x_data, y_data)
+
+			#Plot crosses for peaks
+			neg_cross = False
+			if(len(peaks) > 0):
+				# get indices of the peaks (mainly needed for ranges not starting with position 0)
+				peak_idx = [peak if peak=="neg" else list(x_data).index(peak)for peak in peaks]
+				# check if a peak is at the negative position
+				if collapsed & ("neg" in peak_idx):
+					neg_cross = True
+					peak_idx.remove("neg")
+				y_crosses = y_data[peak_idx] #y-values for peaks
+				if not collapsed:
+					peak_idx = [x + self.min_dist for x in peak_idx]
+				plt.plot(peak_idx, y_crosses, "x")
+
+			plt.plot(x_data, ([thresh] * len(x_data)), "--", color="gray")
+
+			ylbl = 'Corrected count per distance'
+			
+		else: # corrected, linres, histogram, smoothed
+			plt.hist(x_data, weights=y_data, bins=param, density=False, alpha=0.6, color='tab:blue')
+			if method == "corrected":
+				# add linear regression line to plot, recalculate for corrected, should be a line on y=0, if not, something went wrong
+				linres = linregress(x_data, np.array(y_data, dtype=float))
+				plt.plot(x_data, linres.intercept + linres.slope*x_data, 'r', label='fitted line')
+				ylbl = "Corrected count per Distance"
+			elif method == "linres":
+				# add linear regression line to plot
+				self.check_linres()
+				linres = self.linres.loc[ind].iloc[2]
+				plt.plot(x_data, linres.intercept + linres.slope * x_data, 'r', label='fitted line')
+		
+		# add labels to plot
+		plt.xlabel('Distance in bp')
+		plt.ylabel(ylbl)
+	
+		# make x-axis pretty
 		xt = ax.get_xticks() 
-		if negative:
-			plt.hist([offset_neg], bins=1, weights=[neg], color='tab:orange')
+		if collapsed: # adjust to collapsed
+			plt.bar(offset_neg, neg, color='tab:orange')
 			xt[0] = offset_neg
-			xt[0] = -1
 			xt = xt[:-1]
 			xtl = xt.tolist()
 			xtl[0] = "neg"
@@ -3527,9 +3722,55 @@ class DistObj():
 			xtl = xt.tolist()
 		ax.set_xticks(xt)
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
-		plt.title(f"Analyzed signal for {tf1}-{tf2}")
+		
+		# add cross for negative if needed
+		if method == "signal":
+			if neg_cross:
+				plt.plot(offset_neg, neg, "x")
+
+		# set pair as plot title
+		plt.title(pair)
+
+		#save plot
 		if save is not None:
 			plt.savefig(save, dpi=600)
 			plt.close()
 	
+	def plot_network(self, color_node_by="TF1_count",
+						   color_edge_by="Distance", 
+						   size_edge_by="Distance_percent",
+						   **kwargs): 
+		"""
+		Plot the rules in .rules as a network using Graphviz for python. This function is a wrapper for 
+		building the network (using tfcomb.network.build_network) and subsequently plotting the network (using tfcomb.plotting.network).
+
+		Parameters
+		-----------
+		color_node_by : str, optional
+			A column in .rules or .TF_table to color nodes by. Default: 'TF1_count'.
+		color_edge_by : str, optional
+			A column in .rules to color edges by. Default: 'Distance'.
+		size_edge_by : str, optional
+			A column in rules to size edge width by. Default: 'TF1_TF2_count'.
+		**kwargs : arguments
+			All other arguments are passed to tfcomb.plotting.network.
+
+		See also
+		--------
+		tfcomb.network.build_network and tfcomb.plotting.network
+		"""
+
+		#Fetch network from object or build network
+		if self.network is None:
+			self.logger.warning("The .network attribute is not set yet - running build_network().")
+			self.build_network()			#running build network()
+			
+		#Plot network
+		G = self.network 
+		dot = tfcomb.plotting.network(G, color_node_by=color_node_by, 
+										 color_edge_by=color_edge_by, 
+										 size_edge_by=size_edge_by, 
+										 verbosity=self.verbosity, **kwargs)
+
+		return(dot)
 

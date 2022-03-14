@@ -2,15 +2,18 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+import copy
 from copy import deepcopy
 import time
 import datetime
 import scipy.stats
+from scipy.signal import find_peaks
 import random
 import string
 import multiprocessing as mp
 from kneed import DataGenerator, KneeLocator
 import statsmodels.stats.multitest
+import importlib
 
 import pysam
 import tfcomb
@@ -18,11 +21,15 @@ from tfcomb.logging import TFcombLogger, InputError
 from tfcomb.counting import count_co_occurrence
 from tobias.utils.regions import OneRegion, RegionList
 from tobias.utils.motifs import MotifList
+from tobias.utils.signals import fast_rolling_math
 import pathlib
+import pyBigWig
+import matplotlib.pyplot as plt
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
 class OneTFBS():
+	""" Collects location information about one single TFBS """
 
 	def __init__(self, **kwargs):
 
@@ -55,10 +62,97 @@ class OneTFBS():
 		return(self)
 
 
+class TFBSPair():
+	""" Collects information about a co-occurring pair of TFBS """
+
+	def __init__(self, TFBS1, TFBS2, distance, directional=False):
+
+		self.site1 = TFBS1 #OneTFBS object
+		self.site2 = TFBS2 #OneTFBS object
+		self.distance = distance
+
+		#Calculate orientation scenario
+		if directional == True:
+			self.orientation = "TF1-TF2"
+			self.orientation = "TF2-TF1"
+			self.orientation = "divergent"
+			self.orientation = "convergent"
+
+		else:
+			if self.site1.strand == self.site2.strand:
+				self.orientation = "same"
+			else:
+				self.orientation = "opposite"
+
+	def __str__(self):
+		TFBS1 = ",".join([str(getattr(self.site1, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
+		TFBS2 = ",".join([str(getattr(self.site2, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
+
+		s = f"<TFBSPair | TFBS1: ({TFBS1}) | TFBS2: ({TFBS2}) | distance: {self.distance} | orientation: {self.orientation} >"
+		return(s)
+
+	def __repr__(self):
+		return(self.__str__())
+
+
+class TFBSPairList(list):
+	""" Class for collecting and analyzing a list of TFBSPair objects """
+	
+	def as_table(self):
+		""" Table representation of the pairs in the list """
+
+		lines = [[l.site1.chrom, l.site1.start, l.site1.end, l.site1.name, l.site1.strand,
+					l.site2.chrom, l.site2.start, l.site2.end, l.site2.name, l.site2.strand, l.distance, l.orientation] for l in self]
+
+		table = pd.DataFrame(lines)
+		table.columns = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand",
+						"site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand", "site_distance", "site_orientation"]
+
+		return(table)
+	
+	def write_bed(self, outfile, fmt="bed", merge=False):
+		""" 
+		Write the locations of (TF1, TF2) pairs to a bed-file.
+		
+		Parameters
+		------------
+		locations : list
+			The output of get_pair_locations().
+		outfile : str
+			The path which the pair locations should be written to.
+		fmt : str, optional
+			The format of the output file. Must be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites are written individually (see merge option to merge sites). If "bedpe", the sites are written in BEDPE format. Default: "bed".
+		merge : bool, optional
+			If fmt="bed", 'merge' controls how the locations are written out. If True, will be written as one region spanning TF1.start-TF2.end. If False, TF1/TF2 sites are written individually. Default: False.
+		"""
+		
+		tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
+		tfcomb.utils.check_type(merge, bool, "merge")
+
+		#Open output file
+		try:
+			f = open(outfile, "w")
+		except Exception as e:
+			raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
+		
+		#Write locations to file in format 'fmt'
+		if fmt == "bed":
+			if merge == True:
+				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site2.end), l.site1.name + "-" + l.site2.name, str(l.distance), "."]) for l in self]) + "\n"
+			else:
+				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.end), str(l.site1.end), l.site1.name, ".", l.site1.strand]) + "\n" + 
+								"\t".join([l.site2.chrom, str(l.site2.end), str(l.site2.end), l.site2.name, ".", l.site2.strand]) for l in self]) + "\n"
+				
+		elif fmt == "bedpe":
+			s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site1.end),
+										l.site2.chrom, str(l.site2.start), str(l.site2.end), 
+										l.site1.name + "-" + l.site2.name, str(l.distance), l.site1.strand, l.site2.strand]) for l in self]) + "\n"
+		f.write(s)
+		f.close()
+
 #------------------------------ Notebook / script exceptions -----------------------------#
 
-#NOTE: not applied at the moment, but kept here for future uses
-def is_notebook():
+def _is_notebook():
 	""" Utility to check if function is being run from a notebook or a script """
 	try:
 		ipython_shell = get_ipython()
@@ -97,7 +191,29 @@ def check_graphtool():
 		s = "ERROR: Could not find the 'graph-tool' module on path. This module is needed for some of the TFCOMB network analysis functions. "
 		s += "Please visit 'https://graph-tool.skewed.de/' for information about installation."
 
-		if is_notebook():
+		if _is_notebook():
+			raise StopExecution(s) from None
+		else:
+			sys.exit(s)
+	
+	return(True)
+
+def check_module(module):
+	""" Check if <module> can be imported without error """
+
+	error = 0
+	try:
+		importlib.import_module(module)
+	except ModuleNotFoundError:
+		error = 1
+	except: 
+		raise #unexpected error loading module
+	
+	#Write out error if module was not found
+	if error == 1:
+		s = f"ERROR: Could not find the '{module}' module on path. This module is needed for this functionality. Please install this package to proceed."
+
+		if _is_notebook():
 			raise StopExecution(s) from None
 		else:
 			sys.exit(s)
@@ -173,22 +289,24 @@ def check_writeability(file_path):
 		If file_path is not writeable.
 	"""
 
+	check_type(file_path, str)
+
 	#Check if file already exists
-	if file_path is not None: #don't check path given as None; assume that this is taken care of elsewhere
-		error_str = None
-		if os.path.exists(file_path):
-			if not os.path.isfile(file_path): # is it a file or a dir?
-				error_str = "Path '{0}' is not a file".format(file_path)
+	error_str = None
+	if os.path.exists(file_path):
+		if not os.path.isfile(file_path): # is it a file or a dir?
+			error_str = "Path '{0}' is not a file".format(file_path)
 
-		#check writeability of parent dir
-		else:
-			pdir = os.path.dirname(file_path)
-			if os.access(pdir, os.W_OK) == False:
-				error_str = "File '{0}' within dir {1} is not writeable".format(file_path, pdir)
+	#check writeability of parent dir
+	else:
+		pdir = os.path.dirname(file_path)
+		pdir = "." if pdir == "" else pdir #if file_path is in current folder, pdir is empty string
+		if os.access(pdir, os.W_OK) == False:
+			error_str = "Parent directory '{0}' is not writeable".format(pdir)
 
-		#If any errors were found
-		if error_str is not None:
-			raise InputError(error_str)
+	#If any errors were found
+	if error_str is not None:
+		raise InputError(error_str)
 
 
 def check_type(obj, allowed, name=None):
@@ -409,6 +527,19 @@ def open_genome(genome_f):
 	genome_obj = pysam.FastaFile(genome_f)
 	return(genome_obj)
 
+def open_bigwig(bigwig_f):
+	"""
+	Parameters
+	------------
+	bigwig_f : str
+		The path to a bigwig file.	
+	
+	"""
+
+	pybw_obj = pyBigWig.open(bigwig_f)
+
+	return(pybw_obj)
+
 def check_boundaries(regions, genome):
 	""" Utility to check whether regions are within the boundaries of genome.
 	
@@ -457,7 +588,7 @@ def unique_region_names(regions):
 
 	return(names)
 
-def calculate_TFBS(regions, motifs, genome):
+def calculate_TFBS(regions, motifs, genome, resolve="merge"):
 	"""
 	Multiprocessing-safe function to scan for motif occurrences
 
@@ -465,15 +596,19 @@ def calculate_TFBS(regions, motifs, genome):
 	----------
 	genome : str or 
 		If string , genome will be opened 
-	
 	regions : RegionList()
 		A RegionList() object of regions 
+	resolve : str
+		How to resolve overlapping sites from the same TF. Must be one of "off", "highest_score" or "merge". If "highest_score", the highest scoring overlapping site is kept.
+		If "merge", the sites are merged, keeping the information of the first site. If "off", overlapping TFBS are kept. Default: "merge".
 
 	Returns
 	----------
 	List of TFBS within regions
 
 	"""
+
+	check_string(resolve, ["merge", "highest_score", "off"], "resolve")
 
 	#open the genome given
 	if isinstance(genome, str):
@@ -492,91 +627,96 @@ def calculate_TFBS(regions, motifs, genome):
 
 		TFBS_list += region_TFBS
 
+	#Sort all sites
+	TFBS_list.loc_sort()
+
+	#Resolve overlapping
+	if resolve != "off":
+		TFBS_list = resolve_overlaps(TFBS_list, how=resolve)
+
 	if isinstance(genome, str):
 		genome_obj.close()
 
 	return(TFBS_list)
 
+def resolve_overlaps(sites, how="merge", per_name=True):
+	""" 
+	Resolve overlapping sites within a list of genomic regions.
 
-def remove_duplicates(TFBS):
-	""" """
-
-	filtered = TFBS
-
-	return(filtered)
-
-def resolve_overlapping(TFBS):
-	""" Remove self-overlapping regions from TFBS 
-	
 	Parameters
-	-----------
-	TFBS : tobias.regions.RegionList
+	------------
+	sites : RegionList
+		A list of TFBS/regions with .chrom, .start, .end and .name information.
+	how : str
+		How to resolve the overlapping site. Must be one of "highest_score", "merge". If "highest_score", the highest scoring overlapping site is kept.
+		If "merge", the sites are merged, keeping the information of the first site. Default: "merge".
+	per_name : bool
+		Whether to resolve overlapping only per name or across all sites. If 'True' overlaps are only resolved if the name of the sites are equal. 
+		If 'False', overlaps are resolved across all sites. Default: True.
 	"""
+	
+	check_string(how, ["highest_score", "merge"], "how")
 
-	#Split TFBS into dict per name
-	sites_per_name = {}
-	for site in TFBS:
-		if site.name not in sites_per_name:
-			sites_per_name[site.name] = RegionList()
-		sites_per_name[site.name].append(site)
+	#Create a copy of sites to ensure that original sites are not changed
+	sites = copy.copy(sites)
+	
+	n_sites = len(sites)
+	tracking = {} # dictionary for tracking positions of TFBS per name (or across all)
+	
+	for current_site_i in range(n_sites):
+		
+		current_site = sites[current_site_i]
+		site_name = current_site.name if per_name == True else "." #control which site to fetch as 'previous'
+		
+		if site_name in tracking: #if not in tracking, site is the first site of this name
+			
+			#previous_site = tracking[site_name]["site"]
+			previous_i = tracking[site_name]
+			previous_site = sites[previous_i]
 
-	#Resolve overlaps
-	resolved = RegionList()
-	for name in sites_per_name:
-		resolved.extend(sites_per_name[name].resolve_overlaps())
-	resolved.loc_sort()
+			if (current_site.chrom == previous_site.chrom) and (current_site.start < previous_site.end): #overlapping
+								
+				#How to deal with overlap:
+				if how == "highest_score":
+					
+					if current_site.score >= previous_site.score: #keep current site
+						sites[previous_i] = None
+						tracking[site_name] = current_site_i #new tracking
+						
+					else: #keep previous site
+						sites[current_site_i] = None
+						#tracking stays the same
+						
+				elif how == "merge":
+					
+					merged_end = max([previous_site.end, current_site.end])
+					
+					#merge site into the previous; keep previous score/strand
+					merged = OneTFBS(**{"chrom": current_site.chrom, 
+									  "start": previous_site.start, 
+									  "end": merged_end, 
+									  "name": previous_site.name, 
+									  "score": previous_site.score,
+									  "strand": previous_site.strand})
+					
+					sites[previous_i] = merged
+					sites[current_site_i] = None
+					#tracking i stays the same
+
+					#tracking[site_name] = previous_i, "site": merged} , but site is updated to merged
+					
+			else: #no overlaps with previous; save this site to tracking
+				tracking[site_name] = current_site_i
+				
+		else: #Save first site to tracking
+			tracking[site_name] = current_site_i
+	
+	resolved = [site for site in sites if site is not None]
 	
 	return(resolved)
 
-def merge_self_overlaps(regions):
-	""" Merge overlapping regions with the same name.
-	
-	Parameters
-	-----------
-	regions : RegionList()
-		A RegionList() object of regions 
 
-	Return
-	--------
-	RegionList()
-		The given regions merged per name
-	"""
-
-	#regions.loc_sort() #assume that the regions are already sorted due to computational overhead
-	no_regions = len(regions)
-
-	i = 0
-	j = 1
-	while i + j < no_regions:
-
-		reg_a = regions[i]
-		reg_b = regions[i+j]
-
-		if reg_a == None:
-			i += 1
-			j = 1
-		elif reg_b == None:
-			j += 1
-		else:
-			if (reg_a.chrom == reg_b.chrom) and (reg_b.start < reg_a.end): #if overlapping
-				if reg_a.name == reg_b.name:
-					
-					#Update reg_a and set reg_b to None
-					reg_a.end = reg_b.end
-					regions[i+j] = None
-
-				else: #overlapping but not the same - increment b
-					j += 1
-
-			else: #non-overlapping, increment reg_a
-				i += 1
-				j = 1
-
-	#Remove all None
-	merged = RegionList([reg for reg in regions if reg is not None])
-
-	return(merged)
-
+#----------------------------- Analysis on pairs of TFBS ------------------------#
 
 def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 										   TF2_strand = None,
@@ -585,198 +725,165 @@ def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
 										   max_overlap = 0,
 										   directional = False,
 										   anchor = "inner"):
-		""" Get genomic locations of a particular TF pair.
-		
-		Parameters
-		----------
-		sites : RegionList()
-			A list of TFBS regions.
-		TF1 : str 
-			Name of TF1 in pair.
-		TF2 : str 
-			Name of TF2 in pair.
-		TF1_strand : str, optional
-			Strand of TF1 in pair. Default: None (strand is not taken into account).
-		TF2_strand : str, optional
-			Strand of TF2 in pair. Default: None (strand is not taken into account).
-		min_distance : int, optional
-			Minimum distance allowed between two TFBS. Default: 0
-		max_distance : int, optional
-			Maximum distance allowed between two TFBS. Default: 100
-		max_overlap : float between 0-1, optional
-			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
-			Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
-		directional : bool, optional
-			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
-			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
-		anchor : str, optional
-			The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
-
-		Returns
-		-------
-		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
-
-		See also
-		---------
-		count_within
-
-		"""
-
-		#Check input types
-		check_string(anchor, ["inner", "outer", "center"], "anchor")
-
-		#Subset sites to TF1/TF2 sites
-		sites = [site for site in sites if site.name in [TF1, TF2]]
-
-		locations = [] #empty list of regions
-
-		TF1_tup = (TF1, TF1_strand)
-		TF2_tup = (TF2, TF2_strand)
-		n_sites = len(sites)
-
-		#Find out which TF is queried
-		if directional == True:
-			TF1_to_check = [TF1_tup]
-		else:
-			TF1_to_check = [TF1_tup, TF2_tup]
-
-		#Loop over all sites
-		i = 0
-		while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
-			
-			#Get current TF information
-			TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
-			this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
-
-			#Check whether TF is valid
-			if this_TF1_tup in TF1_to_check:
+	""" Get genomic locations of a particular TF pair.
 	
-				#Find possible associations with TF1 within window 
-				finding_assoc = True
-				j = 0
-				while finding_assoc == True:
+	Parameters
+	----------
+	sites : RegionList()
+		A list of TFBS regions.
+	TF1 : str 
+		Name of TF1 in pair.
+	TF2 : str 
+		Name of TF2 in pair.
+	TF1_strand : str, optional
+		Strand of TF1 in pair. Default: None (strand is not taken into account).
+	TF2_strand : str, optional
+		Strand of TF2 in pair. Default: None (strand is not taken into account).
+	min_distance : int, optional
+		Minimum distance allowed between two TFBS. Default: 0
+	max_distance : int, optional
+		Maximum distance allowed between two TFBS. Default: 100
+	max_overlap : float between 0-1, optional
+		Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
+		Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
+	directional : bool, optional
+		Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
+		TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
+	anchor : str, optional
+		The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
+
+	Returns
+	-------
+	List of TFBSPair objects
+		Each entry in the list is a TFBSPair object, which contains .site1, .site2, .distance and .orientation variables
+
+	See also
+	---------
+	count_within
+
+	"""
+
+	#Check input types
+	check_string(anchor, ["inner", "outer", "center"], "anchor")
+
+	#Subset sites to TF1/TF2 sites
+	sites = [site for site in sites if site.name in [TF1, TF2]]
+
+	locations = TFBSPairList() #empty list of regions
+
+	TF1_tup = (TF1, TF1_strand)
+	TF2_tup = (TF2, TF2_strand)
+	n_sites = len(sites)
+
+	#Find out which TF is queried
+	if directional == True:
+		TF1_to_check = [TF1_tup]
+	else:
+		TF1_to_check = [TF1_tup, TF2_tup]
+
+	#Loop over all sites
+	i = 0
+	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
+		
+		#Get current TF information
+		TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
+		this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
+
+		#Check whether TF is valid
+		if this_TF1_tup in TF1_to_check:
+
+			#Find possible associations with TF1 within window 
+			finding_assoc = True
+			j = 0
+			while finding_assoc == True:
+				
+				#Next site relative to TF1
+				j += 1
+				if j+i >= n_sites - 1: #next site is beyond end of list, increment i
+					i += 1
+					finding_assoc = False #break out of finding_assoc
+
+				else:	#There are still sites available
+
+					#Fetch information on TF2-site
+					TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
+					this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
 					
-					#Next site relative to TF1
-					j += 1
-					if j+i >= n_sites - 1: #next site is beyond end of list, increment i
-						i += 1
-						finding_assoc = False #break out of finding_assoc
+					#Find out whether this TF2 is TF1/TF2
+					if this_TF1_tup == TF1_tup:
+						to_check = TF2_tup
+					elif this_TF1_tup == TF2_tup:
+						to_check = TF1_tup
 
-					else:	#There are still sites available
+					#Check whether TF2 is either TF1/TF2
+					if this_TF2_tup == to_check:
+					
+						#Calculate distance between the two sites based on anchor
+						if anchor == "inner":
+							distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+							if distance < 0:
+								distance = 0
+						elif anchor == "outer":
+							distance = TF2_end - TF1_start
+						elif anchor == "center":
+							TF1_mid = (TF1_start + TF1_end) / 2
+							TF2_mid = (TF2_start + TF2_end) / 2
+							distance = TF2_mid - TF1_mid
 
-						#Fetch information on TF2-site
-						TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
-						this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
-						
-						#Find out whether this TF2 is TF1/TF2
-						if this_TF1_tup == TF1_tup:
-							to_check = TF2_tup
-						elif this_TF1_tup == TF2_tup:
-							to_check = TF1_tup
+						#True if these TFBS co-occur within window
+						if TF1_chr == TF2_chr and (distance <= max_distance):
 
-						#Check whether TF2 is either TF1/TF2
-						if this_TF2_tup == to_check:
-						
-							#Calculate distance between the two sites based on anchor
+							if distance >= min_distance:
+							
+								# check if they are overlapping more than the threshold
+								valid_pair = 1
+								if distance == 0:
+
+									# Get the length of the shorter TF
+									short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
+
+									#Calculate overlap between TF1/TF2
+									overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
+									if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
+										overlap_bp = short_bp
+									
+									#Invalid pair, overlap is higher than threshold
+									if overlap_bp / (short_bp*1.0) > max_overlap: 
+										valid_pair = 0
+
+								#Save association
+								if valid_pair == 1:
+
+									#Save location
+									reg1 = sites[i] 
+									reg2 = sites[i+j]
+									pair = TFBSPair(reg1, reg2, distance, directional=directional)
+									locations.append(pair)
+						elif TF1_chr != TF2_chr: 
+							i += 1
+							finding_assoc = False   #break out of finding_assoc-loop
+
+						else: #This TF2 is on the same chromosome but more than max_distance away
+
+							#Establish if all valid sites were found for TF1
 							if anchor == "inner":
-								distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-								if distance < 0:
-									distance = 0
-							elif anchor == "outer":
-								distance = TF2_end - TF1_start
-							elif anchor == "center":
-								TF1_mid = (TF1_start + TF1_end) / 2
-								TF2_mid = (TF2_start + TF2_end) / 2
-								distance = TF2_mid - TF1_mid
 
-							#True if these TFBS co-occur within window
-							if TF1_chr == TF2_chr and (distance <= max_distance):
-
-								if distance >= min_distance:
-								
-									# check if they are overlapping more than the threshold
-									valid_pair = 1
-									if distance == 0:
-
-										# Get the length of the shorter TF
-										short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-
-										#Calculate overlap between TF1/TF2
-										overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
-										if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
-											overlap_bp = short_bp
-										
-										#Invalid pair, overlap is higher than threshold
-										if overlap_bp / (short_bp*1.0) > max_overlap: 
-											valid_pair = 0
-
-									#Save association
-									if valid_pair == 1:
-
-										#Save location
-										reg1 = OneTFBS(chrom=TF1_chr, start=TF1_start, end=TF1_end, name=TF1_name, strand=TF1_strand_i)
-										reg2 = OneTFBS(chrom=TF2_chr, start=TF2_start, end=TF2_end, name=TF2_name, strand=TF2_strand_i)
-										location = (reg1, reg2, distance)
-										locations.append(location)
-							elif TF1_chr != TF2_chr: 
+								#The next site is out of inner window range; increment to next i
 								i += 1
 								finding_assoc = False   #break out of finding_assoc-loop
+							
+							else: #If anchor is outer or center, there might still be valid pairs for future TF2's
 
-							else: #This TF2 is on the same chromosome but more than max_distance away
-
-								#Establish if all valid sites were found for TF1
-								if anchor == "inner":
-
-									#The next site is out of inner window range; increment to next i
+								#Check if it will be possible to find valid pairs in next sites
+								if TF2_start > TF1_start + max_distance:
+									#no longer possible to find valid pairs for TF1; increment to next i
 									i += 1
 									finding_assoc = False   #break out of finding_assoc-loop
-								
-								else: #If anchor is outer or center, there might still be valid pairs for future TF2's
-
-									#Check if it will be possible to find valid pairs in next sites
-									if TF2_start > TF1_start + max_distance:
-										#no longer possible to find valid pairs for TF1; increment to next i
-										i += 1
-										finding_assoc = False   #break out of finding_assoc-loop
-			
-			else: #current TF1 is not TF1/TF2; go to next site
-				i += 1
-
-		return(locations)
-
-def locations_to_bed(locations, outfile, fmt="bed"):
-		""" 
-		Write the locations of (TF1, TF2) pairs to a bed-file.
 		
-		Parameters
-		------------
-		locations : list
-			The output of get_pair_locations()
-		outfile : str
-			The path which the pair locations should be written to.
-		fmt : str, optional
-			The format of the output file. Bust be pne of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
-		"""
-		
-		tfcomb.utils.check_string(fmt, ["bed", "bedpe"], "fmt")
+		else: #current TF1 is not TF1/TF2; go to next site
+			i += 1
 
-		#Open output file
-		try:
-			f = open(outfile, "w")
-		except Exception as e:
-			raise InputError("Error opening '{0}' for writing. Error message was: {1}".format(outfile, e))
-		
-		#Write locations to file in format 'fmt'
-		if fmt == "bed":
-			s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[1].end), loc[0].name + "-" + loc[1].name, str(loc[-1]), "."]) for loc in locations]) + "\n"
-
-		elif fmt == "bedpe":
-			s = "\n".join(["\t".join([loc[0].chrom, str(loc[0].start), str(loc[0].end),
-									  loc[1].chrom, str(loc[1].start), str(loc[1].end), 
-									  loc[0].name + "-" + loc[1].name, str(loc[-1]), loc[0].strand, loc[1].strand]) for loc in locations]) + "\n"
-		f.write(s)
-		f.close()
+	return(locations)
 
 
 #--------------------------------- Background calculation ---------------------------------#
@@ -863,9 +970,9 @@ def calculate_background(sites, min_distance,
 	return(pair_counts)
 
 
-#--------------------------------- P-value calculation ---------------------------------#
+#--------------------------------- Thresholding ---------------------------------#
 
-def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
+def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, plot=False):
 	"""
 	Function to get upper/lower threshold(s) based on the distribution of data. The threshold is calculated as the probability of "percent" (upper=1-percent).
 	
@@ -883,7 +990,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 	If which is one of "upper"/"lower", get_threshold returns a float. If "both", get_threshold returns a list of two float thresholds.
 	"""
 	
-	distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace, 
+	distributions = [scipy.stats.norm, scipy.stats.lognorm, scipy.stats.laplace,
 					 scipy.stats.expon, scipy.stats.truncnorm, scipy.stats.truncexpon, scipy.stats.wald, scipy.stats.weibull_min]
 	
 	logger = tfcomb.logging.TFcombLogger(verbosity)
@@ -902,7 +1009,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 	#Fit data to each distribution
 	distribution_dict = {}
 	for distribution in distributions:
-		logger.debug("Fitting data to '{0}'".format(distribution))
+		
 		params = distribution.fit(data_finite)
 
 		#Test fit using negative loglikelihood function
@@ -912,9 +1019,11 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 		distribution_dict[distribution.name] = {"distribution": distribution,
 												"params": params, 
 												"mle": mle}
-
+		logger.spam("Fitted data to '{0}' with mle={1} and params: {2}".format(distribution.name, mle, params))
+	
 	#Get best distribution
 	best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
+	logger.debug("Best fitting distribution was: {0}".format(best_fit_name))
 	parameters = distribution_dict[best_fit_name]["params"]
 	best_distribution = distribution_dict[best_fit_name]["distribution"]
 
@@ -927,199 +1036,35 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0):
 		final = thresholds[0]
 	elif which == "both":
 		final = tuple(thresholds)
-		
+
 	#Plot fit and threshold
-	#plt.hist(data, bins=20, density=True)
-	#xmin = np.min(data)
-	#xmax = np.max(data)
-	#x = np.linspace(xmin, xmax, 100)
-	#plt.plot(x, best_distribution(*params).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
-	#plt.legend()
+	if plot == True:
+		plt.hist(data, bins=30, density=True)
+
+		xlims = plt.xlim()
+		ylims = plt.ylim()
+
+		xmin = np.min(data)
+		xmax = np.max(data)
+		x = np.linspace(xmin, xmax, 100)
+		plt.plot(x, best_distribution(*parameters).pdf(x), lw=5, alpha=0.6, label=best_distribution.name)
+		
+		thresh_list = [final] if not isinstance(final, tuple) else final
+		for t in thresh_list:
+			plt.axvline(t)
+		plt.legend()
+		plt.xlim(xlims)
+		plt.ylim(ylims)
+		
 	
 	return(final)
 
-def tfcomb_pvalue(table, measure="cosine", alternative="greater", threads = 1, logger=None):
-	"""
-	Calculates the p-value of each TF1-TF2 pair for the measure given.
+#--------------------------------- Working with TF-COMB objects ---------------------------------#
 
-	Parameters
-	------------
-	table : pd.DataFrame
-		The table from '.rules' of DiffObj or DiffCombObj.
-	measure : str, optional
-		The measure to calculate pvalue for. Default: "cosine".
-	alternative : str, optional
-		One of: 'two-sided', 'greater', 'less'. Default: "greater".
-	threads : int, optional
-		Number of threads to use for multiprocessing. Default: 1.
-	logger : logger
-		A logger to use for logging progress.
-	"""
-	
-	if logger == None:
-		logger = TFcombLogger(0) #silent logger
-
-	#Check input types
-	check_type(table, [pd.DataFrame], "table")
-	check_type(measure, [str], "measure")
-	check_type(alternative, [str], "alternative")
-	check_type(threads, [int], "threads")
-
-	#Create pivot-table from rules table
-	pivot_table = pd.pivot(table, index="TF1", columns="TF2", values=measure)
-
-	#Convert pivot table index/columns to integers
-	TF_lists = {"TF1": pivot_table.index.tolist(),
-				"TF2": pivot_table.columns.tolist()}
-	pivot_table.index = [i for (i, _) in enumerate(TF_lists["TF1"])]
-	pivot_table.columns = [i for (i, _) in enumerate(TF_lists["TF2"])]
-
-	#Convert to matrix
-	matrix = pivot_table.to_numpy()
-	matrix = np.nan_to_num(matrix) #Fill NA with 0's
-	
-	##### Calculate background distribution for all TFs in TF1/TF2 #####
-	bg_dist_dict = {"TF1": {}, "TF2": {}}
-
-	for TF_number in bg_dist_dict: #first or second, e.g. TF1/TF2
-		for i, _ in enumerate(TF_lists[TF_number]):
-			
-			if TF_number == "TF1":
-				values = matrix[i,:]
-			elif TF_number == "TF2":
-				values = matrix[:,i]
-
-			#Calculate information about values
-			bg_dist_dict[TF_number][i] = {"n": len(values),
-										"mu": np.mean(values),
-										"std": np.std(values)
-										}
-
-	#Convert table entries to integers -> tuples
-	tuples = table[["TF1", "TF2", measure]].to_records(index=False) #tuples of (TF1, TF2, value)
-	TF1_idx = {TF: i for i, TF in enumerate(TF_lists["TF1"])}
-	TF2_idx = {TF: i for i, TF in enumerate(TF_lists["TF2"])}
-	tuples = [(TF1_idx[TF1], TF2_idx[TF2], value) for (TF1, TF2, value) in tuples]
-
-	#Split tuples into individual tasks
-	n_jobs = 100
-	n_tuples = len(tuples)
-	per_chunk = int(np.ceil(n_tuples/float(n_jobs)))
-	tuples_chunks = [tuples[i:i+per_chunk] for i in range(0, n_tuples, per_chunk)]
-
-	### Calculate pvalues with/without multiprocessing
-	
-	if threads == 1:
-		pvalues = []
-		p = Progress(n_jobs, 10, logger) #Setup progress object
-
-		for i, chunk in enumerate(tuples_chunks):
-			results = _pvalues_for_chunks(chunk, bg_dist_dict, alternative)
-			pvalues.extend(results)
-			p.write_progress(i)
-		logger.info("Finished!")
-
-	else:
-		#start multiprocessing
-		pool = mp.pool(threads)
-
-		jobs = []
-		for chunk in tuples_chunks:
-			job = pool.apply_async(_pvalues_for_chunks, args=(chunk, bg_dist_dict, alternative, ))
-			jobs.append(job)
-		pool.close() 	#done sending jobs to pool
-
-		log_progress(jobs)
-		pvalues = [job.get() for job in jobs]
-		pool.join()
-
-		#Flatten results from individual jobs
-		pvalues = sum(pvalues, [])
-
-
-	##### Process pvalues #####
-
-	#Add p-values to table
-	col = measure + "_pvalue"
-	table[col] = pvalues
-
-	#Adjust pvalues
-	table[col + "_adj"] = statsmodels.stats.multitest.multipletests(table[col], method="Bonferroni")[1]
-
-	#no return, table is changed in place
-
-def _pvalues_for_chunks(TF_int_combinations, bg_dist_dict, alternative="greater"):
-	""" Wrapper of _calculate_pvalue for chunks of TF_int_combinations """
-
-	pvalues = [""]*len(TF_int_combinations) #initialize list of p-values
-	for i, (TF1_i, TF2_i, obs) in enumerate(TF_int_combinations):
-
-		#Remove value from background distributions
-		mu1, std1, n1 = remove_val_from_dist(obs, **bg_dist_dict["TF1"][TF1_i])
-		mu2, std2, n2 = remove_val_from_dist(obs, **bg_dist_dict["TF2"][TF2_i])
-
-		#Merge the two distributions
-		mu = (n1 * mu1 + n2 * mu2)/(n1 + n2)
-		std = np.sqrt((n1 * (std1**2 + (mu1-mu)**2) + n2*(std2**2 + (mu2-mu)**2))/(n1 + n2))
-
-		#Calculate zscore->pvalue of observed value
-		pvalues[i] = _calculate_pvalue(mu, std, obs, alternative=alternative) 
-
-	return(pvalues)
-
-def _calculate_pvalue(mu, std, obs, alternative="greater"):
-	""" Calculate p-value of seeing value within the normal distribution with mu/std parameters"""
-	
-	z = (obs - mu)/std
-	p_oneside = scipy.stats.norm.sf(np.abs(z)) #one-sided pvalue
-
-	#Calculate pvalue based on alternative hypothesis
-	if alternative == "two-sided":
-		p = p_oneside * 2
-
-	elif alternative == "greater":
-		if z > 0: #observed is larger than mean
-			p = p_oneside
-		else:
-			p = 1.0 - p_oneside
-	
-	elif alternative == "less":
-		if z < 0: #observed is smaller than mean
-			p = p_oneside
-		else:
-			p = 1.0 - p_oneside
-
-	return(p)
-
-
-def remove_val_from_dist(value, mu, std, n):
-	""" Remove a value from distribution 
-	
-	Parameters
-	-----------
-	value : float
-		Value to remove. 
-		
-	n : int
-		The number of elements in the distribution (including value)
-	
-	returns()
-	"""
-
-	#Calculate new mean
-	bg_mean = (mu*n - value)/(n-1)
-
-	#Calculate new std
-	var = std**2
-	bg_var = n/(n-1) * (var - (mu - value)**2/(n-1))
-	bg_std = np.sqrt(bg_var)
-
-	bg_n = n - 1
-
-	return((bg_mean, bg_std, bg_n))
-
-
-#--------------------------------- Working with TF-comb objects ---------------------------------#
+def is_symmetric(matrix):
+	""" Check if a matrix is symmetric around the diagonal """
+	b = np.allclose(matrix, matrix.T, equal_nan=True)
+	return(b)
 
 def make_symmetric(matrix):
 	"""
@@ -1148,3 +1093,356 @@ def set_contrast(contrast, available_contrasts):
 			raise ValueError("Contrast {0} is not valid (available contrasts are {1})".format(contrast, available_contrasts))
 
 	return(contrast)
+
+# ------------------------- chunk operations ---------------------------------------- #
+def linress_chunks(pairs, dist_counts, distances):
+	''' Helper function to process linear regression for chunks 
+		
+	Parameters
+	-----------
+	pairs: list<tuple>
+			A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+	dist_counts: pd.DataFrame
+			A (sub-)Dataframe with the distance counts for the pairs
+	distances : list
+			A list of valid column names for the distances  
+	
+	Returns
+	--------
+	results : list 
+			A list with the results in form of a list [TF1, TF2, LinearRegressionObject]
+
+	Note
+	----
+	Constraint: DataFrame with distance counts need to contain a signal for each pair given within pairs. Same for linear regression DataFrame
+	'''
+	# make sure index is correct
+	dist_counts = dist_counts.reset_index()
+	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
+	
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+
+	#save results as list
+	results = []
+	for pair in pairs:
+
+		# get count for specific pair
+		ind = "-".join(pair)
+		try:
+			counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+			counts = np.array(counts, dtype=float)
+		except:
+			raise ValueError(f"No distance counts found for pair {ind}")	
+		# fit linear regression
+		res = scipy.stats.linregress(distances, counts)
+
+		# get TF1, TF2 names from pair
+		tf1, tf2 = pair
+		results.append([tf1, tf2, res])
+	return results
+
+def correct_chunks(pairs, dist_counts, distances, linres):
+	""" Subtracts the estimated background from the Signal for a given pair. 
+			
+	Parameters
+	-----------
+	pairs : list<tuple>
+		A list of tuple with TF names (e.g. ("NFYA", "NFYB"))
+	dist_counts : pd.DataFrame
+		A (sub-)Dataframe with the distance counts for the pairs
+	distances : list
+		A list of valid column names for the distances  
+	linres: pd.DataFrame
+		A (sub-)DataFrame containing linear regression objects for the pairs
+		
+	Returns
+	-------
+	results : list 
+			A list with the results in form of a list [TF1, TF2, Corrected Signal] with Corrected signal with dynamic columns between min distance and max distance.
+			e.g. [-2,-1,0,1,2,3] for min distance = -2, max distance = 3
+	
+	Note
+	-----
+	Constraint: DataFrame with distance counts need to contain a signal for each pair given within pairs. Same for linear regression DataFrame
+
+	"""
+
+	# make sure index is correct
+	dist_counts = dist_counts.reset_index()
+	dist_counts.index = dist_counts["TF1"] + "-" + dist_counts["TF2"]
+
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+
+	linres = linres.reset_index()
+	linres.index = linres["TF1"] + "-" + linres["TF2"]
+
+	linres_col = "Linear Regression"
+	
+	#save results as list
+	results = []
+	for pair in pairs:
+
+		# get count for specific pair
+		ind = "-".join(pair)
+		try:
+			counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
+			counts = np.array(counts, dtype=float)
+		except:
+			raise ValueError(f"No distance counts found for pair  {ind}")	
+
+		try:
+			linres_pair = linres.loc[ind].loc[linres_col] #exclude TF1, TF2 columns
+		except:
+			raise ValueError(f"No fitted linear regression found for pair  {ind}")		
+		# subtract background
+		corrected = counts - (linres_pair.intercept + linres_pair.slope * np.array(distances))
+		
+		# get TF1, TF2 names from pair
+		tf1, tf2 = pair
+		corrected = [tf1, tf2] + corrected.tolist()
+
+		results.append(corrected)
+		
+	return results
+
+def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
+	""" Evaluating signal for chunks. 
+		
+		Parameters
+		----------
+		pairs : list<tuple(str,str)>
+			TF names for which the preferred binding distance(s) should be found. e.g. ("NFYA","NFYB")
+		datasource : pd.DataFrame 
+			A (sub-)Dataframe with the (corrected) distance counts for the pairs
+		distances : list
+			A list of valid column names for the distances  
+		stringency : number
+			stringency the prominence threshold should be multiplied with.
+		prominence : number or ndarray or sequence
+			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
+			Default: 0
+
+		Returns
+		--------
+		list 
+			list of found peaks in form [TF1, TF2, Distance, Peak Heights, Prominences, Prominence Threshold]
+		
+		See also
+		--------
+		tfcomb.object.analyze_signal_all
+
+		Note
+		-----
+		Constraint: DataFrame with corrected distance counts need to contain a signal for each pair given within pairs.
+
+	"""
+
+	# make sure index is correct
+	datasource = datasource.reset_index()
+	datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+
+	# get data column
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+
+	results = []
+	for pair in pairs:
+		# get pair
+		tf1, tf2 = pair
+		ind = "-".join(pair)
+
+		# signal.find_peaks() will not find peaks on first and last position without having 
+		# an other number left and right. 
+		try:
+			signal = datasource.loc[ind].loc[distance_cols].values
+		except:
+			raise ValueError(f"No corrected distances found for pair  {ind}")	
+		x = [0] + list(signal) + [0]
+
+		# determine prominence
+		if prominence =="zscore":
+			prom = 1
+		elif prominence =="median":
+			prom = datasource.loc[ind].loc["median"].values
+		else:
+			prom = prominence
+		
+		# calc threshold 
+		threshold = prom * stringency
+
+		#Find positions of peaks
+		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
+
+		# subtract the position added above (first zero) 
+		peaks_idx = peaks_idx - 1 
+
+		#Get distances from columns
+		peak_distances = [distance_cols[idx] for idx in peaks_idx]
+
+		n_peaks = len(peak_distances)
+		# insert tf1,tf2 names number of peaks times
+		properties["TF1"] = [tf1]*n_peaks
+		properties["TF2"] = [tf2]*n_peaks
+
+		properties["Distance"] = peak_distances
+		properties["Threshold"] = threshold
+
+
+		results.append(properties)
+		
+	return results
+
+def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", height_multiplier=0.75):
+	""" 
+	Evaluate the noisiness of a signal for chunks (a chunk can also be the whole dataset). 
+
+	Parameters
+	---------
+	pairs : list(tuples(str,str))
+		list of pairs to perform analysis on 
+	signals : pd.Dataframe 
+		A (sub-)Dataframe containing signal data for each pair (pairs without signal raises error)
+	peaks : pd.DataFrame
+		A (sub-)DataFrame containing all peaks for the given pairs (pairs without peaks are possible)
+	distances : list()
+		list with distance columns, either integer (usually between min distance and max distance) or artificall "neg" column
+	method : str, otional
+		Method used to get noise measurement, either "median" or "min_max" allowed.
+		Default: "median" 
+	height_multiplier : float, optional
+		Height multiplier (percentage) to calculate cut points. Must be between 0 and 1.
+		Default: 0.75
+	
+	Raises
+	------
+	ValueError
+		If no signal data is given for a pair
+	
+	Note
+	-----
+	Constraint: DataFrame with signals need to contain a signal for each pair given within pairs.
+
+	"""
+	# make sure index is correct
+	signals = signals.reset_index()
+	signals.index = signals["TF1"] + "-" + signals["TF2"]
+
+	peaks = peaks.reset_index()
+	peaks.index = peaks["TF1"] + "-" + peaks["TF2"]
+
+	check_value(height_multiplier, vmin=0, vmax=1)
+
+	# get data column
+	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+	results = []
+	for pair in pairs:
+		# get pair
+		tf1, tf2 = pair
+		ind = "-".join(pair)
+		try:
+			signal = signals.loc[ind].loc[distance_cols].values
+		except:
+			raise ValueError(f"No signal found for pair  {ind}")	
+		
+		# get peaks for specific pair
+		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)]
+
+		results.append([tf1, tf2, _get_noise_measure(peaks_pair, signal, method, height_multiplier)])
+		
+	return results
+
+
+
+def _get_noise_measure(peaks, signal, method, height_multiplier):
+	#check method input
+	check_string(method, ["median", "min_max"], "method")
+
+	# get the cutting points fot the signal
+	cuts = _get_cut_points(peaks, height_multiplier, signal)
+
+	# cut all peaks out of the signal
+	for cut in cuts:
+		signal[cut[0]:cut[1]] = np.nan
+
+	measure = None
+	if method == "median":
+		measure = pd.Series(signal).median()
+	elif method == "min_max":
+		measure = signal.max() - signal.min()
+	
+	return float(measure)
+
+def _get_cut_points(peaks, height_multiplier, signal):
+	cuts =[]
+	for idx,row in peaks.iterrows():
+		# get the peak distance
+		peak = row.Distance
+		# get the peak height 
+		peak_height = signal[peak]
+		# determine cutoff, in common sense this should be "going ~25% down the peak size"
+		cut_off = height_multiplier * peak_height
+		cuts.append(_expand_peak(peak, cut_off, signal))
+	return cuts
+
+def _expand_peak(start_pos, cut_off, signal):
+	found_left = False
+	found_right = False
+	pos_left = start_pos - 1
+	pos_right = start_pos + 1
+
+	# expand the peak until both borders are found
+	while(not(found_left & found_right)):
+		# left side
+		if(not found_left):
+			# left border not found
+			if pos_left <= -1: # check if position less than start of signal
+				found_left = True
+				left = 0
+			elif signal[pos_left] <= cut_off:
+				found_left = True
+				left = pos_left  + 1 # we are one to far left
+			pos_left -= 1
+		
+		# right side
+		if(not found_right):
+			# right border not found	
+			if  pos_right == len(signal): # check if position higher than end of signal
+				found_right = True
+				right = len(signal) - 1
+			elif signal[pos_right] < cut_off:
+				found_right = True
+				right = pos_right - 1 # we are one to far right
+			pos_right += 1
+	return(left, right)
+
+def fast_rolling_mean(arr, w):
+	"""
+	Adaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
+	Rolling operation "mean" of arr with window size w 
+
+	Parameters
+	----------
+	arr : np.ndarray[np.float64_t, ndim=1]
+		array to perform operation on
+	w : int
+		window size 
+
+	See also
+	--------
+	tobias.utils.signals.fast_rolling_math 
+	"""
+
+	lf = int(np.ceil( (w-1) / 2.0))
+	rf = int(np.floor( (w-1) / 2.0))
+	#Expand the array with the first value to the left 
+	arr = np.concatenate((np.repeat(arr[0], lf), arr))
+	#Expand the array with the last value to the right 
+	arr = np.concatenate((arr, np.repeat(arr[-1], rf)))
+
+	# use fast_rolling_math from tobias.utils.signals
+	roll_arr = fast_rolling_math(arr.astype(float), w, "mean")
+
+
+	#remove nan's ( artifical new flanks)
+	roll_arr = roll_arr[~np.isnan(roll_arr)]
+
+	return roll_arr
