@@ -1170,6 +1170,10 @@ class CombObj():
 
 		if reduce_TFBS == True:
 			new_obj.reduce_TFBS()
+
+		#These functions are shared with DiffCombObj - ensure that functions are set
+		if type(new_obj) == tfcomb.DiffCombObj:
+			new_obj._set_combobj_functions()
 		
 		return(new_obj)
 	
@@ -1594,11 +1598,16 @@ class CombObj():
 	#------------------------------------ Network analysis -------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def build_network(self):
+	def build_network(self, **kwargs):
 		""" 
 		Builds a TF-TF co-occurrence network for the rules within object. This is a wrapper for the tfcomb.network.build_nx_network() function, 
 		which uses the python networkx package. 
-			 
+		
+		Parameters
+		-----------
+		kwargs : arguments
+			All other argument are passed to tfcomb.network.build_network.
+
 		Returns
 		-------
 		None - fills the .network attribute of the `CombObj` with a networkx.Graph object
@@ -1606,7 +1615,7 @@ class CombObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_nx_network")
-		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity, **kwargs)
 		self.logger.info("Finished! The network is found within <CombObj>.network.")
 		
 
@@ -1870,8 +1879,8 @@ class DiffCombObj():
 			#if join is inner, remove any TFs not present in both objects
 			if join == "inner":
 
-				left_TFs = set(list(set(self.rules["TF1"])) + list(set(self.rules["TF2"])))
-				right_TFs = set(list(set(obj_table["TF1"])) + list(set(obj_table["TF2"])))
+				left_TFs = set(self.rules["TF1"].tolist()  + obj_table["TF1"].tolist())
+				right_TFs = set(self.rules["TF2"].tolist()  + obj_table["TF2"].tolist())
 
 				common = left_TFs.intersection(right_TFs)
 				not_common = left_TFs.union(right_TFs) - common
@@ -1881,7 +1890,7 @@ class DiffCombObj():
 				#Subset both tables to common TFs
 				A = self.rules.loc[self.rules["TF1"].isin(common) & self.rules["TF2"].isin(common)]
 				B = obj_table.loc[obj_table["TF1"].isin(common) & obj_table["TF2"].isin(common)]
-
+				
 				self.rules = A.merge(B, left_on=["TF1", "TF2"], right_on=["TF1", "TF2"])
 
 			else: #join is outer
@@ -1926,13 +1935,13 @@ class DiffCombObj():
 		self.rules.fillna(0, inplace=True)
 		self.rules[nan_bool] = np.nan
 
-	def calculate_foldchanges(self, pseudo=None):
+	def calculate_foldchanges(self, pseudo=0.05):
 		""" Calculate measure foldchanges  between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
 		----------
 		pseudo : float, optional
-			Set the pseudocount to add to all values before log2-foldchange transformation. Default: None (pseudocount will be estimated per contrast).
+			Set the pseudocount to add to all values before log2-foldchange transformation. Default: 0.05.
 	
 		See also
 		--------
@@ -1954,12 +1963,6 @@ class DiffCombObj():
 
 			p1_values = self.rules[p1 + "_" + measure]
 			p2_values = self.rules[p2 + "_" + measure]
-
-			#Estimate pseudocount
-			if pseudo == None:
-				vals = self.rules[[p1 + "_" + measure, p2 + "_" + measure]].values.ravel()
-				pseudo = np.percentile(vals[vals>0], 25) #25th percentile of values >0
-				self.logger.debug("Pseudocount: {0}".format(pseudo))
 
 			self.rules[log2_col] = np.log2((p1_values + pseudo) / (p2_values + pseudo))
 
@@ -2058,20 +2061,21 @@ class DiffCombObj():
 			mean_threshold = tfcomb.utils.get_threshold(vals, "upper", percent=mean_threshold_percent, verbosity=self.verbosity)
 			self.logger.debug("Mean threshold is: {0}".format(mean_threshold))
 
+		#Set threshold on rules
+		selected = self.rules.copy()
+		selected = selected[((selected[measure_col] <= measure_threshold[0]) | (selected[measure_col] >= measure_threshold[1])) &
+							(table[mean_col] >= mean_threshold)]
+		self.logger.info("Selected {0} rules based on thresholds".format(len(selected)))
+
 		#Plot the MA-plot if chosen
 		if plot == True:
-	
+			self.logger.info("Plotting scatter")
 			tfcomb.plotting.scatter(table, 
 									x=mean_col, 
 									y=measure_col, 
 									x_threshold=mean_threshold,
 									y_threshold=measure_threshold,
 									**kwargs)
-
-		#Set threshold on rules
-		selected = self.rules.copy()
-		selected = selected[((selected[measure_col] <= measure_threshold[0]) | (selected[measure_col] >= measure_threshold[1])) &
-							(table[mean_col] >= mean_threshold)]
 
 		#Create a DiffCombObj with the subset of  rules
 		self.logger.info("Creating subset of rules using thresholds")
@@ -2285,9 +2289,6 @@ class DiffCombObj():
 																												   size_edge_by,
 																													))
 
-		#Create subset of rules
-		selected = self.rules
-
 		#Build network
 		self.logger.debug("Building network using 'tfcomb.network.build_network'")
 		self.build_network() #adds .network to self
@@ -2353,6 +2354,7 @@ class DiffCombObj():
 		self.set_verbosity(self.verbosity)  # restart logger
 
 		return self
+
 
 ###################################################################################
 ############################## Distance analysis ##################################
@@ -3036,7 +3038,7 @@ class DistObj():
 
 		self.datasource = datasource
 
-	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2, min_count=11, save=None):
+	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2, min_count=1, save=None):
 		""" 
 		After background correction is done, the signal is analyzed for peaks, 
 		indicating preferred binding distances. There can be more than one peak (more than one preferred binding distance) per 
@@ -3399,7 +3401,7 @@ class DistObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_nx_network")
-		self.network = tfcomb.network.build_nx_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.peaks, node_table=self.TF_table, verbosity=self.verbosity)
 		self.logger.info("Finished! The network is found within <CombObj>.<distObj>.network.")
 	
 
