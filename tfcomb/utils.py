@@ -25,6 +25,8 @@ from tobias.utils.signals import fast_rolling_math
 import pathlib
 import pyBigWig
 import matplotlib.pyplot as plt
+import matplotlib
+import seaborn as sns
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -149,6 +151,321 @@ class TFBSPairList(list):
 										l.site1.name + "-" + l.site2.name, str(l.distance), l.site1.strand, l.site2.strand]) for l in self]) + "\n"
 		f.write(s)
 		f.close()
+	
+	# ---------------------- override list inherited functions ----------------------
+	# This is done so that plotting_tables are reset when changes in list are detected.
+
+	def append(self, element):
+		self._plotting_tables = None
+		
+		super().append(element)
+
+	def extend(self, l):
+		self._plotting_tables = None
+		
+		super().extend(l)
+
+	def __add__(self, x):
+		self._plotting_tables = None
+		
+		return super().__add__(x)
+
+	def insert(self, index, object):
+		self._plotting_tables = None
+
+		return super().insert(index, object)
+	
+	def remove(self, value):
+		self._plotting_tables = None
+
+		return super().remove(value)
+	
+	def pop(self, index):
+		self._plotting_tables = None
+
+		return super().pop(index)
+
+	def clear(self) -> None:
+		self._plotting_tables = None
+
+		return super().clear()
+
+	@property
+	def bigwig_path(self):
+		"""
+		Get path to bigwig file.
+		"""
+		if not self._bigwig_path:
+			raise("No path to signal bigwig found. Please set with 'object.bigwig_path = \"path/to/file.bw\"'.")
+		return self._bigwig_path
+
+	@bigwig_path.setter
+	def bigwig_path(self, path):
+		"""
+		Set path to bigwig file. Checks for existence.
+		"""
+		if not os.path.exists(path):
+			raise(f"Could not find file! {path}")
+		self._bigwig_path = path
+
+	@property
+	def plotting_tables(self):
+		"""
+		Getter for plotting_tables. Will compute if necessary.
+		"""
+		if not self._plotting_tables:
+			self._comp_plotting_tables()
+		return self._plotting_tables
+
+	def _comp_plotting_tables(self, flank=100):
+		"""
+		Prepare pair and score tables for plotting.
+
+		Parameter:
+		------------
+		flank : int
+			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites. Default 100.
+		"""
+
+		# load bigwig file
+		signal_bigwig = pyBigWig.open(self.bigwig_path)
+
+		# get pairs as table & sort by distance
+		pairs = self.as_table().sort_values(by='site_distance')
+
+		# compute center point between binding pair
+		pairs["center"] = (pairs["site1_end"] + round(pairs["site_distance"] / 2)).astype(int)
+
+		pairs["window_start"] = pairs["center"] - flank
+		pairs["window_end"] = pairs["center"] + flank
+
+		scores = []
+		sorted_pairs = []
+
+		for (index, row) in pairs.iterrows():
+			values = signal_bigwig.values(row["site1_chrom"], start=row["window_start"], end=row["window_end"])
+			
+			if row["site1_name"] < row["site2_name"]:
+				values.reverse()
+				
+				# switch pair
+				site1 = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand"]
+				site2 = ["site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand"]
+				row[site1], row[site2] = row[site2].values, row[site1].values
+				
+				# compute relative positions
+				row["site1_rel_start"] = row["window_end"] - row["site1_start"]
+				row["site1_rel_end"] = row["window_end"] - row["site1_end"]
+				
+				row["site2_rel_start"] = row["window_end"] - row["site2_start"]
+				row["site2_rel_end"] = row["window_end"] - row["site2_end"]
+			else:
+				# compute relative positions
+				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
+				row["site1_rel_end"] = row["site1_end"] - row["window_start"]
+				
+				row["site2_rel_start"] = row["site2_start"] - row["window_start"]
+				row["site2_rel_end"] = row["site2_end"] - row["window_start"]
+
+			sorted_pairs.append(row)
+			scores.append(values)
+
+		sorted_pairs = pd.DataFrame(sorted_pairs).reset_index(drop=True)
+		scores = pd.DataFrame(scores).fillna(value=0)
+
+		#sort by distance, then relative TFBS start
+		sorted_pairs.sort_values(by=["site_distance", "site1_rel_start"], inplace=True)
+		scores = scores.loc[sorted_pairs.index]
+
+		self._plotting_tables = (sorted_pairs, scores)
+
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None):
+		"""
+		Create a heatmap of TF binding pairs sorted for distance.
+		
+		Parameters:
+		----------
+			logNorm_cbar (str):
+				[None, "centerLogNorm", "SymLogNorm"]
+				Choose a type of normalization for the colorbar.
+				SymLogNorm:
+					Use matplotlib.colors.SymLogNorm. This does not center to 0
+				centerLogNorm:
+					Use custom matplotlib.colors.SymLogNorm from stackoverflow. Note this creates a weird colorbar.
+			show_binding (bool):
+				Shows the TF binding positions as a grey background.
+			flank_plot (str):
+				["strand", "orientation"]
+				Decide if the plots flanking the heatmap should be colored for strand or strand-orientation.
+			figsize (tuple, int):
+				Figure dimensions.
+			output (str):
+				Save plot to given file.
+		
+		Returns:
+		----------
+			matplotlib.gridspec.GridSpec:
+				Object containing the finished pairMap.
+		"""
+		fig = plt.figure(figsize=figsize)
+
+		# load custom colorbar normalizaition class
+		# https://stackoverflow.com/a/65260996
+		if logNorm_cbar == "centerLogNorm":
+			class MidpointLogNorm(matplotlib.colors.SymLogNorm):
+				"""
+				Normalise the colorbar so that diverging bars work there way either side from a prescribed midpoint value)
+				e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0.,vmin=-100, vmax=100))
+
+				All arguments are the same as SymLogNorm, except for midpoint    
+				"""
+				def __init__(self, lin_thres, lin_scale, midpoint=None, vmin=None, vmax=None):
+					self.midpoint = midpoint
+					self.lin_thres = lin_thres
+					self.lin_scale = lin_scale
+					#fraction of the cmap that the linear component occupies
+					self.linear_proportion = (lin_scale / (lin_scale + 1)) * 0.5
+					#print(self.linear_proportion)
+
+					mp.colors.SymLogNorm.__init__(self, lin_thres, lin_scale, vmin, vmax)
+
+				def __get_value__(self, v, log_val, clip=None):
+					if v < -self.lin_thres or v > self.lin_thres:
+						return log_val
+					
+					x = [-self.lin_thres, self.midpoint, self.lin_thres]
+					y = [0.5 - self.linear_proportion, 0.5, 0.5 + self.linear_proportion]
+					interpol = np.interp(v, x, y)
+					return interpol
+
+				def __call__(self, value, clip=None):
+					log_val = matplotlib.colors.SymLogNorm.__call__(self, value)
+
+					out = [0] * len(value)
+					for i, v in enumerate(value):
+						out[i] = self.__get_value__(v, log_val[i])
+
+					return np.ma.masked_array(out)
+
+		########## define grid ##########
+		# https://matplotlib.org/stable/gallery/subplots_axes_and_figures/gridspec_nested.html
+		# grid: [legend_area, plot_area]
+		grid = matplotlib.gridspec.GridSpec(nrows=1,
+											ncols=2,
+											figure=fig,
+											width_ratios=[1, 10],
+											wspace=0.3)
+
+		# plot area
+		plot_grid = matplotlib.gridspec.GridSpecFromSubplotSpec(ncols=3,
+																nrows=1,
+																width_ratios=[0.5, 10, 0.5],
+																subplot_spec=grid[1],
+																wspace=0)
+
+		strand1 = fig.add_subplot(plot_grid[0])
+		heatmap = fig.add_subplot(plot_grid[1])
+		strand2 = fig.add_subplot(plot_grid[2])
+
+		# legend area
+		legend_grid = matplotlib.gridspec.GridSpecFromSubplotSpec(ncols=1, nrows=2, subplot_spec=grid[0])
+
+		heatmap_led = fig.add_subplot(legend_grid[0])
+		strand_led = fig.add_subplot(legend_grid[1])
+
+		# legend label
+		heatmap_led.set_title("Open Chromatin Score")
+		strand_led.set_title("TF Binding Strand")
+
+		###### define plots ######
+		### main heatmap ###
+		
+		if logNorm_cbar == None:
+			norm = None
+		elif logNorm_cbar == "centerLogNorm":
+			norm = MidpointLogNorm(lin_thres=1, lin_scale=1, midpoint=0)
+		elif logNorm_cbar == "SymLogNorm":
+			norm = matplotlib.colors.SymLogNorm(linthresh=1, linscale=1)
+			
+		plot = sns.heatmap(scores, 
+						yticklabels=False,
+						xticklabels=False,
+						cmap="seismic",
+						center=None if logNorm_cbar else 0,
+						cbar=True,
+						cbar_ax=heatmap_led,
+						norm=norm,
+						ax=heatmap)
+
+		names = sorted(set(list(pairs["site1_name"]) + list(pairs["site2_name"])), reverse=True)
+		heatmap.set_title(f"{names[0]} <-> {names[1]}")
+
+		# center line
+		plot.vlines(x=len(scores.columns)/2,
+					ymin=0, ymax=len(scores),
+					linestyles="dashed",
+					color="black",
+					alpha=0.9 if logNorm_cbar else 0.2,
+					linewidth=1)
+		# binding sites
+		if show_binding:
+			plot.hlines(y=range(len(scores)),
+						xmin=pairs["site1_rel_start"],
+						xmax=pairs["site1_rel_end"],
+						color="gray",
+						linewidth=0.1,
+						alpha=0.7 if logNorm_cbar else 0.2)
+			plot.hlines(y=range(len(scores)),
+						xmin=pairs["site2_rel_start"],
+						xmax=pairs["site2_rel_end"],
+						color="gray",
+						linewidth=0.1,
+						alpha=0.7 if logNorm_cbar else 0.2)
+
+		# https://moonbooks.org/Articles/How-to-add-a-frame-to-a-seaborn-heatmap-figure-in-python-/
+		# make frame visible
+		for _, spine in plot.spines.items():
+			spine.set_visible(True)
+
+		### strand left ###
+		#https://stackoverflow.com/a/57994641
+		col = ["site1_strand"] if flank_plot == "strand" else ["site_orientation"]
+		
+		str_to_int = {j:i for i, j in enumerate(pd.unique(pairs[col[0]].values))}
+
+		cmap = sns.color_palette("tab10", len(str_to_int))
+
+		plot = sns.heatmap(pairs[col].replace(str_to_int),
+							yticklabels=False,
+							xticklabels=False,
+							cmap=cmap,
+							cbar=True,
+							cbar_ax=strand_led,
+							ax=strand1)
+
+		colorbar = plot.collections[0].colorbar 
+		r = colorbar.vmax - colorbar.vmin 
+		colorbar.set_ticks([colorbar.vmin + r / len(str_to_int) * (0.5 + i) for i in range(len(str_to_int))])
+		colorbar.set_ticklabels(list(str_to_int.keys()))
+
+		### strand right ###
+		col = ["site2_strand"] if flank_plot == "strand" else ["site_orientation"]
+		
+		sns.heatmap(pairs[col].replace(str_to_int),
+					yticklabels=False,
+					xticklabels=False,
+					cmap=cmap,
+					cbar=False,
+					ax=strand2)
+		
+		# save plot
+		if output:
+			plt.savefig(output)
+
+		return grid
+
+	def pairTrack(self):
+		pass
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
