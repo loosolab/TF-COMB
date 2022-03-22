@@ -26,6 +26,7 @@ import pathlib
 import pyBigWig
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.animation
 import seaborn as sns
 import tqdm
 from IPython import display
@@ -255,7 +256,7 @@ class TFBSPairList(list):
 		sorted_pairs = []
 
 		for (index, row) in pairs.iterrows():
-			values = signal_bigwig.values(row["site1_chrom"], start=row["window_start"], end=row["window_end"])
+			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
 			
 			if row["site1_name"] < row["site2_name"]:
 				values.reverse()
@@ -558,7 +559,7 @@ class TFBSPairList(list):
 		# add aggregated line
 		parameter["set"] = {"ylim": (ymin, ymax),
 							"xlim": (xmin, xmax),
-							"ylabel": "Open chromatin score",
+							"ylabel": "Bigwig signal",
 							"xlabel": "Basepair",
 							"title": f"Distance: {dist} | Sites aggregated: {len(tmp_pairs)}\n{lname} <--> {rname}"}
 		
