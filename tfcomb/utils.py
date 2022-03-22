@@ -1010,7 +1010,12 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, 
 	distribution_dict = {}
 	for distribution in distributions:
 		
-		params = distribution.fit(data_finite)
+		#Catch any exceptions from fitting
+		try:
+			params = distribution.fit(data_finite)
+		except Exception as e:
+			logger.error("Exception ({0}) occurred while fitting data to '{1}' distribution; skipping this distribution. Error message was: {2} ".format(e.__class__.__name__, distribution.name, e))
+			continue
 
 		#Test fit using negative loglikelihood function
 		mle = distribution.nnlf(params, data_finite)
@@ -1021,6 +1026,10 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, 
 												"mle": mle}
 		logger.spam("Fitted data to '{0}' with mle={1} and params: {2}".format(distribution.name, mle, params))
 	
+
+	if len(distribution_dict) == 0:
+		raise ValueError("No distributions could be fit to the input data.")
+
 	#Get best distribution
 	best_fit_name = sorted(distribution_dict, key=lambda x: distribution_dict[x]["mle"])[0]
 	logger.debug("Best fitting distribution was: {0}".format(best_fit_name))
@@ -1051,7 +1060,7 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, 
 		
 		thresh_list = [final] if not isinstance(final, tuple) else final
 		for t in thresh_list:
-			plt.axvline(t)
+			plt.axvline(t, color="red")
 		plt.legend()
 		plt.xlim(xlims)
 		plt.ylim(ylims)
