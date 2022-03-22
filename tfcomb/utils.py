@@ -482,6 +482,9 @@ class TFBSPairList(list):
 		if output:
 			plt.savefig(output)
 
+		# close figure
+		plt.close()
+
 		return grid
 
 	def pairTrack(self, dist=None, start=None, end=None, ymin=-15, ymax=60, output=None, _ret_param=False):
@@ -595,6 +598,10 @@ class TFBSPairList(list):
 		if not _ret_param:
 			plt.show()
 		
+		# save plot
+		if output:
+			plt.savefig(output)
+
 		# close figure
 		plt.close()
 		
@@ -703,7 +710,7 @@ class TFBSPairList(list):
 					eval(f"axes.{key}(**params)")
 					
 		##### Run animation #####
-		anim_created = matplotlib.animationFuncAnimation(fig, 
+		anim_created = matplotlib.animation.FuncAnimation(fig, 
 														animate,
 														frames=len(parameter_list),
 														interval=interval,
