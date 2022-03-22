@@ -233,8 +233,8 @@ class TFBSPairList(list):
 
 		Parameter:
 		------------
-		flank : int
-			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites. Default 100.
+		flank : int, default 100
+			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites.
 		"""
 
 		# load bigwig file
@@ -295,21 +295,21 @@ class TFBSPairList(list):
 		
 		Parameters:
 		----------
-			logNorm_cbar (str):
+			logNorm_cbar : str, default None
 				[None, "centerLogNorm", "SymLogNorm"]
 				Choose a type of normalization for the colorbar.
 				SymLogNorm:
 					Use matplotlib.colors.SymLogNorm. This does not center to 0
 				centerLogNorm:
 					Use custom matplotlib.colors.SymLogNorm from stackoverflow. Note this creates a weird colorbar.
-			show_binding (bool):
+			show_binding : bool, default True
 				Shows the TF binding positions as a grey background.
-			flank_plot (str):
+			flank_plot : str, default 'strand'
 				["strand", "orientation"]
 				Decide if the plots flanking the heatmap should be colored for strand or strand-orientation.
-			figsize (tuple, int):
+			figsize : int tuple, default (7, 14)
 				Figure dimensions.
-			output (str):
+			output : str, default None 
 				Save plot to given file.
 		
 		Returns:
@@ -482,8 +482,124 @@ class TFBSPairList(list):
 
 		return grid
 
-	def pairTrack(self):
-		pass
+	def pairTrack(self, dist=None, start=None, end=None, ymin=-15, ymax=60, output=None, _ret_param=False):
+		"""
+		Create an aggregated footprint track on the paired binding sites.
+		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
+		If the second approach spans multiple distances the binding locations are shown as a range as well.
+		
+		
+		Parameters:
+		----------
+			dist : int, default None
+				Show track for a specific distance between binding sites.
+			start : int, default None
+				Define start of range of sites that should be aggregated. If set will ignore 'dist'.
+			end : int, default None
+				Define end of range of sites that should be aggregated. If set will ignore 'dist'.
+			ymin : int, default -15
+				Y-axis minimum limit.
+			ymax : int, default 60
+				Y-axis maximum limit.
+			output : str, default None
+				Save plot to given file.
+			_ret_param : bool, default False
+				Intended for internal animation use!
+				If True will cause the function to return a dict of function call parameters used to create plot.
+		
+		Returns:
+		----------
+			matplotlib.axes._subplots.AxesSubplot or dict:
+				Return axes object of the plot.
+		"""
+		# parameter check
+		if dist is None and start is None and end is None:
+			raise ValueError("Either set dist or start and end parameter!")
+		
+		# load data
+		pairs, scores = self.plotting_tables
+
+		# dict holding dict of all function calls to create plot
+		parameter = dict()
+		
+		# get scores
+		if not start is None and not end is None:
+			if end > len(pairs):
+				raise ValueError(f"Out of range! Given {start}:{end} valid range is 0:{len(pairs)}")
+			
+			tmp_pairs = pairs[start:end]
+			tmp_scores = scores[start:end]
+			
+			dist = f"{tmp_pairs['site_distance'].min()} - {tmp_pairs['site_distance'].max()} | Selected: {start}:{end}"
+		else:
+			tmp_pairs = pairs[pairs["site_distance"] == dist]
+			tmp_scores = scores.loc[tmp_pairs.index] 
+		
+		# get pair names
+		# TODO sanity check for len 1
+		lname = set(tmp_pairs["site1_name"]).pop()
+		rname = set(tmp_pairs["site2_name"]).pop()
+		
+		# computer x axis range (0 centered)
+		center = round(len(tmp_scores.columns) / 2)
+		xmin, xmax = -center, center
+		
+		##### plot #####
+		fig, ax = plt.subplots()
+		
+		# add aggregated line
+		parameter["set"] = {"ylim": (ymin, ymax),
+							"xlim": (xmin, xmax),
+							"ylabel": "Open chromatin score",
+							"xlabel": "Basepair",
+							"title": f"Distance: {dist} | Sites aggregated: {len(tmp_pairs)}\n{lname} <--> {rname}"}
+		
+		ax.set(**parameter["set"])
+		
+		parameter["plot"] = [list(range(xmin, xmax)), tmp_scores.mean()]
+		ax.plot(*parameter["plot"])
+		
+		parameter["vlines"] = {"x": 0,
+							"ymin": ymin, 
+							"ymax": ymax,
+							"linestyles": "dashed",
+							"color": "black",
+							"alpha": 1,
+							"linewidth": 1}
+		
+		# add center line
+		ax.vlines(**parameter["vlines"])
+		
+		# add binding site locations
+		start = tmp_pairs["site1_rel_start"].min() - center
+		end = tmp_pairs["site1_rel_end"].max() - center
+		parameter["patches.Rectangle"] = [{"xy": (start, ymin),
+										"width": end-start,
+										"height": 100,
+										"color": 'tab:red',
+										"alpha": 0.2}]
+		ax.add_patch(patches.Rectangle(**parameter["patches.Rectangle"][0]))
+		
+		start = tmp_pairs["site2_rel_start"].min() - center
+		end = tmp_pairs["site2_rel_end"].max() - center
+		parameter["patches.Rectangle"].append({"xy": (start, ymin),
+											"width": end-start,
+											"height": 100,
+											"color": 'tab:green',
+											"alpha": 0.2})
+		ax.add_patch(patches.Rectangle(**parameter["patches.Rectangle"][1]))
+		
+		# show plot if not in parameter mode
+		if not _ret_param:
+			plt.show()
+		
+		# close figure
+		plt.close()
+		
+		if _ret_param:
+			return parameter
+		else:
+			return ax
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
