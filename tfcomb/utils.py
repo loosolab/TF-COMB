@@ -27,6 +27,8 @@ import pyBigWig
 import matplotlib.pyplot as plt
 import matplotlib
 import seaborn as sns
+import tqdm
+from IPython import display
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -578,7 +580,7 @@ class TFBSPairList(list):
 										"height": 100,
 										"color": 'tab:red',
 										"alpha": 0.2}]
-		ax.add_patch(patches.Rectangle(**parameter["patches.Rectangle"][0]))
+		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][0]))
 		
 		start = tmp_pairs["site2_rel_start"].min() - center
 		end = tmp_pairs["site2_rel_end"].max() - center
@@ -587,7 +589,7 @@ class TFBSPairList(list):
 											"height": 100,
 											"color": 'tab:green',
 											"alpha": 0.2})
-		ax.add_patch(patches.Rectangle(**parameter["patches.Rectangle"][1]))
+		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][1]))
 		
 		# show plot if not in parameter mode
 		if not _ret_param:
@@ -600,6 +602,129 @@ class TFBSPairList(list):
 			return parameter
 		else:
 			return ax
+
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=-15, ymax=60, interval=50, repeat_delay=0, repeat=True, output=None):
+		"""
+		Combine a set of pairTrack plots to a .gif.
+			
+		Note:
+		The memory limit can be increased with the following if necessary. Default is 20 MB.
+		matplotlib.rcParams['animation.embed_limit'] = 100 # in MB
+		
+		
+		Parameters:
+		----------
+			site_num : int, default None
+				Number of sites to aggregate for every step. If None will aggregate by distance between binding pair.
+			step : int, default None
+				Step size between aggregations. Will be ignored if site_num=None.
+			ymin : int, default -15
+				Y-axis minimum limit
+			ymax : int, default 60
+				Y-axis maximum limit
+			interval : int, default 50
+				Delay between frames in milliseconds
+			repeat_delay : int, default 0
+				The delay in milliseconds between consecutive animation runs, if repeat is True.
+			repeat : boolean, default True
+				Whether the animation repeats when the sequence of frames is completed.
+			output : str, default None
+				Save plot to given file.
+		
+		Returns:
+		----------
+			IPython.core.display.HTML:
+				Gif object ready to display in a jupyter notebook.
+		"""
+		# load data
+		pairs, scores = self.plotting_tables
+
+		# prepare plots for animation
+		parameter_list = list()
+		
+		if site_num:
+			pbar = tqdm.tqdm(total=len(range(0, len(pairs), step))+1)
+			pbar.set_description("Create frames")
+			
+			for start in range(0, len(pairs), step):
+				pbar.update()
+				parameter_list.append(self.pairTrack(start=start,
+													end=start + site_num if start + site_num < len(pairs) else len(pairs),
+													ymin=ymin,
+													ymax=ymax,
+													_ret_param=True
+													)
+									)
+		else:
+			pbar = tqdm.tqdm(total=len(set(pairs["site_distance"]))+1)
+			pbar.set_description("Create frames")
+			
+			for d in set(pairs["site_distance"]):
+				pbar.update()
+				parameter_list.append(self.pairTrack(dist=d,
+													ymin=ymin,
+													ymax=ymax,
+													_ret_param=True
+													)
+									)
+		# update to be at 100% then close progress bar
+		pbar.update()
+		pbar.close()
+				
+		##### Setup animation #####
+		# setup figure to draw on
+		fig, axes = plt.subplots()
+		line, = axes.plot([])
+		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
+		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
+		
+		# progress bar
+		pbar = tqdm.tqdm(total=len(parameter_list)+1)
+		pbar.set_description("Render animation")
+		# create animation function (this decides what is drawn in every frame)
+		def animate(i):
+			"""
+			Draw all elements for a given frame index (i).
+			"""
+			# update progress bar
+			pbar.update()
+			
+			calls = parameter_list[i]
+
+			for key, params in calls.items():
+				if key == "plot":
+					line.set_xdata(params[0])
+					line.set_ydata(params[1])
+				elif key == "patches.Rectangle":
+					axes.patches = []
+					for p in params:
+						axes.add_patch(matplotlib.patches.Rectangle(**p))
+				elif isinstance(params, dict):
+					eval(f"axes.{key}(**params)")
+					
+		##### Run animation #####
+		anim_created = matplotlib.animationFuncAnimation(fig, 
+														animate,
+														frames=len(parameter_list),
+														interval=interval,
+														repeat_delay=repeat_delay,
+														repeat=repeat
+														)
+		
+		# save animation
+		if output:
+			anim_created.save(output, dpi=300)
+			pbar.reset()
+		
+		# prepare output
+		video = anim_created.to_jshtml()#to_html5_video()
+		html = display.HTML(video)
+		
+		# close figure & progress bar
+		plt.close()
+		pbar.close()
+		
+		return html
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
