@@ -482,6 +482,9 @@ class TFBSPairList(list):
 		if output:
 			plt.savefig(output)
 
+		# show plot
+		plt.show()
+
 		# close figure
 		plt.close()
 
