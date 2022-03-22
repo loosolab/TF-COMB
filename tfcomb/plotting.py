@@ -574,11 +574,11 @@ def network(network,
 
 	for att in [color_node_by, size_node_by]:
 		if (att is not None) and (att not in node_attributes_list):
-			raise InputError("Attribute '{0}' is not available in the network node attributes. Available attributes are: {1}".format(att, node_attributes))
+			raise InputError("Attribute '{0}' is not available in the network node attributes. Available attributes are: {1}".format(att, node_attributes_list))
 
 	for att in [color_edge_by, size_edge_by]:
 		if (att is not None) and (att not in edge_attributes_list):
-			raise InputError("Attribute '{0}' is not available in the network edge attributes. Available attributes are: {1}".format(att, edge_attributes))
+			raise InputError("Attribute '{0}' is not available in the network edge attributes. Available attributes are: {1}".format(att, edge_attributes_list))
 
 	#Check if engine is within graphviz
 	if engine not in graphviz.ENGINES:
