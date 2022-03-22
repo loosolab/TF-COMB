@@ -99,6 +99,9 @@ class TFBSPair():
 
 class TFBSPairList(list):
 	""" Class for collecting and analyzing a list of TFBSPair objects """
+	# init attributes
+	_bigwig_path = None
+	_plotting_tables = None
 	
 	def as_table(self):
 		""" Table representation of the pairs in the list """
@@ -157,38 +160,44 @@ class TFBSPairList(list):
 
 	def append(self, element):
 		self._plotting_tables = None
-		
 		super().append(element)
 
 	def extend(self, l):
 		self._plotting_tables = None
-		
 		super().extend(l)
 
 	def __add__(self, x):
-		self._plotting_tables = None
-		
-		return super().__add__(x)
+		return TFBSPairList(super().__add__(x))
 
 	def insert(self, index, object):
 		self._plotting_tables = None
-
-		return super().insert(index, object)
+		super().insert(index, object)
 	
 	def remove(self, value):
 		self._plotting_tables = None
-
-		return super().remove(value)
+		super().remove(value)
 	
-	def pop(self, index):
-		self._plotting_tables = None
-
+	def pop(self, index=-1):
+		self._plotting_table = None
 		return super().pop(index)
 
 	def clear(self) -> None:
 		self._plotting_tables = None
+		super().clear()
 
-		return super().clear()
+	# slicing function
+	def __getitem__(self, key):
+		new = super().__getitem__(key)
+		if isinstance(new, list):
+			return TFBSPairList(new)
+		else:
+			return new
+
+	# display object function
+	def __repr__(self):
+		return(f"TFBSPairList({super().__repr__()})")
+
+	# ---------------------- plotting related functions ----------------------
 
 	@property
 	def bigwig_path(self):
@@ -196,7 +205,7 @@ class TFBSPairList(list):
 		Get path to bigwig file.
 		"""
 		if not self._bigwig_path:
-			raise("No path to signal bigwig found. Please set with 'object.bigwig_path = \"path/to/file.bw\"'.")
+			raise Exception("No path to signal bigwig found. Please set with 'object.bigwig_path = \"path/to/file.bw\"'.")
 		return self._bigwig_path
 
 	@bigwig_path.setter
@@ -205,7 +214,8 @@ class TFBSPairList(list):
 		Set path to bigwig file. Checks for existence.
 		"""
 		if not os.path.exists(path):
-			raise(f"Could not find file! {path}")
+			raise Exception(f"Could not find file! {path}")
+		self._plotting_tables = None
 		self._bigwig_path = path
 
 	@property
@@ -307,7 +317,16 @@ class TFBSPairList(list):
 			matplotlib.gridspec.GridSpec:
 				Object containing the finished pairMap.
 		"""
+		# check parameter values
+		if not logNorm_cbar in [None, "centerLogNorm", "SymLogNorm"]:
+			raise ValueError(f"Parameter 'logNorm_cbar' has to be one of [None, \"centerLogNorm\", \"SymLogNorm\"]. But found {logNorm_cbar}.")
+		if not flank_plot in ["strand", "orientation"]:
+			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\"]. But found {flank_plot}")
+
 		fig = plt.figure(figsize=figsize)
+
+		# load data
+		pairs, scores = self.plotting_tables
 
 		# load custom colorbar normalizaition class
 		# https://stackoverflow.com/a/65260996
@@ -325,9 +344,8 @@ class TFBSPairList(list):
 					self.lin_scale = lin_scale
 					#fraction of the cmap that the linear component occupies
 					self.linear_proportion = (lin_scale / (lin_scale + 1)) * 0.5
-					#print(self.linear_proportion)
 
-					mp.colors.SymLogNorm.__init__(self, lin_thres, lin_scale, vmin, vmax)
+					matplotlib.colors.SymLogNorm.__init__(self, lin_thres, lin_scale, vmin, vmax)
 
 				def __get_value__(self, v, log_val, clip=None):
 					if v < -self.lin_thres or v > self.lin_thres:
