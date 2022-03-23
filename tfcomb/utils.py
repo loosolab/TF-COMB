@@ -232,10 +232,10 @@ class TFBSPairList(list):
 		Getter for plotting_tables. Will compute if necessary.
 		"""
 		if not self._plotting_tables:
-			self._comp_plotting_tables()
+			self.comp_plotting_tables()
 		return self._plotting_tables
 
-	def _comp_plotting_tables(self, flank=100):
+	def comp_plotting_tables(self, flank=100):
 		"""
 		Prepare pair and score tables for plotting.
 
