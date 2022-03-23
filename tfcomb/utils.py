@@ -188,13 +188,18 @@ class TFBSPairList(list):
 		self._plotting_tables = None
 		super().clear()
 
-	# slicing function
+	# slicing functions
 	def __getitem__(self, key):
 		new = super().__getitem__(key)
 		if isinstance(new, list):
 			return TFBSPairList(new)
 		else:
 			return new
+
+	def __setitem__(self, index, value):
+		self._plotting_tables = None
+
+		super().__setitem__(index, value)
 
 	# display object function
 	def __repr__(self):
