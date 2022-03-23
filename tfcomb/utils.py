@@ -505,8 +505,8 @@ class TFBSPairList(list):
 		
 		Parameters:
 		----------
-			dist : int, default None
-				Show track for a specific distance between binding sites.
+			dist : int or int list, default None
+				Show track for one or more distances between binding sites.
 			start : int, default None
 				Define start of range of sites that should be aggregated. If set will ignore 'dist'.
 			end : int, default None
@@ -546,7 +546,7 @@ class TFBSPairList(list):
 			
 			dist = f"{tmp_pairs['site_distance'].min()} - {tmp_pairs['site_distance'].max()} | Selected: {start}:{end}"
 		else:
-			tmp_pairs = pairs[pairs["site_distance"] == dist]
+			tmp_pairs = pairs[pairs["site_distance"].isin(dist if isinstance(dist, list) else [dist])]
 			tmp_scores = scores.loc[tmp_pairs.index] 
 		
 		# get pair names
