@@ -423,8 +423,8 @@ class TFBSPairList(list):
 						norm=norm,
 						ax=heatmap)
 
-		names = sorted(set(list(pairs["site1_name"]) + list(pairs["site2_name"])), reverse=True)
-		heatmap.set_title(f"{names[0]} <-> {names[1]}")
+		name1, name2 = set(pairs["site1_name"]).pop(), set(pairs["site2_name"]).pop()
+		heatmap.set_title(f"{name1} <-> {name2}")
 
 		# center line
 		plot.vlines(x=len(scores.columns)/2,
