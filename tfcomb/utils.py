@@ -105,6 +105,7 @@ class TFBSPairList(list):
 	# init attributes
 	_bigwig_path = None
 	_plotting_tables = None
+	_last_flank = None
 	
 	def as_table(self):
 		""" Table representation of the pairs in the list """
@@ -295,9 +296,10 @@ class TFBSPairList(list):
 		sorted_pairs.sort_values(by=["site_distance", "site1_rel_start"], inplace=True)
 		scores = scores.loc[sorted_pairs.index]
 
+		self._last_flank = flank
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -319,6 +321,8 @@ class TFBSPairList(list):
 				Figure dimensions.
 			output : str, default None 
 				Save plot to given file.
+			flank : int, default None
+				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 		
 		Returns:
 		----------
@@ -332,6 +336,10 @@ class TFBSPairList(list):
 			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\"]. But found {flank_plot}")
 
 		fig = plt.figure(figsize=figsize)
+
+		# compute plotting tables with custom flank
+		if not flank is None and flank != self._last_flank:
+			self.comp_plotting_tables(flank=flank)
 
 		# load data
 		pairs, scores = self.plotting_tables
@@ -496,7 +504,7 @@ class TFBSPairList(list):
 
 		return grid
 
-	def pairTrack(self, dist=None, start=None, end=None, ymin=-15, ymax=60, output=None, _ret_param=False):
+	def pairTrack(self, dist=None, start=None, end=None, ymin=-15, ymax=60, output=None, flank=None, _ret_param=False):
 		"""
 		Create an aggregated footprint track on the paired binding sites.
 		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
@@ -517,6 +525,8 @@ class TFBSPairList(list):
 				Y-axis maximum limit.
 			output : str, default None
 				Save plot to given file.
+			flank : int, default None
+				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 			_ret_param : bool, default False
 				Intended for internal animation use!
 				If True will cause the function to return a dict of function call parameters used to create plot.
@@ -530,6 +540,10 @@ class TFBSPairList(list):
 		if dist is None and start is None and end is None:
 			raise ValueError("Either set dist or start and end parameter!")
 		
+		# compute plotting tables with custom flank
+		if not flank is None and flank != self._last_flank:
+			self.comp_plotting_tables(flank=flank)
+
 		# load data
 		pairs, scores = self.plotting_tables
 
@@ -619,7 +633,7 @@ class TFBSPairList(list):
 		else:
 			return ax
 
-	def pairTrackAnimation(self, site_num=None, step=10, ymin=-15, ymax=60, interval=50, repeat_delay=0, repeat=True, output=None):
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=-15, ymax=60, interval=50, repeat_delay=0, repeat=True, output=None, flank=None):
 		"""
 		Combine a set of pairTrack plots to a .gif.
 			
@@ -646,12 +660,18 @@ class TFBSPairList(list):
 				Whether the animation repeats when the sequence of frames is completed.
 			output : str, default None
 				Save plot to given file.
+			flank : int, default None
+				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 		
 		Returns:
 		----------
 			IPython.core.display.HTML:
 				Gif object ready to display in a jupyter notebook.
 		"""
+		# compute plotting tables with custom flank
+		if not flank is None and flank != self._last_flank:
+			self.comp_plotting_tables(flank=flank)
+
 		# load data
 		pairs, scores = self.plotting_tables
 
