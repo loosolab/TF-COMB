@@ -335,6 +335,11 @@ class TFBSPairList(list):
 		if not flank_plot in ["strand", "orientation"]:
 			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\"]. But found {flank_plot}")
 
+		# fixes FloatingPointError: underflow encountered in multiply
+		# https://stackoverflow.com/a/61756043
+		# should be set by default but for some reason it isn't for matplotlib 3.5.1/ numpy 1.21.5
+		np.seterr(under='ignore')
+
 		fig = plt.figure(figsize=figsize)
 
 		# compute plotting tables with custom flank
