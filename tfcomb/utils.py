@@ -504,7 +504,7 @@ class TFBSPairList(list):
 
 		return grid
 
-	def pairTrack(self, dist=None, start=None, end=None, ymin=-15, ymax=60, output=None, flank=None, _ret_param=False):
+	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, output=None, flank=None, _ret_param=False):
 		"""
 		Create an aggregated footprint track on the paired binding sites.
 		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
@@ -519,9 +519,9 @@ class TFBSPairList(list):
 				Define start of range of sites that should be aggregated. If set will ignore 'dist'.
 			end : int, default None
 				Define end of range of sites that should be aggregated. If set will ignore 'dist'.
-			ymin : int, default -15
+			ymin : int, default None
 				Y-axis minimum limit.
-			ymax : int, default 60
+			ymax : int, default None
 				Y-axis maximum limit.
 			output : str, default None
 				Save plot to given file.
@@ -568,9 +568,20 @@ class TFBSPairList(list):
 		lname = set(tmp_pairs["site1_name"]).pop()
 		rname = set(tmp_pairs["site2_name"]).pop()
 		
-		# computer x axis range (0 centered)
+		# compute x axis range (0 centered)
 		center = round(len(tmp_scores.columns) / 2)
 		xmin, xmax = -center, center
+
+		# compute y axis range + 10% padding
+		points = tmp_scores.mean()
+
+		if ymin is None:
+			ymin = points.min()
+			ymin += ymin * 0.1
+		if ymax is None:
+			ymax = points.max()
+			ymax += ymax * 0.1
+
 		
 		##### plot #####
 		fig, ax = plt.subplots()
@@ -584,7 +595,7 @@ class TFBSPairList(list):
 		
 		ax.set(**parameter["set"])
 		
-		parameter["plot"] = [list(range(xmin, xmax)), tmp_scores.mean()]
+		parameter["plot"] = [list(range(xmin, xmax)), points]
 		ax.plot(*parameter["plot"])
 		
 		parameter["vlines"] = {"x": 0,
@@ -603,7 +614,7 @@ class TFBSPairList(list):
 		end = tmp_pairs["site1_rel_end"].max() - center
 		parameter["patches.Rectangle"] = [{"xy": (start, ymin),
 										"width": end-start,
-										"height": 100,
+										"height": np.abs(ymin-ymax),
 										"color": 'tab:red',
 										"alpha": 0.2}]
 		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][0]))
@@ -612,7 +623,7 @@ class TFBSPairList(list):
 		end = tmp_pairs["site2_rel_end"].max() - center
 		parameter["patches.Rectangle"].append({"xy": (start, ymin),
 											"width": end-start,
-											"height": 100,
+											"height": np.abs(ymin-ymax),
 											"color": 'tab:green',
 											"alpha": 0.2})
 		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][1]))
