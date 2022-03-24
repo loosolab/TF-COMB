@@ -644,7 +644,7 @@ class TFBSPairList(list):
 		else:
 			return ax
 
-	def pairTrackAnimation(self, site_num=None, step=10, ymin=-15, ymax=60, interval=50, repeat_delay=0, repeat=True, output=None, flank=None):
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, interval=50, repeat_delay=0, repeat=False, output=None, flank=None):
 		"""
 		Combine a set of pairTrack plots to a .gif.
 			
@@ -659,15 +659,15 @@ class TFBSPairList(list):
 				Number of sites to aggregate for every step. If None will aggregate by distance between binding pair.
 			step : int, default None
 				Step size between aggregations. Will be ignored if site_num=None.
-			ymin : int, default -15
+			ymin : int, default None
 				Y-axis minimum limit
-			ymax : int, default 60
+			ymax : int, default None
 				Y-axis maximum limit
 			interval : int, default 50
 				Delay between frames in milliseconds
 			repeat_delay : int, default 0
 				The delay in milliseconds between consecutive animation runs, if repeat is True.
-			repeat : boolean, default True
+			repeat : boolean, default False
 				Whether the animation repeats when the sequence of frames is completed.
 			output : str, default None
 				Save plot to given file.
@@ -690,6 +690,14 @@ class TFBSPairList(list):
 		parameter_list = list()
 		
 		if site_num:
+			# compute animation y-range + 10% padding
+			if ymin is None:
+				ymin = np.min([scores[s:s + site_num if s + site_num < len(pairs) else len(pairs)].mean().min() for s in range(0, len(pairs), step)])
+				ymin += ymin * 0.1
+			if ymax is None:
+				ymax = np.max([scores[s:s + site_num if s + site_num < len(pairs) else len(pairs)].mean().max() for s in range(0, len(pairs), step)])
+				ymax += ymax * 0.1
+
 			pbar = tqdm.tqdm(total=len(range(0, len(pairs), step))+1)
 			pbar.set_description("Create frames")
 			
@@ -703,6 +711,14 @@ class TFBSPairList(list):
 													)
 									)
 		else:
+			# compute animation y-range + 10% padding
+			if ymin is None:
+				ymin = np.min([scores.loc[pairs[pairs["site_distance"] == d].index].mean().min() for d in set(pairs["site_distance"])])
+				ymin += ymin * 0.1
+			if ymax is None:
+				ymax = np.max([scores.loc[pairs[pairs["site_distance"] == d].index].mean().max() for d in set(pairs["site_distance"])])
+				ymax += ymax * 0.1
+
 			pbar = tqdm.tqdm(total=len(set(pairs["site_distance"]))+1)
 			pbar.set_description("Create frames")
 			
