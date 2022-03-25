@@ -109,16 +109,23 @@ class TFBSPairList(list):
 	
 	def as_table(self):
 		""" Table representation of the pairs in the list """
+		table = []
 
-		lines = [[l.site1.chrom, l.site1.start, l.site1.end, l.site1.name, l.site1.strand,
-					l.site2.chrom, l.site2.start, l.site2.end, l.site2.name, l.site2.strand, l.distance, l.orientation] for l in self]
-
-		table = pd.DataFrame(lines)
-		table.columns = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand",
-						"site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand", "site_distance", "site_orientation"]
-
-		return(table)
-	
+		for p in self:
+			attributes = getAllAttr(p)
+			
+			# add site prefixes/ get attributes for both TFs
+			site1 = {f"site1_{key}": value for key, value in getAllAttr(attributes.pop("site1")).items()}
+			site2 = {f"site2_{key}": value for key, value in getAllAttr(attributes.pop("site2")).items()}
+			attributes = {f"site_{key}": value for key, value in attributes.items()}
+			
+			attributes.update(site1)
+			attributes.update(site2)
+			
+			table.append(attributes)
+		
+		return pd.DataFrame(table)
+		
 	def write_bed(self, outfile, fmt="bed", merge=False):
 		""" 
 		Write the locations of (TF1, TF2) pairs to a bed-file.
@@ -796,6 +803,9 @@ class TFBSPairList(list):
 		pbar.close()
 		
 		return html
+
+	def pairLines(self, y, x="distance", output=None, flank=None):
+		pass
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
@@ -2093,3 +2103,33 @@ def fast_rolling_mean(arr, w):
 	roll_arr = roll_arr[~np.isnan(roll_arr)]
 
 	return roll_arr
+
+def getAllAttr(object, private=False, functions=False):
+	"""
+	Collect all attributes of an object and return as dict.
+
+	Parameters:
+	----------
+		private : boolean, default False
+			If private attributes should be included. Everything with '_' prefix.
+		functions : boolean, default False
+			If callable attributes ie functions shoudl be included.
+
+	Returns:
+	----------
+		dictionary : 
+			Dict of all the objects attributes.
+	"""
+	output = {}
+	
+	for attribute_name in dir(object):
+		attribute_value = getattr(object, attribute_name)
+		
+		if not private and attribute_name.startswith("_"):
+			continue
+		if not functions and callable(attribute_value):
+			continue
+		
+		output[attribute_name] = attribute_value
+		
+	return output
