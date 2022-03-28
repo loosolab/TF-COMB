@@ -810,8 +810,90 @@ class TFBSPairList(list):
 		
 		return html
 
-	def pairLines(self, y, x="distance", output=None, flank=None):
-		pass
+	def pairLines(self, x, y, figsize=(6, 4), output=None):
+		"""
+		Compare miscellaneous values between TF-pair.
+		
+		Parameters:
+		----------
+			x : string
+				Data to show on the x-axis. Set None to get a list of options.
+			y : string
+				Data to show on the y-axis. Set None to get a list of options.
+			figsize : int tuple, default (6, 4)
+				Figure dimensions.
+			output : str, default None
+				Save plot to given file.
+
+		Returns:
+		----------
+			matplotlib.axes._subplots.AxesSubplot:
+				Return axes object of the plot.
+		"""
+		# TODO expose as parameter
+		# would need checks for datatype!
+		hue="name"
+		
+		table = self.as_table()
+		
+		# sort table to always start with the same TF
+		if len(set(table["site1_name"])) > 1:
+			tf = table["site1_name"][0]
+			rf = table["site1_name"] == tf
+			
+			site1 = table.columns[table.columns.str.contains("site1")]
+			site2 = table.columns[table.columns.str.contains("site2")]
+			
+			table.loc[rf, site1.append(site2)] = table.loc[rf, site2.append(site1)].values
+		
+		# fetch column names
+		x_names = list(table.columns[table.columns.str.contains("_" + x)]) * 2
+		y_names = list(table.columns[table.columns.str.contains("_" + y)]) * 2
+		hue_names = list(table.columns[table.columns.str.contains("_" + hue)]) * 2
+
+		tmp_postfix = True if len(set(hue_names)) >= 2 else False
+		
+		if not x_names:
+			raise Exception(f"Could not find x='{x}'. Available are {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}.")
+		if not y_names:
+			raise Exception(f"Could not find y='{y}'. Available are {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}.")
+		if not hue_names:
+			raise Exception(f"Could not find hue='{hue}'. Available are {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}.")
+
+		
+		# collect data
+		x1, x2 = table[x_names[0]], table[x_names[1]]
+		y1, y2 = table[y_names[0]], table[y_names[1]]
+		hue1, hue2 = table[hue_names[0]], table[hue_names[1]]
+		
+		# in case of both names being equal set postfix
+		if tmp_postfix:
+			hue1, hue2 = hue1 + "_1", hue2 + "_2"
+		
+		##### plotting #####
+		plt.figure(figsize=figsize)
+		
+		plot = sns.lineplot(x=x1.append(x2).values,
+							y=y1.append(y2).values,
+							hue=hue1.append(hue2).values)
+		
+		# rotate x-ticks for non numeric data
+		if not pd.api.types.is_numeric_dtype(x1.append(x2)):
+			plt.xticks(rotation=90)
+		
+		# remove postfix in legend
+		if tmp_postfix:
+			handles, labels = plot.get_legend_handles_labels()
+			plot.legend(handles=handles, labels=[l[:-2] for l in labels])
+		
+		# set axis labels
+		plot.set(ylabel=y, xlabel=x)
+		
+		# save plot
+		if output:
+			plt.savefig(output)
+		
+		return plot
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
