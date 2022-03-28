@@ -6,6 +6,7 @@ objects.py: Contains CombObj, DiffCombObj and DistObj classes
 @license: MIT
 """
 
+from operator import sub
 import os 
 import pandas as pd
 import itertools
@@ -2396,8 +2397,9 @@ class DistObj():
 		self.linres = None           # Pandas DataFrame of size n_pairs x 3
 		self.normalized = None       # Pandas DataFrame of size n_pairs x maxDist
 		self.smoothed = None         # Pandas DataFrame of size n_pairs x maxDist
-		self.shift = None			 # Pandas DataFrame of size n_pairs x 3
 		self.peaks = None 	         # Pandas DataFrame of size n_pairs x n_preferredDistance 
+		self.classified = None 	     # Pandas DataFrame of size n_pairs x 3 
+		self.datasource = None 	     # Holds the datastructure 
 
 		self.peaking_count = None    # Number of pairs with at least one peak 
 		self.zscores = None			 # calculated zscores
@@ -2407,30 +2409,44 @@ class DistObj():
 		self._height_multiplier = None # private storage height_mulitplier
 		self._collapsed = None 		#stores the negative values to be able to expand negative section again
 		self._collapsed_peaks = None #stores the negative peaks to be able to expand negative section again
+		
 	
 		
 		self.n_bp = 0			     # Predicted number of baskets 
 		self.TFBS = RegionList()     # None RegionList() of TFBS
 		self.smooth_window = 1       # Smoothing window size, 1 = no smoothing
-		self.anchor_mode = 0         # Distance measure mode [0,1,2]
+		self.anchor_mode = None         # Distance measure mode [0,1,2]
 
 		# str <-> int encoding dicts
 		self.name_to_idx = None      # Mapping TF-names: string <-> int 
 		self.pair_to_idx = None      # Mapping Pairs: tuple(string) <-> int
 
 		# analysis parameters
-		self.min_dist = 0            # Minimum distance. Default: 0 
-		self.max_dist = 300          # Maximum distance. Default: 300
-		self.max_overlap = 0         # Maximum overlap. Default: 0       
+		self.min_dist = None            # Minimum distance. Default: 0 
+		self.max_dist = None          # Maximum distance. Default: 300
+		self.max_overlap = None         # Maximum overlap. Default: 0       
 		self.directional = None      # True if direction is taken into account, false otherwise 
    
 		# private constants
-		self._PEAK_HEADER = "TF1\tTF2\tDistance\tPeak Heights\tProminences\tThreshold\tCount\n"
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
 		self._XLBL_FONTSIZE = 10    # label fontsize adjustment for plotting x labels
 
 	def __str__(self):
-		pass
+		""" Returns a string representation of the DistObj depending on what variables are already stored """
+		
+		s = "<DistObj"
+
+		if self.TFBS is not None:
+			s += ": {0} TFBS ({1} unique names)".format(len(self.TFBS), len(self.TF_names)) 
+
+			if self.rules is not None:
+				s += " | Market basket analysis: {0} rules".format(self.rules.shape[0])
+
+				if self.peaks is not None:
+					s += " | Found peaks: {0}".format(self.peaks.shape[0])
+					s += " | from {0} pairs.".format(self.peaking_count)
+		s += ">"
+		return(s)
 	
 	def set_verbosity(self, level):
 		""" Set the verbosity level for logging after creating the CombObj.
@@ -2455,7 +2471,7 @@ class DistObj():
 
 		Parameters
 		----------
-		comb_obj : tfcomb.objects
+		comb_obj : tfcomb.objects (or any other object contain all necessary rules)
 			Object from which the rules and parameters should be copied from
 
 		Returns
@@ -2465,25 +2481,55 @@ class DistObj():
 		
 		"""
 
-	   
-		# TODO: Check Rules 
+		# Check for mandatory attributes
+		missing =[]
+		for attr in ["rules","TF_names", "TFBS", "TF_table"]:
+			try:
+				getattr(comb_obj, attr)
+			except AttributeError:
+				missing.append(attr)
 		
-		#copy rules
+		if len(missing) > 0:
+			raise InputError(f"Mandatory attributes {missing} missing for object {comb_obj}")
+		
+		# copy required attributes
 		self.rules = comb_obj.rules
-		## reset pandas index
-		#self.rules = self.rules.reset_index(drop=True)
-
-		# copy parameters
 		self.TF_names = comb_obj.TF_names
-		self.TFBS = comb_obj.TFBS 
-		self.min_dist = comb_obj.min_distance
-		self.max_dist = comb_obj.max_distance
-		self.directional = comb_obj.directional
-		self.max_overlap = comb_obj.max_overlap
-		self.stranded = comb_obj.stranded
+		self.TFBS = comb_obj.TFBS
 		self.TF_table = comb_obj.TF_table
 
-		self.set_anchor(comb_obj.anchor) #sets anchor_mode integer from 0-2
+		# copy parameters and set default values
+		if hasattr(comb_obj, 'min_distance'):
+			self.min_dist = comb_obj.min_distance
+		else:
+			self.min_dist = 0
+
+		if hasattr(comb_obj, 'max_distance'):
+			self.max_dist = comb_obj.max_distance
+		else:
+			self.max_dist = 300
+		
+		if hasattr(comb_obj, 'max_overlap'):
+			self.max_overlap = comb_obj.max_overlap
+		else:
+			self.max_overlap = 0
+		
+		if hasattr(comb_obj, 'directional'):
+			self.directional = comb_obj.directional
+		else:
+			self.directional = False
+
+		if hasattr(comb_obj, 'stranded'):
+			self.stranded = comb_obj.stranded
+		else:
+			self.stranded = False
+		
+		if hasattr(comb_obj, 'anchor'):
+			self.set_anchor(comb_obj.anchor) #sets anchor_mode integer from 0-2
+		else:
+			self.set_anchor("inner") # mode: inner = 0
+
+		
 
 	def set_anchor(self, anchor):
 		""" set anchor for distance measure mode
@@ -2524,7 +2570,7 @@ class DistObj():
 		"""
 
 		self.logger.info("Resetting signals")
-		self._datasource = self.distances
+		self.datasource = self.distances
 
 	#-------------------------------------------------------------------------------------------#
 	#---------------------------------- Checks on variables-------------------------------------#
@@ -2668,10 +2714,12 @@ class DistObj():
 		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
 		if func == tfcomb.utils.evaluate_noise_chunks:
 			# list all TF pairs based on distances
-			names = list(zip(list(self.peaks.TF1.values), list(self.peaks.TF2.values)))
+			#ind= self.peaks.index
+			names = list(zip(list(self.peaks.TF1.values), list(self.peaks.TF2.values))) # "tf names may contain "-"
 		else:
 			# list all TF pairs based on distances
-			names = datatable.index #list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values)))
+			#ind = datatable.index 
+			names = list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values))) # "tf names may contain "-"
 
 		names = list(set(names))
 		n_names = len(names)
@@ -2683,29 +2731,31 @@ class DistObj():
 		for i in range(threads):
 
 			# get name subset for chunk
-			subset = names[(i*chunks):(i*chunks+chunks)] # last chunk will be chunks - (threads - 1) smaller
+			subset_names = names[(i*chunks):(i*chunks+chunks)]
+			subset_ind = s = ["-".join(x) for x in subset_names]
+
 			# subset distance information for names in this chunk
-			counts = datatable.set_index(['TF1','TF2']).sort_index().loc[subset]
+			counts = datatable.sort_index().loc[subset_ind]
 
 			if func == tfcomb.utils.linress_chunks:
 				# apply function with params
-				job = pool.apply_async(func, args=(subset, counts, distances, ))
+				job = pool.apply_async(func, args=(subset_names, counts, distances, ))
 
 			elif func == tfcomb.utils.correct_chunks:
 				# subset linres information for names in this chunk
-				linres = self.linres.set_index(['TF1','TF2']).sort_index().loc[subset]
+				linres = self.linres.sort_index().loc[subset_ind]
 				# apply function with params
-				job = pool.apply_async(func, args=(subset, counts, distances, linres, ))
+				job = pool.apply_async(func, args=(subset_names, counts, distances, linres, ))
 			
 			elif func == tfcomb.utils.analyze_signal_chunks:
 				# apply function with params
-				job = pool.apply_async(func, args=(subset, counts, distances, self.stringency, self.prominence, ))
+				job = pool.apply_async(func, args=(subset_names, counts, distances, self.stringency, self.prominence, ))
 
 			elif func == tfcomb.utils.evaluate_noise_chunks:
 				# subset peaks
-				peaks = self.peaks.set_index(['TF1','TF2']).sort_index().loc[subset]
+				peaks = self.peaks.sort_index().loc[subset_ind]
 				# apply function with params
-				job = pool.apply_async(func, args=(subset, counts, peaks, distances, self._noise_method, self._height_multiplier, ))
+				job = pool.apply_async(func, args=(subset_names, counts, peaks, distances, self._noise_method, self._height_multiplier, ))
 			jobs.append(job)
 
 		# accept no new jobs
@@ -2730,7 +2780,7 @@ class DistObj():
 	#---------------------------- Counting distances between TFs -------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def count_distances(self, normalize=True, directional=None, stranded=None):
+	def count_distances(self, directional=None, stranded=None):
 		""" Count distances for co_occurring TFs, can be followed by analyze_distances
 			to determine preferred binding distances
 
@@ -2759,14 +2809,13 @@ class DistObj():
 		stranded = self.stranded if stranded is None else stranded
 
 		#Check input types
-		tfcomb.utils.check_type(normalize, [bool], "normalize")
 		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
 		tfcomb.utils.check_type(directional, [bool], "directional")
 		tfcomb.utils.check_type(stranded, bool, "stranded")
 		self.check_min_max_dist()
 		
-		#Check if overlapping is allowed:
-		if self.anchor_mode == 1 and self.min_dist <= 0 and self.max_overlap == 0:
+		#Check if overlapping is allowed (when anchor == 2 (center))):
+		if self.anchor_mode == 2 and self.min_dist <= 0 and self.max_overlap == 0:
 			self.logger.warning("'min_dist' is below 0, but max_overlap is set to 0. Please set max_overlap > 0 in order to count overlapping pairs with negative distances.")
 
 		#Should strand be taken into account?
@@ -2783,10 +2832,11 @@ class DistObj():
 		# encode chromosome,pairs and name to int representation
 		chromosomes = {site.chrom: "" for site in self.TFBS}.keys()
 		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
+
 		self.name_to_idx = {name: idx for idx, name in enumerate(TF_names)}
-		#self.logger.debug("name_to_idx: {0}".format(self.name_to_idx))
 
 		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) for site in TFBS] #numpy integer array
+
 		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, (tf1, tf2) 
 								in enumerate(self.rules[["TF1", "TF2"]].values)}
 		
@@ -3010,34 +3060,6 @@ class DistObj():
 	#--------------------------- Analysis to get preferred distances ---------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def shift_signal(self):
-		""" Shifts the signal above zero. 
-
-		Returns
-		--------
-		None 
-			Fills the object variables .shift and either .smoothed or .corrected
-
-		"""
-
-		datasource = self.datasource
-		
-		if self.shift is not None:
-			self.logger.info("Signals already above zero, skipping shift.")
-			return
-
-		self.logger.info("Shifting signals above zero")
-
-		datasource = datasource.set_index(["TF1", "TF2"])
-		min_values = datasource.min(axis=1).abs()
-		datasource = datasource.add(min_values, axis=0)
-		datasource = datasource.reset_index()
-		self.shift = min_values.reset_index()
-		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		self.shift.index = self.shift["TF1"] + "-" + self.shift["TF2"]
-
-		self.datasource = datasource
-
 	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2, min_count=1, save=None):
 		""" 
 		After background correction is done, the signal is analyzed for peaks, 
@@ -3049,11 +3071,9 @@ class DistObj():
 		threads : int
 			Number of threads used
 			Default: 1
-		prominence : number or ndarray or sequence or ["median", "zscore"]
+		prominence : number or ndarray or sequence or ["zscore"]
 			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-			If "median", the median for the pairs is used
-			If "zscore", the zscore for the pairs is used (see .translate_to_zscore() for more information). 
-			Attention, this also changes the scale and output column names.
+			If "zscore", the zscore for the pairs is used. Attention, this also changes the scale and output column names.
 			If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
 			Default: "zscore"
 		stringency : float
@@ -3081,7 +3101,7 @@ class DistObj():
 			tfcomb.utils.check_writeability(save)
 
 		if isinstance(prominence, str):
-			tfcomb.utils.check_string(prominence, ["median", "zscore"])
+			tfcomb.utils.check_string(prominence, ["zscore"])
 		else:
 			tfcomb.utils.check_value(prominence)
 
@@ -3093,7 +3113,6 @@ class DistObj():
 		#----- Find preferred peaks -----#
 		self.logger.info(f"Analyzing Signal with threads {threads}")
 	
-		# distinguish between median, zscore and flat
 		datasource = self.datasource
 		distance_cols = datasource.columns[2:].tolist()
 
@@ -3102,24 +3121,11 @@ class DistObj():
 			counts = self.distances[distance_cols].sum(axis=1)
 			datasource = datasource.loc[counts >= min_count, :]
 
+		# save params
 		self.stringency = stringency
 		self.prominence = prominence
 
-		if (prominence == "median"):
-
-			self.shift_signal() #shifting only needed for median?
-
-			# calculate median
-			med = datasource.set_index(["TF1", "TF2"]).median(axis=1)
-			med = med.to_frame('median')
-			# combine median into datasoure
-			combined = pd.concat((datasource.set_index(["TF1", "TF2"]), med), axis=1, ignore_index=False)
-			combined = combined.reset_index().set_index(["TF1", "TF2"], drop=False)
-
-			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, combined)
-			method = "median"
-
-		elif (prominence == "zscore"):
+		if (prominence == "zscore"):
 			stds = datasource[distance_cols].std(ddof=0, axis=1)
 			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
 			means = datasource[distance_cols].mean(axis=1)
@@ -3131,10 +3137,13 @@ class DistObj():
 			zsc = pd.concat((textcols, zsc), axis=1)
 
 			zsc = zsc.set_index(["TF1", "TF2"], drop=False)
-			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, zsc)
 			zsc.index = zsc["TF1"] + "-" + zsc["TF2"]
+			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, zsc)
 			self.zscores = zsc
 			method = "zscore"
+
+			# update datasource
+			self.datasource = self.zscores
 
 		else:
 			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
@@ -3146,7 +3155,8 @@ class DistObj():
 		#Format order of columns
 		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
 		res = res[columns]
-		res["Distance"] = res["Distance"].astype(int) #distances are float - change to int
+		# distances are float - change to int
+		res["Distance"] = res["Distance"].astype(int) 
 		res.rename(columns={"peak_heights":"Peak Heights",
 							"prominences": "Prominences"}, inplace=True)
 		self.peaks = res
@@ -3215,9 +3225,6 @@ class DistObj():
 		tfcomb.utils.evaluate_noise_chunks
 		"""
 		self.check_peaks()
-
-		if self._collapsed is not None: 
-			raise InputError("Collapsed signals can't be analyzed, see .expand_negative() for more details.")
 
 		self._noise_method = method
 		self._height_multiplier = height_multiplier
@@ -3311,7 +3318,7 @@ class DistObj():
 		Returns
 		--------
 		None 
-			adds a column to either .smoothed or .corrected
+			fills .classified
 		"""
 
 		self.check_peaks()
@@ -3320,62 +3327,15 @@ class DistObj():
 
 		p_index = self.peaks.set_index(["TF1","TF2"]).index.drop_duplicates()
 		
-		datasource = self.datasource
+		datasource = self.datasource[["TF1","TF2"]]
 
 		datasource["isPeaking"] = datasource.set_index(["TF1","TF2"]).index.isin(p_index)
 
 		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
 
-		self.logger.info(f"classifcation done")
+		self.classified = datasource
 
-	def _mean_distance_pair(self, pair):
-		""" Calculate the mean distance for the given pair.
-		
-		Parameters
-		----------
-		pair : tuple(str,str)
-			TF names for which to calculate the mean distance e.g. ("NFYA","NFYB")
-		
-		Returns
-		------
-		float
-			numpy average
-		
-		See also
-		--------
-		numpy.average
-		"""
-
-		self.check_pair(pair)
-		key = "-".join(pair)
-
-		#Calculate weighted average using distances/counts
-		distances = range(self.min_dist, self.max_dist + 1) #without negative distances
-		counts = self.distances.loc[key, distances].values
-
-		avg = np.average(distances, weights=counts)
-
-		return(avg)
-
-	def mean_distance_all(self):
-		""" 
-		Calculates the mean distance (numpy average) for all pairs in <distObj>.
-		
-		Returns
-		---------
-		pd.DataFrame containing pairs and mean distances based on the raw distance information
-
-
-		See also
-		--------
-		numpy.average
-
-		"""
-
-		self.mean_distances = pd.DataFrame(index=self.distances.index, columns=["mean_distance"])
-		for pair in zip(self.distances.TF1, self.distances.TF2):
-			key = "-".join(pair)
-			self.mean_distances.loc[key, "mean_distance"] = self._mean_distance_pair(pair)
+		self.logger.info(f"classifcation done. Results can be found in .classified")
 
 	def check_periodicity(self):
 		"""
@@ -3429,22 +3389,33 @@ class DistObj():
 
 		self.check_min_max_dist()
 		self.check_distances()
-		self.check
 		tfcomb.utils.check_dir(save_path)
+
+		# warn user
+		self.logger.info(f"Plotting {method}-plots for all pairs. This may take a while.")
 
 		for tf1,tf2 in list(zip(self.distances.TF1, self.distances.TF2)):
 			self.plot((tf1, tf2), method=method, save=os.path.join(save_path,f"{method}_{tf1}_{tf2}.png"))
 
-	def collapse_negative(self, method="max"):
+	def _collapse_negative(self, sourcetable, method="max"):
 		"""
 		Method to collapse negative coulmns(-min distance to 0). e.g. columns [-3, -2, -1] will ne summarized as "neg".
 		
 		Parameters
 		-----------
+		sourcetable: pd.DataFrame
+			DataFrame which should be collapsed (e.g. .smoothed or distances)
 		method : str, optional
 			Summarization Method. One of ["max","min","mean","sum"].
 			e.g. with "max" 2.3 is chosen from [1.2, 2.3, 1.5], for sum: "neg" would be 5 
 			Default: max
+		
+		Returns
+		-----------
+		pd.DataFrame
+			collapsed dataframe for plotting purposes
+		pd.DataFrame, None
+			altered peak list (negative distances are replaced with "neg"). If no peaks found yet, None will be returned
 
 		Notes
 		--------
@@ -3462,18 +3433,14 @@ class DistObj():
 		# check if negative positions possible
 		if self.min_dist >= 0:
 			raise InputError("Data must contain negative position to collapse")
-		# check  if already collapsed
-		if self._collapsed is not None:
-			raise InputError("Data is already collapsed")
-		# get datasource (either corrected or smoothed)
-		datasource = self._get_datasource()
+
+		datasource = sourcetable
 		# create negative columns 
 		neg_cols = neg_cols = [ x for x in range(self.min_dist,0)]
 		
 		#select negative part
 		neg = datasource[["TF1","TF2"] + neg_cols]
 
-		self._collapsed_method = method
 		#add negative column according to method
 		if method =="max":	
 			neg["neg"] = neg[neg_cols].max(axis=1)
@@ -3491,48 +3458,17 @@ class DistObj():
 			datasource.insert(2, "neg", neg["neg"])
 		except ValueError:
 			raise InputError("Datasource already contains a negative column")
-		# save collapsed data
-		self._collapsed = neg.drop("neg",  axis=1)
-		# update datasource
-		self._set_datasource(datasource)
 
+		# alter peaks list
+		peaks = None
 		if self.peaks is not None:
-			# save negative peaks
-			self._collapsed_peaks = self.peaks.copy()
+			peaks = copy.deepcopy(self.peaks)
 			# replace every negative position with "neg"
-			[self.peaks["Distance"].replace(x,"neg", inplace=True) for x in range(self.min_dist,0)]
+			[peaks["Distance"].replace(x,"neg", inplace=True) for x in range(self.min_dist,0)]
 
-	def expand_negative(self):
-		"""
-		Method to expand negative coulmns back to -min distance to 0. \n
-		e.g. "neg" column will be expanded back to [-3,-2,-1].
+		return (datasource, peaks)
 
-		See also
-		--------
-		tfcomb.objects.collapse_negative
-		"""
-
-		datasource = self._get_datasource()
-		#check if collapsed
-		if "neg" not in datasource.columns:
-			raise InputError("Datasource must contain a negative column")
-
-		#remove neg column
-		datasource = datasource.drop("neg", axis=1)
-		# merge datasource into collapsed (to preserve order TFNames - neg - pos)
-		datasource = self._collapsed.merge(datasource)
-
-		datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
-		# reset self._collapsed
-		self._collapsed = None 
-		# update datasource
-		self._set_datasource(datasource)
-
-		if self._collapsed_peaks is not None:
-			self.peaks = self._collapsed_peaks
-			self._collapsed_peaks = None
-
-	def plot(self, pair, method="signal", save=None, config=None):
+	def plot(self, pair, method="signal", save=None, config=None, collapse=None):
 		"""
 		Produces different plots.
 		
@@ -3555,6 +3491,8 @@ class DistObj():
 			[density]: bwadjust, Default: 0.1 (see seaborn.kdeplot()) \n
 			[signal]: None \n
 			Default: None
+		collapse: str, optional
+			None if negative data should not be collapsed. ["min","max","mean","sum"] allowed as methods. see ._collapse_negative() for more information
 		"""
 
 		# checks
@@ -3566,6 +3504,9 @@ class DistObj():
 		tfcomb.utils.check_type(method, [str], "method")
 		supported = ["hist", "corrected", "density", "linres", "signal", "smoothed"]
 		tfcomb.utils.check_string(method, supported)
+		if collapse is not None:
+			tfcomb.utils.check_string(collapse, ["min","max","mean","sum"])
+		
 
 		# check config is dict 
 		tfcomb.utils.check_type(config, [dict, type(None)], "config")
@@ -3598,6 +3539,13 @@ class DistObj():
 			else:
 				source_table = self.distances
 
+		# collapse negative
+		if collapse:
+			source_table, peak_df = self._collapse_negative(self, source_table, method="max")
+		else:
+			# no altered peak list (no replace with "neg" for negative distances)
+			peak_df = None 
+
 		#Establish x-values
 		if method == "density":
 			param = 0.1
@@ -3620,11 +3568,6 @@ class DistObj():
 				zsc = True if self.zscores is not None else False
 			x_data = np.linspace(self.min_dist, self.max_dist + 1, param)
 		
-		# check whether data is collapsed or not see .collapse_negative() for more information
-		collapsed = False
-		offset_neg = None
-		if "neg" in source_table.columns:
-			collapsed = True
 
 		#Establish y-values
 		# get y_data
@@ -3633,16 +3576,16 @@ class DistObj():
 			y_data = self.zscores.loc[ind].iloc[2:]
 
 		# remove negative data if collapsed
-		if collapsed:
+		if collapse:
 			neg = y_data[0]
 			if zsc:
-				if self._collapsed_method == "max":	
+				if collapse == "max":	
 					neg = y_data[:(-self.min_dist)+1].max()
-				elif self._collapsed_method == "min":
+				elif collapse == "min":
 					neg = y_data[:(-self.min_dist)+1].min()
-				elif self._collapsed_method == "mean":
+				elif collapse == "mean":
 					neg = y_data[:(-self.min_dist)+1].mean()
-				elif self._collapsed_method == "sum":
+				elif collapse == "sum":
 					neg = y_data[:(-self.min_dist)+1].sum()
 				y_data = y_data[-self.min_dist:]
 			else:
@@ -3669,19 +3612,19 @@ class DistObj():
 		elif method == "signal":
 			# plot signal with peaks found
 			#self.check_corrected()
-			self.check_peaks()
-				
-			peaks = self.peaks.loc[((self.peaks["TF1"] == tf1) & 
-									(self.peaks["TF2"] == tf2))].Distance.to_numpy()
+			self.check_peaks()	
+
+			if peak_df is None:
+				# only read access for peak_df - no copy needed
+				peak_df = self.peaks
+
+			peaks = peak_df.loc[((peak_df["TF1"] == tf1) & 
+								 (peak_df["TF2"] == tf2))].iloc[:,2]
+			
 			thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
 									(self.thresh["TF2"] == tf2))].iloc[0,2]
 
 			y_data = y_data.to_numpy()
-
-			# if data is classified, exclude class from plotting
-			if (type(y_data[-1]) is np.bool_) or (type(y_data[-1]) is bool):
-				y_data = y_data[:-1]
-				x_data = x_data[:-1]
 			
 			plt.plot(x_data, y_data)
 
@@ -3689,13 +3632,13 @@ class DistObj():
 			neg_cross = False
 			if(len(peaks) > 0):
 				# get indices of the peaks (mainly needed for ranges not starting with position 0)
-				peak_idx = [peak if peak=="neg" else list(x_data).index(peak)for peak in peaks]
-				# check if a peak is at the negative position
-				if collapsed & ("neg" in peak_idx):
+				peak_idx = [peak if peak=="neg" else list(x_data).index(peak) for peak in peaks]
+				# check if at least one peak is at the negative position
+				if collapse and ("neg" in peak_idx):
 					neg_cross = True
 					peak_idx.remove("neg")
 				y_crosses = y_data[peak_idx] #y-values for peaks
-				if not collapsed:
+				if not collapse:
 					peak_idx = [x + self.min_dist for x in peak_idx]
 				plt.plot(peak_idx, y_crosses, "x")
 
@@ -3722,7 +3665,7 @@ class DistObj():
 	
 		# make x-axis pretty
 		xt = ax.get_xticks() 
-		if collapsed: # adjust to collapsed
+		if collapse: # adjust to collapsed
 			plt.bar(offset_neg, neg, color='tab:orange')
 			xt[0] = offset_neg
 			xt = xt[:-1]

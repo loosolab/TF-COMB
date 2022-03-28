@@ -1125,9 +1125,9 @@ def linress_chunks(pairs, dist_counts, distances):
 	#save results as list
 	results = []
 	for pair in pairs:
-
 		# get count for specific pair
 		ind = "-".join(pair)
+		#ind =pair
 		try:
 			counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
 			counts = np.array(counts, dtype=float)
