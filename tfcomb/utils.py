@@ -124,7 +124,13 @@ class TFBSPairList(list):
 			
 			table.append(attributes)
 		
-		return pd.DataFrame(table)
+		table = pd.DataFrame(table)
+
+		# convert types to best possible
+		# https://stackoverflow.com/a/65915289
+		table = table.apply(pd.to_numeric, errors='ignore').convert_dtypes()
+
+		return table
 		
 	def write_bed(self, outfile, fmt="bed", merge=False):
 		""" 
