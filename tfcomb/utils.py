@@ -892,6 +892,9 @@ class TFBSPairList(list):
 		# save plot
 		if output:
 			plt.savefig(output)
+
+		# close figure
+		plt.close()
 		
 		return plot
 
