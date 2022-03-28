@@ -1135,6 +1135,9 @@ class CombObj():
 		if TF1 == False and TF2 == False:
 			raise InputError("Either TF1 or TF2 must be True in order to create a selection.")
 
+		# reset TF_names
+		TF_names = set()
+
 		#Create selections for TF1/TF2
 		selections = []
 		for (TF_bool, TF_col) in zip([TF1, TF2], ["TF1", "TF2"]):
@@ -1150,6 +1153,9 @@ class CombObj():
 				selected_bool = self.rules[TF_col].isin(TF_list)
 				selected = self.rules[selected_bool]
 				selections.append(selected)
+
+				# update TF_names
+				TF_names.update(selected[TF_col])
 
 		#Join selections from TF1 and TF2
 		if len(selections) > 1:
@@ -1168,6 +1174,10 @@ class CombObj():
 		new_obj = self.copy()
 		new_obj.rules = selected
 		new_obj.network = None
+
+		# set TF_names
+		new_obj.TF_names = list(TF_names)
+		new_obj.TF_names.sort()
 
 		if reduce_TFBS == True:
 			new_obj.reduce_TFBS()
