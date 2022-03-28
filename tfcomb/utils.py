@@ -833,23 +833,28 @@ class TFBSPairList(list):
 		# TODO expose as parameter
 		# would need checks for datatype!
 		hue="name"
-		
+
 		table = self.as_table()
-		
+
+		# print x, y options
+		if not x or not y:
+			print(f"x, y options: {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}")
+			return
+
 		# sort table to always start with the same TF
 		if len(set(table["site1_name"])) > 1:
 			tf = table["site1_name"][0]
 			rf = table["site1_name"] == tf
 			
-			site1 = table.columns[table.columns.str.contains("site1")]
-			site2 = table.columns[table.columns.str.contains("site2")]
+			site1 = table.columns[table.columns.str.startswith("site1")]
+			site2 = table.columns[table.columns.str.startswith("site2")]
 			
 			table.loc[rf, site1.append(site2)] = table.loc[rf, site2.append(site1)].values
 		
 		# fetch column names
-		x_names = list(table.columns[table.columns.str.contains("_" + x)]) * 2
-		y_names = list(table.columns[table.columns.str.contains("_" + y)]) * 2
-		hue_names = list(table.columns[table.columns.str.contains("_" + hue)]) * 2
+		x_names = list(table.columns[table.columns.str.endswith("_" + x)]) * 2
+		y_names = list(table.columns[table.columns.str.endswith("_" + y)]) * 2
+		hue_names = list(table.columns[table.columns.str.endswith("_" + hue)]) * 2
 
 		tmp_postfix = True if len(set(hue_names)) >= 2 else False
 		
@@ -893,7 +898,8 @@ class TFBSPairList(list):
 		if output:
 			plt.savefig(output)
 
-		# close figure
+		# show then close figure
+		plt.show()
 		plt.close()
 		
 		return plot
