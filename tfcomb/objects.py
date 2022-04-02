@@ -2804,9 +2804,9 @@ class DistObj():
 											self.anchor_mode,		#anchor
 											len(TF_names),	 		#n_names
 											2,						#task = count distances
-											self.pairs				#rules
-									directional,
-									)
+											self.pairs,				#rules
+											directional,
+											)
 
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
 		self._raw_to_human_readable() #fills in .distances
