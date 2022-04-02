@@ -2787,8 +2787,7 @@ class DistObj():
 		#self.logger.debug("name_to_idx: {0}".format(self.name_to_idx))
 
 		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) for site in TFBS] #numpy integer array
-		self.pairs_to_idx = {(self.name_to_idx[tf1], self.name_to_idx[tf2]): idx for idx, (tf1, tf2) 
-								in enumerate(self.rules[["TF1", "TF2"]].values)}
+		self.pairs = self.rules[["TF1", "TF2"]].values.tolist() #list of TF1/TF rules to count distances for
 		
 		#Sort sites by mid if anchor == 2 (center):
 		if self.anchor_mode == 2: 
@@ -2798,18 +2797,19 @@ class DistObj():
 		sites = np.array(sites)
 
 		self.logger.info("Calculating distances")
-		self._raw = count_distances(sites, 
-									self.pairs_to_idx,
+		self._raw = count_co_occurrence(sites, 
 									self.min_dist,
 									self.max_dist,
 									self.max_overlap,
-									self.anchor_mode,
+											self.anchor_mode,		#anchor
+											len(TF_names),	 		#n_names
+											2,						#task = count distances
+											self.pairs				#rules
 									directional,
 									)
 
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
-		#fills in .distances
-		self._raw_to_human_readable()
+		self._raw_to_human_readable() #fills in .distances
 
 		self.logger.info("Done finding distances! Results are found in .distances")
 		self.logger.info("Run .linregress_all() to fit linear regression")
