@@ -101,9 +101,6 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 		for (TF1_name, TF2_name) in rules:
 			dist_indices_mat[TF1_name, TF2_name] = ind #ind initializes at 1
 
-			if directional == False:
-				dist_indices_mat[TF2_name, TF1_name] = ind #TF2-TF1 pairs also count towards TF1-TF2 distances; ind is the same if TF1 == TF2
-
 			dist_count_mat[ind, 0] = TF1_name 	#first column is TF1 name
 			dist_count_mat[ind, 1] = TF2_name 	#second column is TF2 name
 			ind += 1
@@ -200,6 +197,11 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 									rule_idx = dist_indices_mat[TF1_name, TF2_name] #row index of rule (is 0 if pair is not in rules)
 									dist_idx = 2 + distance - min_distance #column index of distance
 									dist_count_mat[rule_idx, dist_idx] += 1
+
+									#Save counts to TF2_name, TF1_name as well
+									if directional == False:
+										rule_idx = dist_indices_mat[TF2_name, TF1_name] #this can be 0 even if TF1-TF2 is != 0
+										dist_count_mat[rule_idx, dist_idx] += 1 
 
 								#Append indices of pair to list (if chosen)
 								if task == 3:
