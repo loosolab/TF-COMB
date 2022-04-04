@@ -12,12 +12,19 @@ from adjustText import adjust_text
 import copy
 import distutils
 from distutils import util
+import sys
 
 import tfcomb
 from tfcomb.utils import check_columns, check_type, check_string, check_value, random_string
 from tfcomb.logging import TFcombLogger, InputError
 import tobias
 
+# fix 'dot' not found error
+# only if conda is found
+# https://stackoverflow.com/a/51267131
+if os.path.exists(os.path.join(sys.prefix, 'conda-meta')):
+	# add install path of active conda bin
+	os.environ["PATH"] += os.pathsep + os.path.join(sys.prefix, 'bin')
 
 def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,4), save=None):
 	""" 
