@@ -2835,8 +2835,8 @@ class DistObj():
 		tfcomb.utils.check_type(stranded, bool, "stranded")
 		self.check_min_max_dist()
 		
-		#Check if overlapping is allowed (when anchor == 2 (center))):
-		if self.anchor_mode == 2 and self.min_dist <= 0 and self.max_overlap == 0:
+		#Check if overlapping is allowed (when anchor == 0 (inner))):
+		if self.anchor_mode == 0 and self.min_dist < 0 and self.max_overlap == 0:
 			self.logger.warning("'min_dist' is below 0, but max_overlap is set to 0. Please set max_overlap > 0 in order to count overlapping pairs with negative distances.")
 
 		self.logger.info("Preparing to count distances.")
