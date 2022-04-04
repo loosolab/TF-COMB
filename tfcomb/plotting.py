@@ -12,12 +12,19 @@ from adjustText import adjust_text
 import copy
 import distutils
 from distutils import util
+import sys
 
 import tfcomb
 from tfcomb.utils import check_columns, check_type, check_string, check_value, random_string
-from tfcomb.logging import TFcombLogger, InputError
+from tfcomb.logging import TFcombLogger
 import tobias
 
+# fix 'dot' not found error
+# only if conda is found
+# https://stackoverflow.com/a/51267131
+if os.path.exists(os.path.join(sys.prefix, 'conda-meta')):
+	# add install path of active conda bin
+	os.environ["PATH"] += os.pathsep + os.path.join(sys.prefix, 'bin')
 
 def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,4), save=None):
 	""" 
@@ -157,7 +164,6 @@ def scatter(table, x, y,
 				   y_threshold=None, 
 				   label=None, 
 				   label_fontsize=9, 
-				   label_color="red",
 				   title=None,
 				   save=None,
 				   **kwargs):
@@ -180,8 +186,6 @@ def scatter(table, x, y,
 		If None, no point labels are plotted. If "selection", the . Default: None.
 	label_fontsize : float, optional
 		Size of labels. Default: 9.
-	label_color : str, optional
-		Color of labels. Default: 'red'.
 	title : str, optional
 		Title of plot. Default: None.
 	kwargs : arguments
@@ -243,10 +247,12 @@ def scatter(table, x, y,
 
 	#Label given indices
 	if label is not None:
+		print("Adding labels")
 		if isinstance(label, list):
 
 			#Check if labels are within table index
 			selection = table.loc[label, :]
+
 			txts = _add_labels(selection, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
 
 		elif label == "selection":
@@ -256,15 +262,14 @@ def scatter(table, x, y,
 			txts = _add_labels(table, x, y, g.ax_joint, color=label_color, label_fontsize=label_fontsize)
 
 		#Adjust positions of labels
-		adjust_text(txts, 
-						x=table[x].tolist(), 
+		#print(txts)
+		adjust_text(txts, x=table[x].tolist(), 
 						y=table[y].tolist(), 
 						ax=g.ax_joint,
 						#add_objects=[], 
 						text_from_points=True, 
 						arrowprops=dict(arrowstyle='-', color='black', lw=0.5),
-						expand_points=(1.2, 1.2),
-						expand_text=(1.2, 1.2)
+						expand_points=(2,2)
 						)
 
 	if title is not None:
@@ -300,11 +305,18 @@ def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9
 	"""
 
 	txts = []
-	for label, row in table.iterrows():
-		coord = (row[x], row[y])
-		txts.append(ax.text(coord[0], coord[1], label, fontsize=label_fontsize, color=color))
+	for l in label:
+		coord = [table.loc[l,measure_col], table.loc[l,log_col]]
+		
+		ax = g.ax_joint
+		ax.scatter(coord[0], coord[1], color="red")
 	
-	return(txts)
+		txts.append(ax.text(coord[0], coord[1], l, fontsize=label_fontsize))
+	
+	#Adjust overlapping labels
+	adjust_text(txts, ax=ax, add_objects=[], text_from_points=True, arrowprops=dict(arrowstyle='-', color='black', lw=0.5))  #, expand_text=(0.1,1.2), expand_objects=(0.1,0.1))
+
+
 
 
 def go_bubble(table, aspect="MF", n_terms=20, threshold=0.05, save=None):
@@ -502,7 +514,7 @@ def network(network,
 				node_border=False,
 				node_cmap=None,
 				edge_cmap=None,
-				node_attributes={},
+				font_color=None,
 				save=None,
 				verbosity=1,
 				):
@@ -541,8 +553,8 @@ def network(network,
 		Name of colormap for node coloring. Default: None (colors are automatically chosen).
 	edge_cmap : str, optional
 		Name of colormap for edge coloring. Default: None (colors are automatically chosen).
-	node_attributes : dict, optional
-		Additional node attributes to apply to graph. Default: No additional attributes.
+	font_color : str, optional
+		Set a custom color of the node labels. Default: None (automatically chosen). 
 	save : str, optional
 		Path to save network figure to. Format is inferred from the filename - if not valid, the default format is '.pdf'.	
 	verbosity : int, optional
@@ -552,7 +564,7 @@ def network(network,
 	-------
 	TypeError
 		If network is not a networkx.Graph object
-	InputError 
+	ValueError 
 		If any of 'color_node_by', 'color_edge_by' or 'size_edge_by' is not in node/edge attributes, or if 'engine' is not a valid graphviz engine.
 	"""
 		
@@ -569,20 +581,20 @@ def network(network,
 	node_view = network.nodes(data=True)
 	edge_view = network.edges(data=True)
 
-	node_attributes_list = list(list(node_view)[0][-1].keys())    
-	edge_attributes_list = list(list(edge_view)[0][-1].keys())
+	node_attributes = list(list(node_view)[0][-1].keys())    
+	edge_attributes = list(list(edge_view)[0][-1].keys())
 
 	for att in [color_node_by, size_node_by]:
-		if (att is not None) and (att not in node_attributes_list):
-			raise InputError("Attribute '{0}' is not available in the network node attributes. Available attributes are: {1}".format(att, node_attributes_list))
+		if (att is not None) and (att not in node_attributes):
+			raise ValueError("Attribute '{0}' is not available in the network node attributes. Available attributes are: {1}".format(att, node_attributes))
 
 	for att in [color_edge_by, size_edge_by]:
-		if (att is not None) and (att not in edge_attributes_list):
-			raise InputError("Attribute '{0}' is not available in the network edge attributes. Available attributes are: {1}".format(att, edge_attributes_list))
+		if (att is not None) and (att not in edge_attributes):
+			raise ValueError("Attribute '{0}' is not available in the network edge attributes. Available attributes are: {1}".format(att, edge_attributes))
 
 	#Check if engine is within graphviz
 	if engine not in graphviz.ENGINES:
-		raise InputError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
+		raise ValueError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
 	
 	#todo: check size with re
 	
@@ -639,13 +651,9 @@ def network(network,
 		
 		attributes = {} #attributes for dot
 		attributes["style"] = "filled"
-		attributes["width"] = "0.25" #minimum width; will expand to fit label
-		attributes["height"] = "0.25" #minimum width; will expand to fit label
-		attributes["fixedsize"] = "false" #automatically adjust node sizes
-		attributes["fillcolor"] = "lightgrey"
 
 		#Set color of node border (default: black)
-		if node_border == False:
+		if node_border == False and color_node_by != None: #node border cannot be none if there is no color
 			attributes["color"] = "none"
 
 		#Set node color
@@ -663,10 +671,10 @@ def network(network,
 		if size_node_by != None:
 			value = node_att[size_node_by]
 			attributes["fontsize"] = str(map_value["node_size"](value))
-
-		#Apply any additional attributes
-		for key in node_attributes:
-			attributes[key] = str(node_attributes[key])
+		
+		#Set custom font color
+		if font_color != None:
+			attributes["fontcolor"] = font_color
 
 		#After collecting all attributes; add node with attribute dict
 		logger.spam("Adding node {0}".format(node_name))
