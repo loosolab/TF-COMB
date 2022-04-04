@@ -81,8 +81,29 @@ class TFBSPair():
 		else:
 			if self.site1.strand == self.site2.strand:
 				self.orientation = "same"
+			
 			else:
-				self.orientation = "opposite"
+
+				#Calculate based on whether site1/site2 is stranded
+				if self.site1.strand not in ["+","-"]:
+					if self.site2.strand == "+":
+						self.orientation = "away"
+					elif self.site2.strand == "-":
+						self.orientation = "towards"
+					else:
+						self.orientation = "NA"
+					
+				elif self.site2.strand not in ["+", "-"]:
+					if self.site1.strand == "+":
+						self.orientation = "towards"
+					elif self.site1.strand == "-":
+						self.orientation = "away"
+					else:
+						self.orientation = "NA"
+				
+				else: #both positions are + or -
+					self.orientation = "opposite"
+					
 
 	def __str__(self):
 		TFBS1 = ",".join([str(getattr(self.site1, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
@@ -1134,9 +1155,9 @@ def linress_chunks(pairs, dist_counts, distances):
 	#save results as list
 	results = []
 	for pair in pairs:
+
 		# get count for specific pair
 		ind = "-".join(pair)
-		#ind =pair
 		try:
 			counts = dist_counts.loc[ind].loc[distance_cols].values #exclude TF1, TF2 columns
 			counts = np.array(counts, dtype=float)
