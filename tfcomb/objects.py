@@ -2839,6 +2839,8 @@ class DistObj():
 		if self.anchor_mode == 2 and self.min_dist <= 0 and self.max_overlap == 0:
 			self.logger.warning("'min_dist' is below 0, but max_overlap is set to 0. Please set max_overlap > 0 in order to count overlapping pairs with negative distances.")
 
+		self.logger.info("Preparing to count distances.")
+
 		#Should strand be taken into account?
 		TFBS = copy.deepcopy(self.TFBS)
 		if stranded == True:
@@ -3314,6 +3316,29 @@ class DistObj():
 	#-------------------------------------------------------------------------------------------#
 	#------------------- Additional functionality/analysis for distances -----------------------#
 	#-------------------------------------------------------------------------------------------#
+
+	def mean_distance(self):
+		""" Get the mean distance for each rule in .rules.
+		
+		Returns:
+		---------
+		pandas.DataFrame containing "mean_distance" per rule.
+
+		""" 
+
+		self.check_distances()
+
+		#Calculate weighted average
+		sums = self.distances.iloc[:,2:].sum(axis=1).values
+		weights = self.distances.iloc[:,2:].div(sums, axis=0)
+		distances = self.distances.columns[2:].tolist()
+		avg = (weights * distances).sum(axis=1)
+
+		#Convert series to df
+		df = pd.DataFrame(avg).rename(columns={0:"mean_distance"})
+
+		return df
+		
 
 	def analyze_hubs(self):
 		""" 
