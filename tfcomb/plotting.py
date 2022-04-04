@@ -595,6 +595,10 @@ def network(network,
 	#Check if engine is within graphviz
 	if engine not in graphviz.ENGINES:
 		raise ValueError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
+
+	# Check number of edges
+	if len(network.edges) > 10000:
+		logger.warning(f"Detected more than 10.000 edges ({len(network.edges)}). This can result in issues when using jupyter.")
 	
 	#todo: check size with re
 	
