@@ -24,6 +24,7 @@ import math
 import qnorm #quantile normalization
 from scipy.stats import linregress
 from kneed import KneeLocator
+import statsmodels.api as sm
 
 #Modules for plotting
 import matplotlib.pyplot as plt
@@ -2695,6 +2696,26 @@ class DistObj():
 	#------------------------ Running different functions in chunks ----------------------------#
 	#-------------------------------------------------------------------------------------------#
 
+	@staticmethod
+	def chunk_table(table, n):
+		""" Split a pandas dataframe row-wise into n chunks.
+		
+		Parameters
+		------------
+		n : int
+			A positive number of chunks to split table into.
+
+		Returns
+		--------
+			list of pd.DataFrames
+		"""
+
+		n_rows = table.shape[0]
+		chunk_size = math.ceil(n_rows/n) # last chunk will be chunks - (threads - 1) smaller
+		chunks = [table.iloc[i:i+chunk_size,:] for i in range(0, n_rows, chunk_size)]	#list of dataframes
+
+		return chunks
+
 	def _multiprocess_chunks(self, threads, func, datatable):
 		"""
 		Split Data in chunks to multiprocess it. Because of the rather short but numerous calls mp.Pool() creates to much overhead. 
@@ -2976,108 +2997,82 @@ class DistObj():
 		return True
 
 	#Correct background signal from distance counts
-	def correct_background(self, threads=1):
-		""" Corrects the background of distances. This is a wrapper to run .linregress_all() and .correct_all().
+	def correct_background(self, frac=0.66, threads=1):
+		""" Corrects the background of distances.
 		
 		Parameters
 		-------------
+		frac : float, optional
+			Fraction of data used to calculate smooth. Setting this fraction lower will cause stronger smoothing effect. Default: 0.66 
 		threads : int, optional
 			Number of threads to use in functions. Default: 1.
-		"""
 
-		#Linregress
-		self.linregress_all(threads=threads)
-
-		#Correct signals
-		self.correct_all(threads=threads)
-
-
-	def linregress_all(self, threads=1, save=None):
-		""" Fits a linear Regression to distance count data for all rules. The linear regression is used to 
-			estimate the background. Proceed with .correct_all()
-			
-			Parameters
-			----------
-			threads : int
-				Number of threads used for fitting linear regression
-			save : str 
-				Path to save the plots to. If save is None plots won't be plotted. 
-				Default: None
-
-			Returns
-			-----
+		Returns
+		----------
+		None 
 			None
-				Fills the object variable .linres
+		None 
+			None
+		None 
+			Fills the object variable .corrected
 		"""
 
-		# check input param
-		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
-
-		# sanity checks
+		#Check input parameters
 		self.check_distances()
-
-		self.logger.info(f"Fitting linear regression. With number of threads: {threads}")
-
-		# hand it over to multiprocess chunks 
-		results = self._multiprocess_chunks(threads, tfcomb.utils.linress_chunks, self.datasource)
-
-		# save results to .linres
-		self.linres = pd.DataFrame(results, columns=['TF1', 'TF2', 'Linear Regression']).reset_index(drop=True) 
-		self.linres.index = self.linres["TF1"] + "-" + self.linres["TF2"]
-
-		#Plot linregress results
-		if save is not None:
-			self.logger.info("Plotting all linear regressions. This may take a while")
-			self._plot_all(save, "linres")
-
-		self.logger.info("Linear regression finished! Results can be found in .linres")
-
-
-	def correct_all(self, threads=1, save=None):
-		""" Subtracts the estimated background from the Signal for all rules. 
-			
-			Parameters
-			----------
-			threads : int
-				Number of threads used for fitting linear regression
-			save : str
-				Path to save the plots to. If save is None plots won't be plotted. 
-				Default: None
-
-			Returns
-			--------
-			None 
-				Fills the object variable .corrected
-		"""
-		
-		# check input param
+		tfcomb.utils.check_value(frac, vmin=0, vmax=1, name="frac")
 		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
-		
-		# sanity checks
-		self.check_linres()
-		self.check_min_max_dist()
 
-		self.logger.info(f"Correcting background with {threads} threads.")
-		
-		# hand it over to multiprocess chunks 
-		result = self._multiprocess_chunks(threads, tfcomb.utils.correct_chunks, self.datasource)
+		#Correct background in chunks
+		pool = mp.Pool(threads)
+		chunks = self.chunk_table(self.datasource, threads)
+		jobs = []
+		for chunk in chunks:
+			job = pool.apply_async(self._correct_chunk, (chunk, frac, ))
+			jobs.append(job)
 
-		#Create dataframe of corrected counts
-		columns = self.datasource.columns.tolist()
-		self.corrected = pd.DataFrame(result, columns=columns).reset_index(drop=True)
-		self.corrected.index = self.corrected["TF1"] + "-" + self.corrected["TF2"]
+		#Collect results
+		pool.close()
+		pool.join() #waits for all jobs
+		results = [job.get() for job in jobs]
 
-		#Update datasource
-		self.datasource = self.corrected
-
-		#Save plots for corrected signals
-		if save is not None:
-			self.logger.info("Plotting all corrected signals. This may take a while")
-			self._plot_all(save, "corrected")
+		#Join tables
+		self.lowess = pd.concat([result[0] for result in results])
+		self.corrected = pd.concat([result[1] for result in results])
+		self.datasource = self.corrected #update datasource
 
 		self.logger.info("Background correction finished! Results can be found in .corrected")
 
-	
+	@staticmethod
+	def _correct_chunk(counts, frac=0.66):
+		""" Correct counts for background signal using lowess smoothing.
+		
+		Parameters
+		------------
+		counts : pd.DataFrame
+			Subset of .datasource dataframe
+		frac : float, optional
+			Fraction of data used to calculate smooth. Default: 0.66.
+
+		Returns
+		---------
+		Tuple of two dataframes
+			counts_lowess : lowess smoothing of counts
+			corrected : counts corrected
+		"""
+
+		#Run lowess smoothing for each row in input counts
+		n_rows = counts.shape[0]
+		counts_lowess = counts.copy()
+		for i in range(n_rows):
+			signal = counts.iloc[i,2:] #first two columns are TF names
+			counts_lowess.iloc[i,2:] = sm.nonparametric.lowess(signal, range(len(signal)), frac=frac)[:,1] #first column in result is x-values
+
+		#Correct counts
+		corrected = counts.copy()
+		corrected.iloc[:,2:] = counts.iloc[:,2:] - counts_lowess.iloc[:,2:] #correct by subtracting lowess
+
+		return (counts_lowess, corrected)
+
 	#-------------------------------------------------------------------------------------------#
 	#--------------------------- Analysis to get preferred distances ---------------------------#
 	#-------------------------------------------------------------------------------------------#
