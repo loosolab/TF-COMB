@@ -3165,7 +3165,7 @@ class DistObj():
 			method = "zscore"
 
 			# update datasource
-			self.datasource = self.zscores
+			#self.datasource = self.zscores
 
 		else:
 			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
@@ -3338,7 +3338,7 @@ class DistObj():
 		df = pd.DataFrame(avg).rename(columns={0:"mean_distance"})
 
 		return df
-		
+
 
 	def analyze_hubs(self):
 		""" 
