@@ -3377,13 +3377,78 @@ class DistObj():
 
 		self.logger.info(f"classifcation done. Results can be found in .classified")
 
-	def check_periodicity(self):
+	def get_periodicity(self):
 		"""
-		checks periodicity of distances (like 10 bp indicating DNA full turn)
-			- placeholder for functionality upgrade - 
+		Calculate periodicity for all rules via autocorrelation.
+		
+		Returns
+		---------
+		None
+			Fills the object variable .autocorrelation and .periodicity
+		
 		"""
-		pass
+		
+		#Collect data
+		datasource = self.datasource #raw/corrected/smoothed
+		distances = datasource.columns.tolist()[2:]
+		lags = range(1,len(distances)) #lag 1 to end of distances
+		
+		#Setup output table
+		self.autocorrelation = pd.DataFrame(index=datasource.index, columns=lags)
+		
+		#Calculate autocorrelation per pair
+		n_rules = datasource.shape[0]
+		for i in range(n_rules): #for each pair 
+			
+			counts = datasource.iloc[i,2:].values
 
+			#Calculate autocorrelation
+			autocorr = sm.tsa.acf(counts, nlags=len(lags), fft=True)
+			autocorr = autocorr[1:] #exclude lag 0           
+			
+			self.autocorrelation.iloc[i,:] = autocorr
+		
+		#Find best periodicity per pair
+		info = {}
+		for i in range(n_rules):
+			
+			signal = self.autocorrelation.iloc[i,:]
+			
+			y = np.fft.rfft(signal)
+			x = np.fft.rfftfreq(len(signal))
+		
+			#Position of highest peak
+			idx_max = np.argmax(y)
+
+			info[self.autocorrelation.index[i]] = {"period": np.round(1/x[idx_max], 2),
+												"amplitude": np.round(np.abs(y[idx_max]), 3)}
+			
+		self.periodicity = pd.DataFrame().from_dict(info, orient="index")
+
+	def plot_autocorrelation(self, pair):
+		"""
+		Plot the autocorrelation for a pair, which shows the lag of periodicity in the counted distances.
+		
+		Parameters
+		------------
+		pair : tuple(str, str)
+			TF names to plot. e.g. ("NFYA","NFYB")
+		"""
+		
+		from statsmodels.graphics import tsaplots
+
+		#check pair
+		name = "-".join(pair)
+		
+		#Fetch signal for pair
+		datasource = self.datasource
+		signal = datasource.loc[name][2:] #raw/corrected/smoothed
+		distances = datasource.columns.tolist()[2:]
+		lags = range(1,len(distances)) #lag 1 to end of distances
+		
+		fig = tsaplots.plot_acf(signal, lags=len(lags), zero=False, alpha=None, title=f"Autocorrelation for {name}")
+		plt.xlabel("Lag (bp)")
+		plt.ylabel("Correlation coefficient")
 
 	def build_network(self):
 		""" 
