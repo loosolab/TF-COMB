@@ -25,6 +25,11 @@ from tobias.utils.signals import fast_rolling_math
 import pathlib
 import pyBigWig
 import matplotlib.pyplot as plt
+import matplotlib
+import matplotlib.animation
+import seaborn as sns
+import tqdm
+from IPython import display
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -118,19 +123,36 @@ class TFBSPair():
 
 class TFBSPairList(list):
 	""" Class for collecting and analyzing a list of TFBSPair objects """
+	# init attributes
+	_bigwig_path = None
+	_plotting_tables = None
+	_last_flank = None
 	
 	def as_table(self):
 		""" Table representation of the pairs in the list """
+		table = []
 
-		lines = [[l.site1.chrom, l.site1.start, l.site1.end, l.site1.name, l.site1.strand,
-					l.site2.chrom, l.site2.start, l.site2.end, l.site2.name, l.site2.strand, l.distance, l.orientation] for l in self]
+		for p in self:
+			attributes = getAllAttr(p)
+			
+			# add site prefixes/ get attributes for both TFs
+			site1 = {f"site1_{key}": value for key, value in getAllAttr(attributes.pop("site1")).items()}
+			site2 = {f"site2_{key}": value for key, value in getAllAttr(attributes.pop("site2")).items()}
+			attributes = {f"site_{key}": value for key, value in attributes.items()}
+			
+			attributes.update(site1)
+			attributes.update(site2)
+			
+			table.append(attributes)
+		
+		table = pd.DataFrame(table)
 
-		table = pd.DataFrame(lines)
-		table.columns = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand",
-						"site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand", "site_distance", "site_orientation"]
+		# convert types to best possible
+		# https://stackoverflow.com/a/65915289
+		table = table.apply(pd.to_numeric, errors='ignore').convert_dtypes()
 
-		return(table)
-	
+		return table
+		
 	def write_bed(self, outfile, fmt="bed", merge=False):
 		""" 
 		Write the locations of (TF1, TF2) pairs to a bed-file.
@@ -170,6 +192,738 @@ class TFBSPairList(list):
 										l.site1.name + "-" + l.site2.name, str(l.distance), l.site1.strand, l.site2.strand]) for l in self]) + "\n"
 		f.write(s)
 		f.close()
+	
+	# ---------------------- override list inherited functions ----------------------
+	# This is done so that plotting_tables are reset when changes in list are detected.
+
+	def append(self, element):
+		self._plotting_tables = None
+		super().append(element)
+
+	def extend(self, l):
+		self._plotting_tables = None
+		super().extend(l)
+
+	def __add__(self, x):
+		return TFBSPairList(super().__add__(x))
+
+	def insert(self, index, object):
+		self._plotting_tables = None
+		super().insert(index, object)
+	
+	def remove(self, value):
+		self._plotting_tables = None
+		super().remove(value)
+	
+	def pop(self, index=-1):
+		self._plotting_table = None
+		return super().pop(index)
+
+	def clear(self) -> None:
+		self._plotting_tables = None
+		super().clear()
+
+	# slicing functions
+	def __getitem__(self, key):
+		new = super().__getitem__(key)
+		if isinstance(new, list):
+			return TFBSPairList(new)
+		else:
+			return new
+
+	def __setitem__(self, index, value):
+		self._plotting_tables = None
+
+		super().__setitem__(index, value)
+
+	# display object function
+	def __repr__(self):
+		return(f"TFBSPairList({super().__repr__()})")
+
+	# ---------------------- plotting related functions ----------------------
+
+	@property
+	def bigwig_path(self):
+		"""
+		Get path to bigwig file.
+		"""
+		if not self._bigwig_path:
+			raise Exception("No path to signal bigwig found. Please set with 'object.bigwig_path = \"path/to/file.bw\"'.")
+		return self._bigwig_path
+
+	@bigwig_path.setter
+	def bigwig_path(self, path):
+		"""
+		Set path to bigwig file. Checks for existence.
+		"""
+		if not os.path.exists(path):
+			raise Exception(f"Could not find file! {path}")
+		self._plotting_tables = None
+		self._bigwig_path = path
+
+	@property
+	def plotting_tables(self):
+		"""
+		Getter for plotting_tables. Will compute if necessary.
+		"""
+		if not self._plotting_tables:
+			self.comp_plotting_tables()
+		return self._plotting_tables
+
+	def comp_plotting_tables(self, flank=100):
+		"""
+		Prepare pair and score tables for plotting.
+
+		Parameter:
+		------------
+		flank : int, default 100
+			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites.
+		"""
+
+		# load bigwig file
+		signal_bigwig = pyBigWig.open(self.bigwig_path)
+
+		# get pairs as table & sort by distance
+		pairs = self.as_table().sort_values(by='site_distance')
+
+		# compute center point between binding pair
+		pairs["center"] = (pairs["site1_end"] + round(pairs["site_distance"] / 2)).astype(int)
+
+		pairs["window_start"] = pairs["center"] - flank
+		pairs["window_end"] = pairs["center"] + flank
+
+		scores = []
+		sorted_pairs = []
+
+		for (index, row) in pairs.iterrows():
+			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
+			
+			if row["site1_name"] < row["site2_name"]:
+				values.reverse()
+				
+				# switch pair
+				site1 = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand"]
+				site2 = ["site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand"]
+				row[site1], row[site2] = row[site2].values, row[site1].values
+				
+				# compute relative positions
+				row["site1_rel_start"] = row["window_end"] - row["site1_start"]
+				row["site1_rel_end"] = row["window_end"] - row["site1_end"]
+				
+				row["site2_rel_start"] = row["window_end"] - row["site2_start"]
+				row["site2_rel_end"] = row["window_end"] - row["site2_end"]
+			else:
+				# compute relative positions
+				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
+				row["site1_rel_end"] = row["site1_end"] - row["window_start"]
+				
+				row["site2_rel_start"] = row["site2_start"] - row["window_start"]
+				row["site2_rel_end"] = row["site2_end"] - row["window_start"]
+
+			sorted_pairs.append(row)
+			scores.append(values)
+
+		sorted_pairs = pd.DataFrame(sorted_pairs).reset_index(drop=True)
+		scores = pd.DataFrame(scores).fillna(value=0)
+
+		#sort by distance, then relative TFBS start
+		sorted_pairs.sort_values(by=["site_distance", "site1_rel_start"], inplace=True)
+		scores = scores.loc[sorted_pairs.index]
+
+		self._last_flank = flank
+		self._plotting_tables = (sorted_pairs, scores)
+
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None):
+		"""
+		Create a heatmap of TF binding pairs sorted for distance.
+		
+		Parameters:
+		----------
+			logNorm_cbar : str, default None
+				[None, "centerLogNorm", "SymLogNorm"]
+				Choose a type of normalization for the colorbar.
+				SymLogNorm:
+					Use matplotlib.colors.SymLogNorm. This does not center to 0
+				centerLogNorm:
+					Use custom matplotlib.colors.SymLogNorm from stackoverflow. Note this creates a weird colorbar.
+			show_binding : bool, default True
+				Shows the TF binding positions as a grey background.
+			flank_plot : str, default 'strand'
+				["strand", "orientation"]
+				Decide if the plots flanking the heatmap should be colored for strand or strand-orientation.
+			figsize : int tuple, default (7, 14)
+				Figure dimensions.
+			output : str, default None 
+				Save plot to given file.
+			flank : int, default None
+				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+		
+		Returns:
+		----------
+			matplotlib.gridspec.GridSpec:
+				Object containing the finished pairMap.
+		"""
+		# check parameter values
+		if not logNorm_cbar in [None, "centerLogNorm", "SymLogNorm"]:
+			raise ValueError(f"Parameter 'logNorm_cbar' has to be one of [None, \"centerLogNorm\", \"SymLogNorm\"]. But found {logNorm_cbar}.")
+		if not flank_plot in ["strand", "orientation"]:
+			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\"]. But found {flank_plot}")
+
+		# fixes FloatingPointError: underflow encountered in multiply
+		# https://stackoverflow.com/a/61756043
+		# should be set by default but for some reason it isn't for matplotlib 3.5.1/ numpy 1.21.5
+		np.seterr(under='ignore')
+
+		fig = plt.figure(figsize=figsize)
+
+		# compute plotting tables with custom flank
+		if not flank is None and flank != self._last_flank:
+			self.comp_plotting_tables(flank=flank)
+
+		# load data
+		pairs, scores = self.plotting_tables
+
+		# load custom colorbar normalizaition class
+		# https://stackoverflow.com/a/65260996
+		if logNorm_cbar == "centerLogNorm":
+			class MidpointLogNorm(matplotlib.colors.SymLogNorm):
+				"""
+				Normalise the colorbar so that diverging bars work there way either side from a prescribed midpoint value)
+				e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0.,vmin=-100, vmax=100))
+
+				All arguments are the same as SymLogNorm, except for midpoint    
+				"""
+				def __init__(self, lin_thres, lin_scale, midpoint=None, vmin=None, vmax=None):
+					self.midpoint = midpoint
+					self.lin_thres = lin_thres
+					self.lin_scale = lin_scale
+					#fraction of the cmap that the linear component occupies
+					self.linear_proportion = (lin_scale / (lin_scale + 1)) * 0.5
+
+					matplotlib.colors.SymLogNorm.__init__(self, lin_thres, lin_scale, vmin, vmax)
+
+				def __get_value__(self, v, log_val, clip=None):
+					if v < -self.lin_thres or v > self.lin_thres:
+						return log_val
+					
+					x = [-self.lin_thres, self.midpoint, self.lin_thres]
+					y = [0.5 - self.linear_proportion, 0.5, 0.5 + self.linear_proportion]
+					interpol = np.interp(v, x, y)
+					return interpol
+
+				def __call__(self, value, clip=None):
+					log_val = matplotlib.colors.SymLogNorm.__call__(self, value)
+
+					out = [0] * len(value)
+					for i, v in enumerate(value):
+						out[i] = self.__get_value__(v, log_val[i])
+
+					return np.ma.masked_array(out)
+
+		########## define grid ##########
+		# https://matplotlib.org/stable/gallery/subplots_axes_and_figures/gridspec_nested.html
+		# grid: [legend_area, plot_area]
+		grid = matplotlib.gridspec.GridSpec(nrows=1,
+											ncols=2,
+											figure=fig,
+											width_ratios=[1, 10],
+											wspace=0.3)
+
+		# plot area
+		plot_grid = matplotlib.gridspec.GridSpecFromSubplotSpec(ncols=3,
+																nrows=1,
+																width_ratios=[0.5, 10, 0.5],
+																subplot_spec=grid[1],
+																wspace=0)
+
+		strand1 = fig.add_subplot(plot_grid[0])
+		heatmap = fig.add_subplot(plot_grid[1])
+		strand2 = fig.add_subplot(plot_grid[2])
+
+		# legend area
+		legend_grid = matplotlib.gridspec.GridSpecFromSubplotSpec(ncols=1, nrows=2, subplot_spec=grid[0])
+
+		heatmap_led = fig.add_subplot(legend_grid[0])
+		strand_led = fig.add_subplot(legend_grid[1])
+
+		# legend label
+		heatmap_led.set_title("Open Chromatin Score")
+		strand_led.set_title("TF Binding Strand")
+
+		###### define plots ######
+		### main heatmap ###
+		
+		if logNorm_cbar == None:
+			norm = None
+		elif logNorm_cbar == "centerLogNorm":
+			norm = MidpointLogNorm(lin_thres=1, lin_scale=1, midpoint=0)
+		elif logNorm_cbar == "SymLogNorm":
+			norm = matplotlib.colors.SymLogNorm(linthresh=1, linscale=1)
+			
+		plot = sns.heatmap(scores, 
+						yticklabels=False,
+						xticklabels=False,
+						cmap="seismic",
+						center=None if logNorm_cbar else 0,
+						cbar=True,
+						cbar_ax=heatmap_led,
+						norm=norm,
+						ax=heatmap)
+
+		name1, name2 = set(pairs["site1_name"]).pop(), set(pairs["site2_name"]).pop()
+		heatmap.set_title(f"{name1} <-> {name2}")
+
+		# center line
+		plot.vlines(x=len(scores.columns)/2,
+					ymin=0, ymax=len(scores),
+					linestyles="dashed",
+					color="black",
+					alpha=0.9 if logNorm_cbar else 0.2,
+					linewidth=1)
+		# binding sites
+		if show_binding:
+			plot.hlines(y=range(len(scores)),
+						xmin=pairs["site1_rel_start"],
+						xmax=pairs["site1_rel_end"],
+						color="gray",
+						linewidth=0.1,
+						alpha=0.7 if logNorm_cbar else 0.2)
+			plot.hlines(y=range(len(scores)),
+						xmin=pairs["site2_rel_start"],
+						xmax=pairs["site2_rel_end"],
+						color="gray",
+						linewidth=0.1,
+						alpha=0.7 if logNorm_cbar else 0.2)
+
+		# https://moonbooks.org/Articles/How-to-add-a-frame-to-a-seaborn-heatmap-figure-in-python-/
+		# make frame visible
+		for _, spine in plot.spines.items():
+			spine.set_visible(True)
+
+		### strand left ###
+		#https://stackoverflow.com/a/57994641
+		col = ["site1_strand"] if flank_plot == "strand" else ["site_orientation"]
+		
+		str_to_int = {j:i for i, j in enumerate(pd.unique(pairs[col[0]].values))}
+
+		cmap = sns.color_palette("tab10", len(str_to_int))
+
+		plot = sns.heatmap(pairs[col].replace(str_to_int),
+							yticklabels=False,
+							xticklabels=False,
+							cmap=cmap,
+							cbar=True,
+							cbar_ax=strand_led,
+							ax=strand1)
+
+		colorbar = plot.collections[0].colorbar 
+		r = colorbar.vmax - colorbar.vmin 
+		colorbar.set_ticks([colorbar.vmin + r / len(str_to_int) * (0.5 + i) for i in range(len(str_to_int))])
+		colorbar.set_ticklabels(list(str_to_int.keys()))
+
+		### strand right ###
+		col = ["site2_strand"] if flank_plot == "strand" else ["site_orientation"]
+		
+		sns.heatmap(pairs[col].replace(str_to_int),
+					yticklabels=False,
+					xticklabels=False,
+					cmap=cmap,
+					cbar=False,
+					ax=strand2)
+		
+		# save plot
+		if output:
+			plt.savefig(output)
+
+		# show plot
+		plt.show()
+
+		# close figure
+		plt.close()
+
+		return grid
+
+	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, output=None, flank=None, _ret_param=False):
+		"""
+		Create an aggregated footprint track on the paired binding sites.
+		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
+		If the second approach spans multiple distances the binding locations are shown as a range as well.
+		
+		
+		Parameters:
+		----------
+			dist : int or int list, default None
+				Show track for one or more distances between binding sites.
+			start : int, default None
+				Define start of range of sites that should be aggregated. If set will ignore 'dist'.
+			end : int, default None
+				Define end of range of sites that should be aggregated. If set will ignore 'dist'.
+			ymin : int, default None
+				Y-axis minimum limit.
+			ymax : int, default None
+				Y-axis maximum limit.
+			output : str, default None
+				Save plot to given file.
+			flank : int, default None
+				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+			_ret_param : bool, default False
+				Intended for internal animation use!
+				If True will cause the function to return a dict of function call parameters used to create plot.
+		
+		Returns:
+		----------
+			matplotlib.axes._subplots.AxesSubplot or dict:
+				Return axes object of the plot.
+		"""
+		# parameter check
+		if dist is None and start is None and end is None:
+			raise ValueError("Either set dist or start and end parameter!")
+		
+		# compute plotting tables with custom flank
+		if not flank is None and flank != self._last_flank:
+			self.comp_plotting_tables(flank=flank)
+
+		# load data
+		pairs, scores = self.plotting_tables
+
+		# dict holding dict of all function calls to create plot
+		parameter = dict()
+		
+		# get scores
+		if not start is None and not end is None:
+			if end > len(pairs):
+				raise ValueError(f"Out of range! Given {start}:{end} valid range is 0:{len(pairs)}")
+			
+			tmp_pairs = pairs[start:end]
+			tmp_scores = scores[start:end]
+			
+			dist = f"{tmp_pairs['site_distance'].min()} - {tmp_pairs['site_distance'].max()} | Selected: {start}:{end}"
+		else:
+			tmp_pairs = pairs[pairs["site_distance"].isin(dist if isinstance(dist, list) else [dist])]
+			tmp_scores = scores.loc[tmp_pairs.index] 
+		
+		# get pair names
+		# TODO sanity check for len 1
+		lname = set(tmp_pairs["site1_name"]).pop()
+		rname = set(tmp_pairs["site2_name"]).pop()
+		
+		# compute x axis range (0 centered)
+		center = round(len(tmp_scores.columns) / 2)
+		xmin, xmax = -center, center
+
+		# compute y axis range + 10% padding
+		points = tmp_scores.mean()
+
+		if ymin is None:
+			ymin = points.min()
+			ymin += ymin * 0.1
+		if ymax is None:
+			ymax = points.max()
+			ymax += ymax * 0.1
+
+		
+		##### plot #####
+		fig, ax = plt.subplots()
+		
+		# add aggregated line
+		parameter["set"] = {"ylim": (ymin, ymax),
+							"xlim": (xmin, xmax),
+							"ylabel": "Bigwig signal",
+							"xlabel": "Basepair",
+							"title": f"Distance: {dist} | Sites aggregated: {len(tmp_pairs)}\n{lname} <--> {rname}"}
+		
+		ax.set(**parameter["set"])
+		
+		parameter["plot"] = [list(range(xmin, xmax)), points]
+		ax.plot(*parameter["plot"])
+		
+		parameter["vlines"] = {"x": 0,
+							"ymin": ymin, 
+							"ymax": ymax,
+							"linestyles": "dashed",
+							"color": "black",
+							"alpha": 1,
+							"linewidth": 1}
+		
+		# add center line
+		ax.vlines(**parameter["vlines"])
+		
+		# add binding site locations
+		start = tmp_pairs["site1_rel_start"].min() - center
+		end = tmp_pairs["site1_rel_end"].max() - center
+		parameter["patches.Rectangle"] = [{"xy": (start, ymin),
+										"width": end-start,
+										"height": np.abs(ymin-ymax),
+										"color": 'tab:red',
+										"alpha": 0.2}]
+		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][0]))
+		
+		start = tmp_pairs["site2_rel_start"].min() - center
+		end = tmp_pairs["site2_rel_end"].max() - center
+		parameter["patches.Rectangle"].append({"xy": (start, ymin),
+											"width": end-start,
+											"height": np.abs(ymin-ymax),
+											"color": 'tab:green',
+											"alpha": 0.2})
+		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][1]))
+		
+		# show plot if not in parameter mode
+		if not _ret_param:
+			plt.show()
+		
+		# save plot
+		if output:
+			plt.savefig(output)
+
+		# close figure
+		plt.close()
+		
+		if _ret_param:
+			return parameter
+		else:
+			return ax
+
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, interval=50, repeat_delay=0, repeat=False, output=None, flank=None):
+		"""
+		Combine a set of pairTrack plots to a .gif.
+			
+		Note:
+		The memory limit can be increased with the following if necessary. Default is 20 MB.
+		matplotlib.rcParams['animation.embed_limit'] = 100 # in MB
+		
+		
+		Parameters:
+		----------
+			site_num : int, default None
+				Number of sites to aggregate for every step. If None will aggregate by distance between binding pair.
+			step : int, default None
+				Step size between aggregations. Will be ignored if site_num=None.
+			ymin : int, default None
+				Y-axis minimum limit
+			ymax : int, default None
+				Y-axis maximum limit
+			interval : int, default 50
+				Delay between frames in milliseconds
+			repeat_delay : int, default 0
+				The delay in milliseconds between consecutive animation runs, if repeat is True.
+			repeat : boolean, default False
+				Whether the animation repeats when the sequence of frames is completed.
+			output : str, default None
+				Save plot to given file.
+			flank : int, default None
+				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+		
+		Returns:
+		----------
+			IPython.core.display.HTML:
+				Gif object ready to display in a jupyter notebook.
+		"""
+		# compute plotting tables with custom flank
+		if not flank is None and flank != self._last_flank:
+			self.comp_plotting_tables(flank=flank)
+
+		# load data
+		pairs, scores = self.plotting_tables
+
+		# prepare plots for animation
+		parameter_list = list()
+		
+		if site_num:
+			# compute animation y-range + 10% padding
+			if ymin is None:
+				ymin = np.min([scores[s:s + site_num if s + site_num < len(pairs) else len(pairs)].mean().min() for s in range(0, len(pairs), step)])
+				ymin += ymin * 0.1
+			if ymax is None:
+				ymax = np.max([scores[s:s + site_num if s + site_num < len(pairs) else len(pairs)].mean().max() for s in range(0, len(pairs), step)])
+				ymax += ymax * 0.1
+
+			pbar = tqdm.tqdm(total=len(range(0, len(pairs), step))+1)
+			pbar.set_description("Create frames")
+			
+			for start in range(0, len(pairs), step):
+				pbar.update()
+				parameter_list.append(self.pairTrack(start=start,
+													end=start + site_num if start + site_num < len(pairs) else len(pairs),
+													ymin=ymin,
+													ymax=ymax,
+													_ret_param=True
+													)
+									)
+		else:
+			# compute animation y-range + 10% padding
+			if ymin is None:
+				ymin = np.min([scores.loc[pairs[pairs["site_distance"] == d].index].mean().min() for d in set(pairs["site_distance"])])
+				ymin += ymin * 0.1
+			if ymax is None:
+				ymax = np.max([scores.loc[pairs[pairs["site_distance"] == d].index].mean().max() for d in set(pairs["site_distance"])])
+				ymax += ymax * 0.1
+
+			pbar = tqdm.tqdm(total=len(set(pairs["site_distance"]))+1)
+			pbar.set_description("Create frames")
+			
+			for d in set(pairs["site_distance"]):
+				pbar.update()
+				parameter_list.append(self.pairTrack(dist=d,
+													ymin=ymin,
+													ymax=ymax,
+													_ret_param=True
+													)
+									)
+		# update to be at 100% then close progress bar
+		pbar.update()
+		pbar.close()
+				
+		##### Setup animation #####
+		# setup figure to draw on
+		fig, axes = plt.subplots()
+		line, = axes.plot([])
+		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
+		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
+		
+		# progress bar
+		pbar = tqdm.tqdm(total=len(parameter_list)+1)
+		pbar.set_description("Render animation")
+		# create animation function (this decides what is drawn in every frame)
+		def animate(i):
+			"""
+			Draw all elements for a given frame index (i).
+			"""
+			# update progress bar
+			pbar.update()
+			
+			calls = parameter_list[i]
+
+			for key, params in calls.items():
+				if key == "plot":
+					line.set_xdata(params[0])
+					line.set_ydata(params[1])
+				elif key == "patches.Rectangle":
+					# remove old patches
+					# https://stackoverflow.com/a/62591596
+					axes.patches.clear()
+					# add new patches
+					for p in params:
+						axes.add_patch(matplotlib.patches.Rectangle(**p))
+				elif isinstance(params, dict):
+					eval(f"axes.{key}(**params)")
+					
+		##### Run animation #####
+		anim_created = matplotlib.animation.FuncAnimation(fig, 
+														animate,
+														frames=len(parameter_list),
+														interval=interval,
+														repeat_delay=repeat_delay,
+														repeat=repeat
+														)
+		
+		# save animation
+		if output:
+			anim_created.save(output, dpi=300)
+			pbar.reset()
+		
+		# prepare output
+		video = anim_created.to_jshtml()#to_html5_video()
+		html = display.HTML(video)
+		
+		# close figure & progress bar
+		plt.close()
+		pbar.close()
+		
+		return html
+
+	def pairLines(self, x, y, figsize=(6, 4), output=None):
+		"""
+		Compare miscellaneous values between TF-pair.
+		
+		Parameters:
+		----------
+			x : string
+				Data to show on the x-axis. Set None to get a list of options.
+			y : string
+				Data to show on the y-axis. Set None to get a list of options.
+			figsize : int tuple, default (6, 4)
+				Figure dimensions.
+			output : str, default None
+				Save plot to given file.
+
+		Returns:
+		----------
+			matplotlib.axes._subplots.AxesSubplot:
+				Return axes object of the plot.
+		"""
+		# TODO expose as parameter
+		# would need checks for datatype!
+		hue="name"
+
+		table = self.as_table()
+
+		# print x, y options
+		if not x or not y:
+			print(f"x, y options: {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}")
+			return
+
+		# sort table to always start with the same TF
+		if len(set(table["site1_name"])) > 1:
+			tf = table["site1_name"][0]
+			rf = table["site1_name"] == tf
+			
+			site1 = table.columns[table.columns.str.startswith("site1")]
+			site2 = table.columns[table.columns.str.startswith("site2")]
+			
+			table.loc[rf, site1.append(site2)] = table.loc[rf, site2.append(site1)].values
+		
+		# fetch column names
+		x_names = list(table.columns[table.columns.str.endswith("_" + x)]) * 2
+		y_names = list(table.columns[table.columns.str.endswith("_" + y)]) * 2
+		hue_names = list(table.columns[table.columns.str.endswith("_" + hue)]) * 2
+
+		tmp_postfix = True if len(set(hue_names)) >= 2 else False
+		
+		if not x_names:
+			raise Exception(f"Could not find x='{x}'. Available are {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}.")
+		if not y_names:
+			raise Exception(f"Could not find y='{y}'. Available are {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}.")
+		if not hue_names:
+			raise Exception(f"Could not find hue='{hue}'. Available are {set(sl[1] for sl in table.columns.str.split('_', n=1).to_list())}.")
+
+		
+		# collect data
+		x1, x2 = table[x_names[0]], table[x_names[1]]
+		y1, y2 = table[y_names[0]], table[y_names[1]]
+		hue1, hue2 = table[hue_names[0]], table[hue_names[1]]
+		
+		# in case of both names being equal set postfix
+		if tmp_postfix:
+			hue1, hue2 = hue1 + "_1", hue2 + "_2"
+		
+		##### plotting #####
+		plt.figure(figsize=figsize)
+		
+		plot = sns.lineplot(x=x1.append(x2).values,
+							y=y1.append(y2).values,
+							hue=hue1.append(hue2).values)
+		
+		# rotate x-ticks for non numeric data
+		if not pd.api.types.is_numeric_dtype(x1.append(x2)):
+			plt.xticks(rotation=90)
+		
+		# remove postfix in legend
+		if tmp_postfix:
+			handles, labels = plot.get_legend_handles_labels()
+			plot.legend(handles=handles, labels=[l[:-2] for l in labels])
+		
+		# set axis labels
+		plot.set(ylabel=y, xlabel=x)
+		
+		# save plot
+		if output:
+			plt.savefig(output)
+
+		# show then close figure
+		plt.show()
+		plt.close()
+		
+		return plot
 
 #------------------------------ Notebook / script exceptions -----------------------------#
 
@@ -1476,3 +2230,33 @@ def fast_rolling_mean(arr, w):
 	roll_arr = roll_arr[~np.isnan(roll_arr)]
 
 	return roll_arr
+
+def getAllAttr(object, private=False, functions=False):
+	"""
+	Collect all attributes of an object and return as dict.
+
+	Parameters:
+	----------
+		private : boolean, default False
+			If private attributes should be included. Everything with '_' prefix.
+		functions : boolean, default False
+			If callable attributes ie functions shoudl be included.
+
+	Returns:
+	----------
+		dictionary : 
+			Dict of all the objects attributes.
+	"""
+	output = {}
+	
+	for attribute_name in dir(object):
+		attribute_value = getattr(object, attribute_name)
+		
+		if not private and attribute_name.startswith("_"):
+			continue
+		if not functions and callable(attribute_value):
+			continue
+		
+		output[attribute_name] = attribute_value
+		
+	return output
