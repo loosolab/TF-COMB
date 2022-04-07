@@ -717,8 +717,8 @@ class CombObj():
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 
-	def count_within(self, min_distance=0, 
-						   max_distance=100, 
+	def count_within(self, min_dist=0, 
+						   max_dist=100, 
 						   max_overlap=0, 
 						   stranded=False, 
 						   directional=False, 
@@ -732,9 +732,9 @@ class CombObj():
 		
 		Parameters
 		-----------
-		min_distance : int
+		min_dist : int
 			Minimum distance between two TFBS to be counted as co-occurring. Distances are calculated depending on the 'anchor' given. Default: 0.
-		max_distance : int
+		max_dist : int
 			Maximum distance between two TFBS to be counted as co-occurring. Distances are calculated depending on the 'anchor' given. Default: 100.
 		max_overlap : float between 0-1
 			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
@@ -768,8 +768,8 @@ class CombObj():
 
 		#Check input parameters
 		self._check_TFBS()
-		tfcomb.utils.check_value(min_distance, vmin=0, integer=True, name="min_distance")
-		tfcomb.utils.check_value(max_distance, vmin=min_distance, integer=True, name="max_distance")
+		tfcomb.utils.check_value(min_dist, vmin=0, integer=True, name="min_dist")
+		tfcomb.utils.check_value(max_dist, vmin=min_dist, integer=True, name="max_dist")
 		tfcomb.utils.check_value(max_overlap, vmin=0, vmax=1, name="max_overlap")
 		tfcomb.utils.check_type(stranded, bool, "stranded")
 		tfcomb.utils.check_type(directional, bool, "directional")
@@ -806,8 +806,8 @@ class CombObj():
 		self.logger.info("Counting co-occurrences within sites")
 		n_TFs = len(TF_names)
 		anchor_int = anchor_str_to_int[anchor]
-		TF_counts, pair_counts = count_co_occurrence(sites, min_distance,
-															max_distance,
+		TF_counts, pair_counts = count_co_occurrence(sites, min_dist,
+															max_dist,
 															max_overlap, 
 															binarize,
 															anchor_int,
@@ -821,7 +821,7 @@ class CombObj():
 		#---------- Count co-occurrences within shuffled background ---------#
 		if n_background > 0:
 			self.logger.info("Counting co-occurrence within background")
-			args = (min_distance, max_distance,	max_overlap, binarize, anchor_int, n_TFs, directional)
+			args = (min_dist, max_dist,	max_overlap, binarize, anchor_int, n_TFs, directional)
 
 			#setup multiprocessing
 			if threads == 1:
@@ -872,8 +872,8 @@ class CombObj():
 		#Update object variables
 		self.rules = None 	#Remove .rules if market_basket() was previously run
 		self.n_TFBS = len(self.TFBS)	#number of TFBS counted
-		self.min_distance = min_distance
-		self.max_distance = max_distance
+		self.min_dist = min_dist
+		self.max_dist = max_dist
 		self.stranded = stranded
 		self.directional = directional
 		self.max_overlap = max_overlap
@@ -925,7 +925,7 @@ class CombObj():
 		self.logger.debug("kwargs given in function: {0}".format(kwargs))
 
 		#If not set, fill in kwargs with internal arguments set by count_within()
-		attributes = ["min_distance", "max_distance", "directional", "max_overlap", "anchor"]
+		attributes = ["min_dist", "max_dist", "directional", "max_overlap", "anchor"]
 		for att in attributes:
 			if hasattr(self, att):
 				if not att in kwargs:
@@ -2435,22 +2435,21 @@ class DistObj():
 		self._collapsed = None 		#stores the negative values to be able to expand negative section again
 		self._collapsed_peaks = None #stores the negative peaks to be able to expand negative section again
 		
-	
-		
 		self.n_bp = 0			     # Predicted number of baskets 
 		self.TFBS = RegionList()     # None RegionList() of TFBS
 		self.smooth_window = 1       # Smoothing window size, 1 = no smoothing
-		self.anchor_mode = None         # Distance measure mode [0,1,2]
 
 		# str <-> int encoding dicts
 		self.name_to_idx = None      # Mapping TF-names: string <-> int 
 		self.pair_to_idx = None      # Mapping Pairs: tuple(string) <-> int
+		self.anchor_modes = {"inner": 0, "outer": 1, "center": 2} #str -> integer anchor mode
 
-		# analysis parameters
+		# Default analysis parameters
 		self.min_dist = 0            # Minimum distance. Default: 0
 		self.max_dist = 100          # Maximum distance. Default 100.
 		self.max_overlap = 0         # Maximum overlap. Default 0.
 		self.directional = False     # True if direction is taken into account, false otherwise 
+		self.anchor = "inner"		 # How to count distances: inner, outer or center.
 
 		# private constants
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
@@ -2507,8 +2506,8 @@ class DistObj():
 		"""
 
 		# Check for mandatory attributes
-		missing =[]
-		for attr in ["rules","TF_names", "TFBS", "TF_table"]:
+		missing = []
+		for attr in ["rules", "TF_names", "TFBS", "TF_table"]:
 			try:
 				getattr(comb_obj, attr)
 			except AttributeError:
@@ -2523,67 +2522,11 @@ class DistObj():
 		self.TFBS = comb_obj.TFBS
 		self.TF_table = comb_obj.TF_table
 
-		# copy parameters and set default values
-		if hasattr(comb_obj, 'min_distance'):
-			self.min_dist = comb_obj.min_distance
-		else:
-			self.min_dist = 0
-
-		if hasattr(comb_obj, 'max_distance'):
-			self.max_dist = comb_obj.max_distance
-		else:
-			self.max_dist = 300
-		
-		if hasattr(comb_obj, 'max_overlap'):
-			self.max_overlap = comb_obj.max_overlap
-		else:
-			self.max_overlap = 0
-		
-		if hasattr(comb_obj, 'directional'):
-			self.directional = comb_obj.directional
-		else:
-			self.directional = False
-
-		if hasattr(comb_obj, 'stranded'):
-			self.stranded = comb_obj.stranded
-		else:
-			self.stranded = False
-		
-		if hasattr(comb_obj, 'anchor'):
-			self.set_anchor(comb_obj.anchor) #sets anchor_mode integer from 0-2
-		else:
-			self.set_anchor("inner") # mode: inner = 0
-
-		
-
-	def set_anchor(self, anchor):
-		""" set anchor for distance measure mode
-		0 = inner
-		1 = outer
-		2 = center
-
-		Parameters
-		----------
-		anchor : str or int
-			one of ["inner","outer","center"] or [0,1,2]
-
-		Returns
-		-------
-		None 
-			Sets anchor mode inplace
-		"""
-
-		modes = ["inner", "outer", "center"]
-
-		tfcomb.utils.check_type(anchor, [str, int], "anchor")
-		if isinstance(anchor, str):
-			tfcomb.utils.check_string(anchor, modes)
-			self.anchor_mode = modes.index(anchor)
-
-		else: # anchor is int
-			tfcomb.utils.check_value(anchor, vmin=0, vmax=2, integer=True)
-			self.anchor_mode = anchor
-
+		# Overwrite default parameters with values from CombObj
+		variables = ["min_dist", "max_dist", "max_overlap", "directional", "stranded", "anchor"]
+		for variable in variables:
+			if hasattr(comb_obj, variable):
+				setattr(self, variable, getattr(comb_obj, variable))
 	
 	def reset_signal(self):
 		""" Resets the signals to their original state. 
@@ -2851,13 +2794,13 @@ class DistObj():
 		stranded = self.stranded if stranded is None else stranded
 
 		#Check input types
-		tfcomb.utils.check_type(self.anchor_mode, [int], "anchor_mode")
+		tfcomb.utils.check_string(self.anchor, list(self.anchor_modes.keys(), "self.anchor")
 		tfcomb.utils.check_type(directional, [bool], "directional")
 		tfcomb.utils.check_type(stranded, bool, "stranded")
 		self.check_min_max_dist()
 		
 		#Check if overlapping is allowed (when anchor == 0 (inner))):
-		if self.anchor_mode == 0 and self.min_dist < 0 and self.max_overlap == 0:
+		if self.anchor == "inner" and self.min_dist < 0 and self.max_overlap == 0:
 			self.logger.warning("'min_dist' is below 0, but max_overlap is set to 0. Please set max_overlap > 0 in order to count overlapping pairs with negative distances.")
 
 		self.logger.info("Preparing to count distances.")
@@ -2882,19 +2825,20 @@ class DistObj():
 		self.pairs = [(self.name_to_idx[TF1], self.name_to_idx[TF2]) for (TF1, TF2) in self.rules[["TF1", "TF2"]].values] #list of TF1/TF rules to count distances for
 		
 		#Sort sites by mid if anchor == 2 (center):
-		if self.anchor_mode == 2: 
+		if self.anchor == "center": 
 			sites = sorted(sites, key=lambda site: int((site[1] + site[2]) / 2))
 
 		#Convert to numpy integer arr for count_distances
 		sites = np.array(sites)
 
 		self.logger.info("Calculating distances")
+		anchor_mode = self.anchor_modes[self.anchor]
 		self._raw = count_co_occurrence(sites, 
 											min_distance=self.min_dist,
 											max_distance=self.max_dist,
 											max_overlap=self.max_overlap,
 											binary=False,				#does not affect distance counting
-											anchor=self.anchor_mode,
+											anchor=anchor_mode,			#integer representation of anchor
 											n_names=len(TF_names),
 											task=2,						#task = count distances
 											rules=self.pairs,			#rules to count distances for
