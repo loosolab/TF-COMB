@@ -288,10 +288,14 @@ def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9
 		The name of a column in table containing x coordinates.
 	y : str
 		The name of a column in table containing y cooordinates.
-	label : str
-		Name of column or "index" containing labels to plot.
 	ax : plt axes
-
+		Axes to plot texts on.
+	color : str, optional
+		Color of label text. Default: "black".
+	label_col : str, optional
+		Name of column containing labels to plot. Default: None (label is table index)
+	label_fontsize : str, optional
+		Size of labels. Default: 9.
 
 	Returns 
 	--------
@@ -299,11 +303,19 @@ def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9
 		The labels are added to ax in place
 	"""
 
+	#Check if columns are in table
+	tfcomb.utils.check_columns(table, [x,y,label_col]) #label_col is not checked if it is None
+
+	#Add texts
 	txts = []
 	for label, row in table.iterrows():
 		coord = (row[x], row[y])
+
+		if label_col != None:
+			label = row[label_col]
+
 		txts.append(ax.text(coord[0], coord[1], label, fontsize=label_fontsize, color=color))
-	
+
 	return(txts)
 
 
