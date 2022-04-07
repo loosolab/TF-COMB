@@ -2553,20 +2553,12 @@ class DistObj():
 		#If self.distances is present, check if it is a Dataframe
 		tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
 	
-	def check_linres(self):
-		""" Utility function to check if linear regressions were set. If not, InputError is raised. """
-
-		if self.linres is None:
-			raise InputError("Linear regression not fitted yet. Please run .linregress_all() first.")
-			
-		#If self.linres is present, check if it is a Dataframe
-		tfcomb.utils.check_type(self.linres, pd.DataFrame, ".linres")
 	
 	def check_corrected(self):
 		""" Utility function to check if corrected were set. If not, InputError is raised. """
 
 		if self.corrected is None:
-			raise InputError("Distances not corrected yet. Please run .correct_all() first.")
+			raise InputError("Distances not corrected yet. Please run .correct_background() first.")
 			
 		#If self.corrected is present, check if it is a Dataframe
 		tfcomb.utils.check_type(self.corrected, pd.DataFrame, ".corrected")
@@ -2664,7 +2656,7 @@ class DistObj():
 		Split Data in chunks to multiprocess it. Because of the rather short but numerous calls mp.Pool() creates to much overhead. 
 		So instead utilize chunks. 
 		Following functions can be multiprocessed: 
-		["linress", "correct background", "analyze_signal", "evaluate_noise"]
+		["analyze_signal", "evaluate_noise"]
 
 		Parameters
 		----------
@@ -2677,8 +2669,6 @@ class DistObj():
 
 		See also
 		-------
-		tfcomb.utils.linress_chunks 
-		tfcomb.utils.correct_chunks 
 		tfcomb.utils.analyze_signal_chunks
 		tfcomb.utils.evaluate_noise_chunks
 
@@ -2687,9 +2677,7 @@ class DistObj():
 		# check function is supported
 		if not callable(func):
 			raise InputError(f"Input {func} not callable. Please provide a function")
-		check_string(func.__name__,["linress_chunks", 
-									"correct_chunks", 
-									"analyze_signal_chunks", 
+		check_string(func.__name__,["analyze_signal_chunks", 
 									"evaluate_noise_chunks"], name="function")
 
 		self.logger.debug(f"Multiprocessing chunks for {func}")
@@ -2725,17 +2713,7 @@ class DistObj():
 			# subset distance information for names in this chunk
 			counts = datatable.sort_index().loc[subset_ind]
 
-			if func == tfcomb.utils.linress_chunks:
-				# apply function with params
-				job = pool.apply_async(func, args=(subset_names, counts, distances, ))
-
-			elif func == tfcomb.utils.correct_chunks:
-				# subset linres information for names in this chunk
-				linres = self.linres.sort_index().loc[subset_ind]
-				# apply function with params
-				job = pool.apply_async(func, args=(subset_names, counts, distances, linres, ))
-			
-			elif func == tfcomb.utils.analyze_signal_chunks:
+			if func == tfcomb.utils.analyze_signal_chunks:
 				# apply function with params
 				job = pool.apply_async(func, args=(subset_names, counts, distances, self.stringency, self.prominence, ))
 
@@ -2794,7 +2772,7 @@ class DistObj():
 		stranded = self.stranded if stranded is None else stranded
 
 		#Check input types
-		tfcomb.utils.check_string(self.anchor, list(self.anchor_modes.keys(), "self.anchor")
+		tfcomb.utils.check_string(self.anchor, list(self.anchor_modes.keys()), "self.anchor")
 		tfcomb.utils.check_type(directional, [bool], "directional")
 		tfcomb.utils.check_type(stranded, bool, "stranded")
 		self.check_min_max_dist()
