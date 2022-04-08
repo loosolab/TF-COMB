@@ -77,14 +77,13 @@ class TFBSPair():
 		self.distance = distance
 
 		#Calculate orientation scenario
-		if directional == True:
-			self.orientation = "TF1-TF2"
-			self.orientation = "TF2-TF1"
-			self.orientation = "divergent"
-			self.orientation = "convergent"
+		if self.site1.strand == self.site2.strand:
 
-		else:
-			if self.site1.strand == self.site2.strand:
+			if self.site1.strand == "+": #site2 strand is the same
+			self.orientation = "TF1-TF2"
+			elif self.site1.strand == "-":
+			self.orientation = "TF2-TF1"
+			elif self.site1.strand == ".":
 				self.orientation = "same"
 			
 			else:
@@ -107,8 +106,20 @@ class TFBSPair():
 						self.orientation = "NA"
 				
 				else: #both positions are + or -
-					self.orientation = "opposite"
+				
+				if self.site1.strand == "+" and self.site2.strand == "-":
+					self.orientation = "convergent"
+				elif self.site1.strand == "-" and self.site2.strand == "+":
+					self.orientation = "divergent"
+
+		#Simplify orientation if directional = False
+		if directional == False:
+			translation_dict = {"convergent": "opposite", 
+								"divergent": "opposite", 
+								"TF1-TF2": "same",
+								"TF2-TF1": "same"}
 					
+			self.orientation = translation_dict.get(self.orientation, self.orientation) #translate if possible
 
 	def __str__(self):
 		TFBS1 = ",".join([str(getattr(self.site1, col)) for col in ["chrom", "start", "end", "name", "score", "strand"]])
