@@ -80,33 +80,33 @@ class TFBSPair():
 		if self.site1.strand == self.site2.strand:
 
 			if self.site1.strand == "+": #site2 strand is the same
-			self.orientation = "TF1-TF2"
+				self.orientation = "TF1-TF2"
 			elif self.site1.strand == "-":
-			self.orientation = "TF2-TF1"
+				self.orientation = "TF2-TF1"
 			elif self.site1.strand == ".":
-				self.orientation = "same"
+				self.orientation = "NA" #no orientation applicable
 			
-			else:
+		else: #Strands are different
 
-				#Calculate based on whether site1/site2 is stranded
-				if self.site1.strand not in ["+","-"]:
-					if self.site2.strand == "+":
-						self.orientation = "away"
-					elif self.site2.strand == "-":
-						self.orientation = "towards"
-					else:
-						self.orientation = "NA"
-					
-				elif self.site2.strand not in ["+", "-"]:
-					if self.site1.strand == "+":
-						self.orientation = "towards"
-					elif self.site1.strand == "-":
-						self.orientation = "away"
-					else:
-						self.orientation = "NA"
+			#Calculate based on whether site1/site2 is stranded
+			if self.site1.strand not in ["+","-"]:
+				if self.site2.strand == "+":
+					self.orientation = "away"
+				elif self.site2.strand == "-":
+					self.orientation = "towards"
+				else:
+					self.orientation = "NA"
 				
-				else: #both positions are + or -
-				
+			elif self.site2.strand not in ["+", "-"]:
+				if self.site1.strand == "+":
+					self.orientation = "towards"
+				elif self.site1.strand == "-":
+					self.orientation = "away"
+				else:
+					self.orientation = "NA"
+			
+			else: #both positions are + or -
+			
 				if self.site1.strand == "+" and self.site2.strand == "-":
 					self.orientation = "convergent"
 				elif self.site1.strand == "-" and self.site2.strand == "+":
