@@ -318,11 +318,11 @@ class TFBSPairList(list):
 				row[site1], row[site2] = row[site2].values, row[site1].values
 				
 				# compute relative positions
-				row["site1_rel_start"] = row["window_end"] - row["site1_start"]
-				row["site1_rel_end"] = row["window_end"] - row["site1_end"]
+				row["site1_rel_start"] = row["window_end"] - row["site1_end"]
+				row["site1_rel_end"] = row["window_end"] - row["site1_start"]
 				
-				row["site2_rel_start"] = row["window_end"] - row["site2_start"]
-				row["site2_rel_end"] = row["window_end"] - row["site2_end"]
+				row["site2_rel_start"] = row["window_end"] - row["site2_end"]
+				row["site2_rel_end"] = row["window_end"] - row["site2_start"]
 			else:
 				# compute relative positions
 				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
@@ -344,7 +344,7 @@ class TFBSPairList(list):
 		self._last_flank = flank
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, alpha=0.7, cmap="seismic"):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, alpha=0.7, cmap="seismic", show_diagonal=True):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -369,9 +369,11 @@ class TFBSPairList(list):
 			flank : int, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 			alpha : float, default 0.7
-				Alpha value for TF binding positions and center line.
+				Alpha value for diagonal lines, TF binding positions and center line.
 			cmap : matplotlib colormap name or object, or list of colors, default 'seismic'
 				Color palette used in the main heatmap. Forwarded to seaborn.heatmap(cmap)
+			show_diagonal : boolean, default True
+				Shows diagonal lines for identifying preference in binding distance.
 		
 		Returns:
 		----------
@@ -520,6 +522,43 @@ class TFBSPairList(list):
 					edgecolor=None,
 					lw=0
 				))
+
+		# diagonal binding lines
+		if show_diagonal:
+			linecolor="black"
+			linestyle="dotted"
+
+			# left
+			# start
+			plot.axline(
+				xy1=(pairs["site1_rel_start"].max(), 0),
+				xy2=(pairs["site1_rel_start"].min(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
+			# end
+			plot.axline(
+				xy1=(pairs["site1_rel_end"].max(), 0),
+				xy2=(pairs["site1_rel_end"].min(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
+
+			# right
+			# start
+			plot.axline(
+				xy1=(pairs["site2_rel_start"].min(), 0),
+				xy2=(pairs["site2_rel_start"].max(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
+			# end
+			plot.axline(
+				xy1=(pairs["site2_rel_end"].min(), 0),
+				xy2=(pairs["site2_rel_end"].max(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
 
 		# https://moonbooks.org/Articles/How-to-add-a-frame-to-a-seaborn-heatmap-figure-in-python-/
 		# make frame visible
