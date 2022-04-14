@@ -344,7 +344,7 @@ class TFBSPairList(list):
 		self._last_flank = flank
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, alpha=0.7, cmap="seismic"):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -368,6 +368,10 @@ class TFBSPairList(list):
 				Save plot to given file.
 			flank : int, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+			alpha : float, default 0.7
+				Alpha value for TF binding positions and center line.
+			cmap : matplotlib colormap name or object, or list of colors, default 'seismic'
+				Color palette used in the main heatmap. Forwarded to seaborn.heatmap(cmap)
 		
 		Returns:
 		----------
@@ -474,7 +478,7 @@ class TFBSPairList(list):
 		plot = sns.heatmap(scores, 
 						yticklabels=False,
 						xticklabels=False,
-						cmap="seismic",
+						cmap=cmap,#"seismic",
 						center=None if logNorm_cbar else 0,
 						cbar=True,
 						cbar_ax=heatmap_led,
@@ -489,7 +493,7 @@ class TFBSPairList(list):
 					ymin=0, ymax=len(scores),
 					linestyles="dashed",
 					color="black",
-					alpha=0.9 if logNorm_cbar else 0.2,
+					alpha=alpha,#0.9 if logNorm_cbar else 0.2,
 					linewidth=1)
 		# binding sites
 		if show_binding:
@@ -498,13 +502,13 @@ class TFBSPairList(list):
 						xmax=pairs["site1_rel_end"],
 						color="gray",
 						linewidth=0.1,
-						alpha=0.7 if logNorm_cbar else 0.2)
+						alpha=alpha)#0.7 if logNorm_cbar else 0.2)
 			plot.hlines(y=range(len(scores)),
 						xmin=pairs["site2_rel_start"],
 						xmax=pairs["site2_rel_end"],
 						color="gray",
 						linewidth=0.1,
-						alpha=0.7 if logNorm_cbar else 0.2)
+						alpha=alpha)#0.7 if logNorm_cbar else 0.2)
 
 		# https://moonbooks.org/Articles/How-to-add-a-frame-to-a-seaborn-heatmap-figure-in-python-/
 		# make frame visible
