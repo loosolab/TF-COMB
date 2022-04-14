@@ -478,7 +478,7 @@ class TFBSPairList(list):
 		plot = sns.heatmap(scores, 
 						yticklabels=False,
 						xticklabels=False,
-						cmap=cmap,#"seismic",
+						cmap=cmap,
 						center=None if logNorm_cbar else 0,
 						cbar=True,
 						cbar_ax=heatmap_led,
@@ -493,22 +493,33 @@ class TFBSPairList(list):
 					ymin=0, ymax=len(scores),
 					linestyles="dashed",
 					color="black",
-					alpha=alpha,#0.9 if logNorm_cbar else 0.2,
+					alpha=alpha,
 					linewidth=1)
+
 		# binding sites
 		if show_binding:
-			plot.hlines(y=range(len(scores)),
-						xmin=pairs["site1_rel_start"],
-						xmax=pairs["site1_rel_end"],
-						color="gray",
-						linewidth=0.1,
-						alpha=alpha)#0.7 if logNorm_cbar else 0.2)
-			plot.hlines(y=range(len(scores)),
-						xmin=pairs["site2_rel_start"],
-						xmax=pairs["site2_rel_end"],
-						color="gray",
-						linewidth=0.1,
-						alpha=alpha)#0.7 if logNorm_cbar else 0.2)
+			for y, (_, row) in enumerate(pairs.iterrows()):
+				# left sites
+				plot.add_patch(matplotlib.patches.Rectangle(
+					xy=(row["site1_rel_start"], y),
+					width=row["site1_rel_end"] - row["site1_rel_start"],
+					height=1,
+					alpha=alpha,
+					color="gray",
+					edgecolor=None,
+					lw=0
+				))
+
+				# right sites
+				plot.add_patch(matplotlib.patches.Rectangle(
+					xy=(row["site2_rel_start"], y),
+					width=row["site2_rel_end"] - row["site2_rel_start"],
+					height=1,
+					alpha=alpha,
+					color="gray",
+					edgecolor=None,
+					lw=0
+				))
 
 		# https://moonbooks.org/Articles/How-to-add-a-frame-to-a-seaborn-heatmap-figure-in-python-/
 		# make frame visible
