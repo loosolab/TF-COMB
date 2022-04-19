@@ -1942,13 +1942,13 @@ class DiffCombObj():
 		self.rules.fillna(0, inplace=True)
 		self.rules[nan_bool] = np.nan
 
-	def calculate_foldchanges(self, pseudo=None):
+	def calculate_foldchanges(self, pseudo=0.01):
 		""" Calculate measure foldchanges  between objects in DiffCombObj. The measure is chosen at the creation of the DiffCombObj and defaults to 'cosine'.
 		
 		Parameters
 		----------
 		pseudo : float, optional
-			Set the pseudocount to add to all values before log2-foldchange transformation. Default: None (pseudocount will be estimated per contrast).
+			Set the pseudocount to add to all values before log2-foldchange transformation. Default: 0.01.
 	
 		See also
 		--------
@@ -1970,12 +1970,6 @@ class DiffCombObj():
 
 			p1_values = self.rules[p1 + "_" + measure]
 			p2_values = self.rules[p2 + "_" + measure]
-
-			#Estimate pseudocount
-			if pseudo == None:
-				vals = self.rules[[p1 + "_" + measure, p2 + "_" + measure]].values.ravel()
-				pseudo = np.percentile(vals[vals>0], 25) #25th percentile of values >0
-				self.logger.debug("Pseudocount: {0}".format(pseudo))
 
 			ratio = (p1_values + pseudo) / (p2_values + pseudo)
 			ratio[ratio <= 0] = np.nan 
