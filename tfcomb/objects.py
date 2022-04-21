@@ -654,14 +654,13 @@ class CombObj():
 			if isinstance(regions, str):
 				regions = RegionList().from_bed(regions)
 			
-			#Create regions->sites dict
+			#Get indices of overlapping sites
 			n_TFBS = len(self.TFBS)
-			self.logger("Overlapping {0} TFBS with {1} regions".format(n_TFBS, len(regions)))
-			TFBS_in_regions = tfcomb.utils.assign_sites_to_regions(self.TFBS, regions)
-
-			#Merge across keys
-			self.TFBS = RegionList(sum([TFBS_in_regions[key] for key in TFBS_in_regions], []))
-			self.TFBS.loc_sort()
+			self.logger.info("Overlapping {0} TFBS with {1} regions".format(n_TFBS, len(regions)))
+			
+			TFBS_overlap_labeled = tfcomb.utils.add_region_overlap(self.TFBS, regions, att="overlap") #adds overlap boolean to TFBS
+			idx = [i for i, site in enumerate(TFBS_overlap_labeled) if site.overlap == True]
+			self.TFBS = RegionList([self.TFBS[i] for i in idx])
 		
 		elif names is not None:
 			tfcomb.utils.check_type(names, [list, set, tuple], "names")
@@ -2143,8 +2142,10 @@ class DiffCombObj():
 		data = self.rules[cols]
 		g = sns.clustermap(data, xticklabels=True, **kwargs)
 
-		#tfcomb.plotting.heatmap()
+		#Rotate labels
+		_ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", size=15) # For x axis
 
+		return(g)
 
 	#todo: plot_contrast heatmap
 	def plot_heatmap(self, contrast=None, 
