@@ -75,7 +75,10 @@ setup(name='TF-COMB',
 			'goatools',
 			'uropa',
 			'qnorm',
-			'dill'
+			'dill',
+			'seaborn',
+			'tqdm',
+			'IPython'
 		],
 		classifiers=[
 			'License :: OSI Approved :: MIT License',

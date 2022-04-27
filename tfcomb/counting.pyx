@@ -164,8 +164,10 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 						
 					#Calculate distance between the two sites
 					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-					if distance < 0:
-						distance = 0 #cap any negative distances to 0
+					
+					if task == 1:
+						if distance < 0:
+							distance = 0 #cap any negative distances to 0 (overlapping is dist 0)
 
 					#Check if distance is valid:
 					if distance <= max_distance:

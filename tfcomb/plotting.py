@@ -12,12 +12,19 @@ from adjustText import adjust_text
 import copy
 import distutils
 from distutils import util
+import sys
 
 import tfcomb
 from tfcomb.utils import check_columns, check_type, check_string, check_value, random_string
 from tfcomb.logging import TFcombLogger, InputError
 import tobias
 
+# fix 'dot' not found error
+# only if conda is found
+# https://stackoverflow.com/a/51267131
+if os.path.exists(os.path.join(sys.prefix, 'conda-meta')):
+	# add install path of active conda bin
+	os.environ["PATH"] += os.pathsep + os.path.join(sys.prefix, 'bin')
 
 def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by="lift", figsize=(7,4), save=None):
 	""" 
@@ -288,10 +295,14 @@ def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9
 		The name of a column in table containing x coordinates.
 	y : str
 		The name of a column in table containing y cooordinates.
-	label : str
-		Name of column or "index" containing labels to plot.
 	ax : plt axes
-
+		Axes to plot texts on.
+	color : str, optional
+		Color of label text. Default: "black".
+	label_col : str, optional
+		Name of column containing labels to plot. Default: None (label is table index)
+	label_fontsize : str, optional
+		Size of labels. Default: 9.
 
 	Returns 
 	--------
@@ -299,11 +310,19 @@ def _add_labels(table, x, y, ax, color="black", label_col=None, label_fontsize=9
 		The labels are added to ax in place
 	"""
 
+	#Check if columns are in table
+	tfcomb.utils.check_columns(table, [x,y,label_col]) #label_col is not checked if it is None
+
+	#Add texts
 	txts = []
 	for label, row in table.iterrows():
 		coord = (row[x], row[y])
+
+		if label_col != None:
+			label = row[label_col]
+
 		txts.append(ax.text(coord[0], coord[1], label, fontsize=label_fontsize, color=color))
-	
+
 	return(txts)
 
 
@@ -582,7 +601,11 @@ def network(network,
 
 	#Check if engine is within graphviz
 	if engine not in graphviz.ENGINES:
-		raise InputError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
+		raise ValueError("The given engine '{0}' is not in graphviz available engines: {1}".format(engine, graphviz.ENGINES))
+
+	# Check number of edges
+	if len(network.edges) > 10000:
+		logger.warning(f"Detected more than 10.000 edges ({len(network.edges)}). This can result in issues when using jupyter.")
 	
 	#todo: check size with re
 	
