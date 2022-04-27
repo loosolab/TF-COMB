@@ -2130,7 +2130,7 @@ class DiffCombObj():
 		_ = plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", size=15) # For x axis
 
 		if save is not None:
-			plt.savefig(save, dpi=600)
+			plt.savefig(save, dpi=600, bbox_inches="tight")
 
 		return(g)
 
