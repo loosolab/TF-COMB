@@ -135,8 +135,6 @@ class CombObj():
 		counts = {r.name: "" for r in combined.TFBS}
 		combined.TF_names = sorted(list(set(counts.keys()))) #ensures that the same TF order is used across cores/subsets		
 
-		combined._prepare_TFBS() #fill in _sites
-
 		return(combined)
 	
 	def copy(self):
@@ -434,8 +432,6 @@ class CombObj():
 		if resolve_overlapping != "off":
 			TFBS = tfcomb.utils.resolve_overlaps(TFBS, how=resolve_overlapping)
 
-		self._prepare_TFBS()
-
 		#Final info log
 		self.logger.info("Identified {0} TFBS ({1} unique names) within given regions".format(len(TFBS), len(TF_names)))
 		if initialized == 0: #if sites were added, log the updated
@@ -479,8 +475,6 @@ class CombObj():
 		self.TFBS.loc_sort()
 		read_TF_names = unique_region_names(read_TFBS)
 		self.TF_names = sorted(list(set(self.TF_names + read_TF_names)))
-
-		self._prepare_TFBS()
 
 		#Final info log
 		self.logger.info("Read {0} sites ({1} unique names)".format(len(read_TFBS), len(read_TF_names)))
@@ -547,8 +541,6 @@ class CombObj():
 		self.TFBS.loc_sort()
 		read_TF_names = unique_region_names(TFBS)
 		self.TF_names = sorted(list(set(self.TF_names + read_TF_names)))
-
-		self._prepare_TFBS()
 
 		self.logger.info("Read {0} sites ({1} unique names) from condition '{2}'".format(len(TFBS), len(read_TF_names), condition))
 		if initialized == 0:
@@ -618,8 +610,6 @@ class CombObj():
 		self.TF_names = unique_region_names(self.TFBS)	#unique names after clustering
 		n_names_clustered = len(self.TF_names)
 
-		self._prepare_TFBS()
-
 		self.logger.info("TFBS were clustered from {0} to {1} unique names. The new TF names can be seen in <CombObj>.TFBS and <CombObj>.TF_names.",format(n_names_orig, n_names_clustered))
 
 
@@ -679,8 +669,6 @@ class CombObj():
 			self.TFBS = RegionList([site for site in self.TFBS if site.name in in_TFBS])
 			self.TF_names = unique_region_names(self.TFBS)	#unique names after clustering
 
-		self._prepare_TFBS()
-
 		self.logger.info("Subset finished! The attribute .TFBS now contains {0} sites.".format(len(self.TFBS)))
 
 	def TFBS_to_bed(self, path):
@@ -703,13 +691,27 @@ class CombObj():
 		f.write(s)
 		f.close()
 
-	def _prepare_TFBS(self):
-		""" Prepare the TFBS for internal counting within count_within. Sets the internal ._sites attribute. """
+	def _prepare_TFBS(self, force=False):
+		""" 
+			Prepare the TFBS for internal counting within count_within. Sets the internal ._sites attribute. 
+			Checks the existence and correct length of _sites, and only creates it if not already saved. Set 'force' to True to force recalculation.
+		"""
 
-		chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
-		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
-		name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)} 
-		self._sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, name_to_idx[site.name]) for site in self.TFBS]) #numpy integer array
+		#Find out if _sites should be set
+		create = 1
+		if hasattr(self, "_sites"):
+			if len(self.TFBS) == len(self._sites):
+				create = 0
+			else:
+				self.debug("Length of .TFBS ({0}) is different than existing ._sites ({1}) attribute. Recreating _sites.".format(len(self.TFBS), len(self._sites)))	
+
+		if create == 1 or force == True or not hasattr(self, "name_to_idx"):
+
+			self.logger.info("Setting up binding sites for counting")
+			chromosomes = {site.chrom:"" for site in self.TFBS}.keys()
+			chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
+			self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
+			self._sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) for site in self.TFBS]) #numpy integer array
 
 	#-------------------------------------------------------------------------------------------------------------#
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
@@ -774,7 +776,8 @@ class CombObj():
 		tfcomb.utils.check_type(binarize, bool, "binarize")
 		tfcomb.utils.check_string(anchor, list(anchor_str_to_int.keys()), "anchor")
 
-		self.logger.info("Setting up binding sites for counting")
+		#Prepare TFBS in the correct format
+		self._prepare_TFBS()
 		sites = self._sites #sites still points to ._sites
 
 		#Should strand be taken into account?
@@ -1071,7 +1074,7 @@ class CombObj():
 
 			#Get names from rules
 			self.logger.debug("Getting names")
-			selected_names = list(set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()))
+			selected_names = set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()) #check against set is faster than list
 
 			#Subset TFBS
 			self.logger.debug("Setting TFBS in new object")
@@ -2450,6 +2453,16 @@ class DistObj():
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
 		self._XLBL_FONTSIZE = 10    # label fontsize adjustment for plotting x labels
 
+		#Use functions from CombObj
+		self._set_combobj_functions()
+
+	def _set_combobj_functions(self):
+		""" Reuse CombObj functions"""
+
+		self.copy = lambda : CombObj.copy(self)
+		self.set_verbosity = lambda *args, **kwargs: CombObj.set_verbosity(self, *args, **kwargs)
+		self._prepare_TFBS = lambda *args, **kwargs: CombObj._prepare_TFBS(self, *args, **kwargs)
+
 	def __str__(self):
 		""" Returns a string representation of the DistObj depending on what variables are already stored """
 		
@@ -2516,6 +2529,11 @@ class DistObj():
 		self.TF_names = comb_obj.TF_names
 		self.TFBS = comb_obj.TFBS
 		self.TF_table = comb_obj.TF_table
+
+		#Copy internal _sites (integer representation of TFBS) and name_to_idx for name translation
+		for attr in ["name_to_idx", "_sites"]:
+			if hasattr(comb_obj, attr):
+				setattr(self, attr, getattr(comb_obj, attr))
 
 		# copy parameters and set default values
 		if hasattr(comb_obj, 'min_distance'):
@@ -2836,25 +2854,32 @@ class DistObj():
 
 		self.logger.info("Preparing to count distances.")
 
+		# encode chromosome,pairs and name to int representation
+		self._prepare_TFBS() #prepare _sites and name_to_idx dict
+		sites = self._sites
+		
 		#Should strand be taken into account?
-		TFBS = copy.deepcopy(self.TFBS)
 		if stranded == True:
-			for site in TFBS:
-				site.name = "{0}({1})".format(site.name, site.strand)
-			TF_names = unique_region_names(TFBS)
+			sites = self._sites.copy() #don't change self._sites
+
+			name_to_idx = {}
+			TF_names = [] #names in order of idx
+			current_idx = -1
+
+			for i, site in enumerate(self.TFBS):
+				name = "{0}({1})".format(site.name, site.strand)
+				if name not in name_to_idx:
+					TF_names.append(name)
+					current_idx = current_idx + 1
+					name_to_idx[name] = current_idx
+				sites[0][-1] = name_to_idx[name] #set new idx based on stranded name
 		else:
-			TFBS = self.TFBS
 			TF_names = self.TF_names
+			name_to_idx = self.name_to_idx
+
+		self.pairs = [(self.name_to_idx[TF1], self.name_to_idx[TF2]) for (TF1, TF2) in self.rules[["TF1", "TF2"]].values]	#list of TF1/TF rules to count distances for
 		self.logger.spam("TF_names: {0}".format(TF_names))
 
-		# encode chromosome,pairs and name to int representation
-		chromosomes = {site.chrom: "" for site in self.TFBS}.keys()
-		chrom_to_idx = {chrom: idx for idx, chrom in enumerate(chromosomes)}
-		self.name_to_idx = {name: idx for idx, name in enumerate(TF_names)}
-
-		sites = [(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) for site in TFBS] #numpy integer array
-		self.pairs = [(self.name_to_idx[TF1], self.name_to_idx[TF2]) for (TF1, TF2) in self.rules[["TF1", "TF2"]].values] #list of TF1/TF rules to count distances for
-		
 		#Sort sites by mid if anchor == 2 (center):
 		if self.anchor_mode == 2: 
 			sites = sorted(sites, key=lambda site: int((site[1] + site[2]) / 2))
