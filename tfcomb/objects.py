@@ -1112,7 +1112,7 @@ class CombObj():
 
 		self.rules = sub_rules #overwrite .rules with simplified rules
 		
-	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True):
+	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True, inplace=False):
 		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
 		
 		Parameters
@@ -1125,6 +1125,8 @@ class CombObj():
 			Whether to subset the rules containing 'TF_list' TFs within "TF2". Default: True.
 		reduce_TFBS : bool, optional
 			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
+		inplace : bool, optional
+			Whether to make selection on current CombObj. If False, 
 
 		Raises
 		--------
@@ -1133,8 +1135,10 @@ class CombObj():
 
 		Returns
 		--------
-		tfcomb.objects.CombObj()
+		If inplace == False; tfcomb.objects.CombObj()
 			An object containing a subset of <Combobj>.rules.
+		if inplace == True; 
+			Returns None
 		"""
 
 		#Check input
@@ -1180,7 +1184,18 @@ class CombObj():
 
 		self.logger.info("Selected {0} rules".format(len(selected)))
 
-		#Create new object with selected rules
+		#Create new object with selected rules (or filter current object)
+		if inplace == True:
+			self.rules = selected
+			self.network = None
+
+			#Reduce the TFBS and TF_names
+			if reduce_TFBS == True:
+				self.reduce_TFBS()
+
+			return(None)
+
+		else: #create copy of object
 		self.logger.info("Creating subset of object")
 		new_obj = self.copy()
 		new_obj.rules = selected
