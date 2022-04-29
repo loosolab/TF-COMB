@@ -138,6 +138,7 @@ class TFBSPairList(list):
 	_bigwig_path = None
 	_plotting_tables = None
 	_last_flank = None
+	_last_align = None
 	
 	def as_table(self):
 		""" Table representation of the pairs in the list """
@@ -371,9 +372,10 @@ class TFBSPairList(list):
 		scores = scores.loc[sorted_pairs.index]
 
 		self._last_flank = flank
+		self._last_align = align
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, alpha=0.7, cmap="seismic", show_diagonal=True):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -397,6 +399,8 @@ class TFBSPairList(list):
 				Save plot to given file.
 			flank : int, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+			align : str, default None
+				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
 			alpha : float, default 0.7
 				Alpha value for diagonal lines, TF binding positions and center line.
 			cmap : matplotlib colormap name or object, or list of colors, default 'seismic'
@@ -423,8 +427,12 @@ class TFBSPairList(list):
 		fig = plt.figure(figsize=figsize)
 
 		# compute plotting tables with custom flank
-		if not flank is None and flank != self._last_flank:
-			self.comp_plotting_tables(flank=flank)
+		if not flank is None and flank != self._last_flank or not align is None and align != self._last_align:
+			params = {}
+			if flank: params["flank"] = flank
+			if align: params["align"] = align
+
+			self.comp_plotting_tables(**params)
 
 		# load data
 		pairs, scores = self.plotting_tables
