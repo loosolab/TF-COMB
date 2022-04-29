@@ -287,14 +287,20 @@ class TFBSPairList(list):
 
 		Parameter:
 		------------
-		flank : int, default 100
-			Window size of TFBSpair. Adds given amount of bases in both directions counted from alignment anchor (see align) between binding sites.
+		flank : int or tuple, default 100
+			Window size of TFBSpair. Adds given amount of bases in both directions counted from alignment anchor (see align) between binding sites. Use a tuple of ints to set left and right flank independently.
 		align : str, default 'center'
 			Position from which the flanking regions are added. Must be one of 'center', 'left', 'right'.
 				'center': Midpoint between binding positions (rounded down if uneven).
-				'left': End of first binding position in pair.
-				'right': Start of second binding position in pair.
+				'left': Start of first binding position in pair.
+				'right': End of second binding position in pair.
 		"""
+		if align not in ["center", "left", "right"]:
+			raise ValueError(f"Parameter 'align' has to be one of ['center', 'left', 'right']. Got '{align}'.")
+
+		# flank tuple
+		if not isinstance(flank, tuple):
+			flank = (flank, flank)
 
 		# load bigwig file
 		signal_bigwig = pyBigWig.open(self.bigwig_path)
@@ -302,28 +308,23 @@ class TFBSPairList(list):
 		# get pairs as table & sort by distance
 		pairs = self.as_table().sort_values(by='site_distance')
 
-		# compute alignment center point between binding pair
-		if align == "center":
-			pairs["center"] = (pairs["site1_end"] + round(pairs["site_distance"] / 2)).astype(int)
-		elif align == "left":
-			pairs["center"] = pairs["site1_end"]
-		elif align == "right":
-			pairs["center"] = pairs["site2_start"]
-		else:
-			raise ValueError(f"Parameter 'align' has to be one of ['center', 'left', 'right']. Got '{align}'.")
-
-		pairs["window_start"] = pairs["center"] - flank
-		pairs["window_end"] = pairs["center"] + flank
-
 		scores = []
 		sorted_pairs = []
 
 		for (index, row) in pairs.iterrows():
-			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
-			
+			# compute positioning
 			if row["site1_name"] < row["site2_name"]:
-				values.reverse()
-				
+				# compute center and flanks
+				if align == "center":
+					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
+				elif align == "left":
+					row["center"] = row["site2_end"]
+				elif align == "right":
+					row["center"] = row["site1_start"]
+
+				row["window_start"] = row["center"] - flank[1]
+				row["window_end"] = row["center"] + flank[0]
+
 				# switch pair
 				site1 = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand"]
 				site2 = ["site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand"]
@@ -336,12 +337,28 @@ class TFBSPairList(list):
 				row["site2_rel_start"] = row["window_end"] - row["site2_end"]
 				row["site2_rel_end"] = row["window_end"] - row["site2_start"]
 			else:
+				# compute center and flanks
+				if align == "center":
+					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
+				elif align == "left":
+					row["center"] = row["site1_start"]
+				elif align == "right":
+					row["center"] = row["site2_end"]
+
+				row["window_start"] = row["center"] - flank[0]
+				row["window_end"] = row["center"] + flank[1]
+
 				# compute relative positions
 				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
 				row["site1_rel_end"] = row["site1_end"] - row["window_start"]
 				
 				row["site2_rel_start"] = row["site2_start"] - row["window_start"]
 				row["site2_rel_end"] = row["site2_end"] - row["window_start"]
+
+			# get scores
+			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
+			if row["site1_name"] < row["site2_name"]:
+				values.reverse()
 
 			sorted_pairs.append(row)
 			scores.append(values)
