@@ -281,14 +281,19 @@ class TFBSPairList(list):
 			self.comp_plotting_tables()
 		return self._plotting_tables
 
-	def comp_plotting_tables(self, flank=100):
+	def comp_plotting_tables(self, flank=100, align="center"):
 		"""
 		Prepare pair and score tables for plotting.
 
 		Parameter:
 		------------
 		flank : int, default 100
-			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites.
+			Window size of TFBSpair. Adds given amount of bases in both directions counted from alignment anchor (see align) between binding sites.
+		align : str, default 'center'
+			Position from which the flanking regions are added. Must be one of 'center', 'left', 'right'.
+				'center': Midpoint between binding positions (rounded down if uneven).
+				'left': End of first binding position in pair.
+				'right': Start of second binding position in pair.
 		"""
 
 		# load bigwig file
@@ -297,8 +302,15 @@ class TFBSPairList(list):
 		# get pairs as table & sort by distance
 		pairs = self.as_table().sort_values(by='site_distance')
 
-		# compute center point between binding pair
-		pairs["center"] = (pairs["site1_end"] + round(pairs["site_distance"] / 2)).astype(int)
+		# compute alignment center point between binding pair
+		if align == "center":
+			pairs["center"] = (pairs["site1_end"] + round(pairs["site_distance"] / 2)).astype(int)
+		elif align == "left":
+			pairs["center"] = pairs["site1_end"]
+		elif align == "right":
+			pairs["center"] = pairs["site2_start"]
+		else:
+			raise ValueError(f"Parameter 'align' has to be one of ['center', 'left', 'right']. Got '{align}'.")
 
 		pairs["window_start"] = pairs["center"] - flank
 		pairs["window_end"] = pairs["center"] + flank
