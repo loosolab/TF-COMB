@@ -528,7 +528,14 @@ class TFBSPairList(list):
 		heatmap.set_title(f"{name1} <-> {name2}")
 
 		# center line
-		plot.vlines(x=len(scores.columns)/2,
+		if self._last_align == "center":
+			pos = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
+		elif self._last_align == "left":
+			pos = pairs["site1_rel_end"][0]
+		elif self._last_align == "right":
+			pos = pairs["site2_rel_start"][0]
+
+		plot.vlines(x=pos,
 					ymin=0, ymax=len(scores),
 					linestyles="dashed",
 					color="black",
