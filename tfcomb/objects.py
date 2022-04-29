@@ -91,6 +91,8 @@ class CombObj():
 		self.rules = None  		 #filled in by .market_basket()
 		self.network = None		 #filled by .build_network()
 
+		self.anchor_to_int = {"inner": 0, "outer": 1, "center": 2}
+
 		#Variable for storing DistObj for distance analysis
 		self.distObj = None
 
@@ -714,12 +716,33 @@ class CombObj():
 			self.name_to_idx = {name: idx for idx, name in enumerate(self.TF_names)}
 			self._sites = np.array([(chrom_to_idx[site.chrom], site.start, site.end, self.name_to_idx[site.name]) for site in self.TFBS]) #numpy integer array
 
+	@staticmethod
+	def _get_sort_idx(sites, anchor="center"):
+		""" Get indices for sorting sites (from _prepare_TFBS) depending on anchor.
+		
+		Parameters
+		-----------
+		sites : np.array
+			The ._sites array prepared by _prepare_TFBS.
+		anchor : str
+			The anchor for calculating distances. One of "inner", "outer" or "center". Default: "center".
+		"""
+		
+		if anchor == "center":
+			sort_idx = [i for i, _ in sorted(enumerate(sites), key=lambda tup: (tup[1][0], int((tup[1][1] + tup[1][2]) / 2)))]
+		
+		elif anchor == "inner" or anchor == "outer":
+			sort_idx = [i for i, _ in sorted(enumerate(sites), key=lambda tup: (tup[1][0], tup[1][1], tup[1][2]))]
+
+		return sort_idx
+
 	#-------------------------------------------------------------------------------------------------------------#
 	#----------------------------------------- Counting co-occurrences -------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 
 	def count_within(self, min_dist=0, 
 						   max_dist=100, 
+						   min_overlap=0,
 						   max_overlap=0, 
 						   stranded=False, 
 						   directional=False, 
@@ -737,7 +760,9 @@ class CombObj():
 			Minimum distance between two TFBS to be counted as co-occurring. Distances are calculated depending on the 'anchor' given. Default: 0.
 		max_dist : int
 			Maximum distance between two TFBS to be counted as co-occurring. Distances are calculated depending on the 'anchor' given. Default: 100.
-		max_overlap : float between 0-1
+		min_overlap : float between 0-1, optional
+			Minimum overlap fraction needed between sites, e.g. 0 = no overlap needed, 1 = full overlap needed. Default: 0.
+		max_overlap : float between 0-1, optional
 			Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
 			Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
 		stranded : bool
@@ -771,11 +796,24 @@ class CombObj():
 		self._check_TFBS()
 		tfcomb.utils.check_value(min_dist, vmin=0, integer=True, name="min_dist")
 		tfcomb.utils.check_value(max_dist, vmin=min_dist, integer=True, name="max_dist")
+		tfcomb.utils.check_value(min_overlap, vmin=0, vmax=1, name="min_overlap")
 		tfcomb.utils.check_value(max_overlap, vmin=0, vmax=1, name="max_overlap")
 		tfcomb.utils.check_type(stranded, bool, "stranded")
 		tfcomb.utils.check_type(directional, bool, "directional")
 		tfcomb.utils.check_type(binarize, bool, "binarize")
 		tfcomb.utils.check_string(anchor, list(anchor_str_to_int.keys()), "anchor")
+
+		#Update object variables
+		self.rules = None 	#Remove .rules if market_basket() was previously run
+		self.n_TFBS = len(self.TFBS)	#number of TFBS counted
+		self.min_dist = min_dist
+		self.max_dist = max_dist
+		self.min_overlap = min_overlap
+		self.max_overlap = max_overlap
+		self.stranded = stranded
+		self.directional = directional
+		self.binarize = binarize
+		self.anchor = anchor
 
 		#Prepare TFBS in the correct format
 		self._prepare_TFBS()
@@ -802,18 +840,20 @@ class CombObj():
 
 		#Sort sites by mid if anchor is center:
 		if anchor == "center": 
-			sites = np.array(sorted(sites, key=lambda site: int((site[1] + site[2]) / 2)))
+			sort_idx = self._get_sort_idx(sites, anchor="center")
+			sites = sites[sort_idx, :]
 
 		#---------- Count co-occurrences within TFBS ---------#
 		self.logger.info("Counting co-occurrences within sites")
-		n_TFs = len(TF_names)
+		n_names = len(TF_names)
 		anchor_int = anchor_str_to_int[anchor]
-		TF_counts, pair_counts = count_co_occurrence(sites, min_dist,
-															max_dist,
-															max_overlap, 
-															binarize,
-															anchor_int,
-															n_TFs)
+		TF_counts, pair_counts = count_co_occurrence(sites, min_dist=min_dist,
+															max_dist=max_dist,
+															min_overlap=min_overlap,
+															max_overlap=max_overlap, 
+															binarize=binarize,
+															anchor=anchor_int,
+															n_names=n_names)
 		pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
 
 		self.count_names = TF_names #this can be different from TF_names if stranded == True
@@ -823,7 +863,11 @@ class CombObj():
 		#---------- Count co-occurrences within shuffled background ---------#
 		if n_background > 0:
 			self.logger.info("Counting co-occurrence within background")
-			args = (min_dist, max_dist,	max_overlap, binarize, anchor_int, n_TFs, directional)
+			parameters = ["min_dist", "max_dist", "min_overlap", "max_overlap", "binarize"]
+			kwargs = {param: getattr(self, param) for param in parameters}
+			kwargs.update({"sites": sites, "seed": i, "directional": directional})
+			kwargs["anchor"] = anchor_int
+			kwargs["n_names"] = n_names #this is not necessarily the length of self.TF_names!
 
 			#setup multiprocessing
 			if threads == 1:
@@ -832,8 +876,8 @@ class CombObj():
 				self.logger.info("Running with multiprocessing threads == 1. To change this, give 'threads' in the parameter of the function.")
 				p = Progress(n_background, 10, self.logger) #Setup progress object
 				for i in range(n_background):
-					all_args = (sites,) + args + (i,)
-					l.append(tfcomb.utils.calculate_background(*all_args))
+					kwargs.update({"seed": i})
+					l.append(tfcomb.utils.calculate_background(**kwargs))
 					p.write_progress(i)
 
 			else:
@@ -844,8 +888,8 @@ class CombObj():
 				jobs = []
 				for i in range(n_background):
 					self.logger.spam("Adding job for i = {0}".format(i))
-					all_args = (sites,) + args + (i,)
-					job = pool.apply_async(tfcomb.utils.calculate_background, all_args)
+					kwargs.update({"seed": i})
+					job = pool.apply_async(tfcomb.utils.calculate_background, **kwargs)
 					jobs.append(job)
 				pool.close()
 				
@@ -871,19 +915,9 @@ class CombObj():
 		else:
 			self.logger.info("n_background is set to 0; z-score calculation will be skipped")
 
-		#Update object variables
-		self.rules = None 	#Remove .rules if market_basket() was previously run
-		self.n_TFBS = len(self.TFBS)	#number of TFBS counted
-		self.min_dist = min_dist
-		self.max_dist = max_dist
-		self.stranded = stranded
-		self.directional = directional
-		self.max_overlap = max_overlap
-		self.anchor = anchor
-
 		self.logger.info("Done finding co-occurrences! Run .market_basket() to estimate significant pairs")
 
-	def get_pair_locations(self, TF1, TF2, 
+	def get_pair_locations(self, pair, 
 								 TF1_strand = None, 
 								 TF2_strand = None, 
 								 save = None,
@@ -896,10 +930,8 @@ class CombObj():
 		
 		Parameters
 		----------
-		TF1 : str 
-			Name of TF1 in pair.
-		TF2 : str 
-			Name of TF2 in pair.
+		pair : tuple
+			Name of TF1, TF2 in pair.
 		TF1_strand : str, optional
 			Strand of TF1 in pair. Default: None (strand is not taken into account).
 		TF2_strand : str, optional
@@ -924,21 +956,62 @@ class CombObj():
 		
 		#Check input parameters
 		self._check_TFBS()
+		self._prepare_TFBS() #prepare TFBS sites if not already existing
 		self.logger.debug("kwargs given in function: {0}".format(kwargs))
 
 		#If not set, fill in kwargs with internal arguments set by count_within()
-		attributes = ["min_dist", "max_dist", "directional", "max_overlap", "anchor"]
+		attributes = ["min_dist", "max_dist", "directional", "min_overlap", "max_overlap", "anchor"]
 		for att in attributes:
 			if hasattr(self, att):
 				if not att in kwargs:
 					kwargs[att] = getattr(self, att)
 		self.logger.debug("kwargs for get_pair_locations: {0}".format(kwargs))	
 
-		#Get locations via utils function
-		locations = tfcomb.utils.get_pair_locations(self.TFBS, TF1, TF2, TF1_strand, TF2_strand, **kwargs)
+		TF1, TF2 = pair
+		TF1_int = self.name_to_idx[TF1]
+		TF2_int = self.name_to_idx[TF2]
+		anchor_string = kwargs["anchor"]
+		
+		#Sort sites based on the anchor position
+		sites = self._sites
+		sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
+		idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
+		sites = sites[sort_idx, :]
 
-		if save is not None:
-			locations.write_bed(outfile=save, fmt=fmt)
+		#Get locations via counting function
+		kwargs["anchor"] = self.anchor_to_int[kwargs["anchor"]] #convert anchor string to int
+		idx_mat = tfcomb.counting.count_co_occurrence(sites, task=3, rules=[(TF1_int, TF2_int)], **kwargs)
+		n_locations = idx_mat.shape[0]
+
+		#Fetch locations from TFBS list
+		locations = tfcomb.utils.TFBSPairList([None]*n_locations)
+		#TFBS_sorted = [self.TFBS[i] for i in sort_idx]
+		for i in range(n_locations):
+
+			site1_idx = idx_mat[i, 0] #location in sorted sites
+			site1_idx = idx_to_original[site1_idx] #original idx in self.TFBS (before sorting)
+
+			site2_idx = idx_mat[i, 1]
+			site2_idx = idx_to_original[site2_idx]
+
+			#Fetch locations in .TFBS
+			site1 = self.TFBS[site1_idx]
+			site2 = self.TFBS[site2_idx]
+			locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string)
+
+		#Check strandedness
+		if TF1_strand != None or TF2_strand != None:
+			drop = [] #collect indices to drop from locations
+			for i, pair in enumerate(locations):
+				
+				if TF1_strand != None and ((pair[0].name == TF1 and pair[0].strand != TF1_strand) or (pair[1].name == TF1 and pair[1].strand != TF1_strand)):
+					drop.append(i)
+
+				if TF2_strand != None and ((pair[0].name == TF2 and pair[0].strand != TF2_strand) or (pair[1].name == TF2 and pair[1].strand != TF2_strand)):	 
+					drop.append(i)
+
+			drop = set(drop) #remove any duplicate indices
+			locations = tfcomb.utils.TFBSPairList([pair for i, pair in enumerate(locations) if i not in drop])
 
 		return(locations)
 
@@ -983,7 +1056,8 @@ class CombObj():
 		#Check that TF counts are available; otherwise calculate counts
 		try:
 			self._check_counts()
-		except InputError:
+		except InputError as e:
+			print(e)
 			self.logger.warning("No counts found in <CombObj>. Running <CombObj>.count_within() with standard parameters.")
 			self.count_within(threads=threads)
 
@@ -1196,16 +1270,16 @@ class CombObj():
 			return(None)
 
 		else: #create copy of object
-		self.logger.info("Creating subset of object")
-		new_obj = self.copy()
-		new_obj.rules = selected
-		new_obj.network = None
+			self.logger.info("Creating subset of object")
+			new_obj = self.copy()
+			new_obj.rules = selected
+			new_obj.network = None
 
-		#Reduce the TFBS and TF_names
-		if reduce_TFBS == True:
-			new_obj.reduce_TFBS()
+			#Reduce the TFBS and TF_names
+			if reduce_TFBS == True:
+				new_obj.reduce_TFBS()
 		
-		return(new_obj)
+			return(new_obj)
 	
 	def select_custom_rules(self, custom_list, reduce_TFBS=True):
 		""" Select rules based on a custom list of TF pairs. 
@@ -2477,6 +2551,7 @@ class DistObj():
 		self.copy = lambda : CombObj.copy(self)
 		self.set_verbosity = lambda *args, **kwargs: CombObj.set_verbosity(self, *args, **kwargs)
 		self._prepare_TFBS = lambda *args, **kwargs: CombObj._prepare_TFBS(self, *args, **kwargs)
+		self._get_sort_idx = lambda *args, **kwargs: CombObj._get_sort_idx(*args, **kwargs)
 
 	def __str__(self):
 		""" Returns a string representation of the DistObj depending on what variables are already stored """
@@ -2551,7 +2626,7 @@ class DistObj():
 		self.TF_table = comb_obj.TF_table
 
 		# Overwrite default parameters with values from CombObj
-		variables = ["min_dist", "max_dist", "max_overlap", "directional", "stranded", "anchor"]
+		variables = ["min_dist", "max_dist", "min_overlap", "max_overlap", "directional", "stranded", "anchor"]
 		for variable in variables:
 			if hasattr(comb_obj, variable):
 				setattr(self, variable, getattr(comb_obj, variable))
@@ -2774,19 +2849,22 @@ class DistObj():
 	#---------------------------- Counting distances between TFs -------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def count_distances(self, directional=None, stranded=None):
+	def count_distances(self, directional=None, stranded=None, percentage=False, percentage_bins=100):
 		""" Count distances for co_occurring TFs, can be followed by analyze_distances
 			to determine preferred binding distances
 
 		Parameters
 		----------
-		directional : bool or None
+		directional : bool or None, optional
 			Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
 			TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). If directional is None, self.directional will be used.
 			Default: None.
-		stranded : bool or None
+		stranded : bool or None, optional
 			Whether to take strand of TFBS into account when counting distances. If stranded is None, self.stranded will be used. 
 			Default: None
+		percentage : bool, optional
+			Whether to count distances as bp or percentage of longest TF1/TF2 region. If True, output will be collected in 1-percent increments from 0-1. 
+			If False, output depends on the min/max distance values given in the DistObj. Default: False.
 		
 		Returns
 		--------
@@ -2803,6 +2881,8 @@ class DistObj():
 		tfcomb.utils.check_string(self.anchor, list(self.anchor_modes.keys()), "self.anchor")
 		tfcomb.utils.check_type(directional, [bool], "directional")
 		tfcomb.utils.check_type(stranded, bool, "stranded")
+		tfcomb.utils.check_type(percentage, bool, "percentage")
+		tfcomb.utils.check_value(percentage_bins, vmin=1, integer=True, name="percentage_bins")
 		self.check_min_max_dist()
 		
 		#Check if overlapping is allowed (when anchor == 0 (inner))):
@@ -2837,26 +2917,29 @@ class DistObj():
 		self.pairs = [(self.name_to_idx[TF1], self.name_to_idx[TF2]) for (TF1, TF2) in self.rules[["TF1", "TF2"]].values]	#list of TF1/TF rules to count distances for
 		self.logger.spam("TF_names: {0}".format(TF_names))
 
-		#Sort sites by mid if anchor == 2 (center):
+		#Sort sites by mid if anchor == center:
 		if self.anchor == "center": 
-			sites = sorted(sites, key=lambda site: int((site[1] + site[2]) / 2))
-
-		#Convert to numpy integer arr for count_distances
-		sites = np.array(sites)
+			sort_idx = self._get_sort_idx(sites, anchor="center")
+			sites = sites[sort_idx, :]
 
 		self.logger.info("Calculating distances")
 		anchor_mode = self.anchor_modes[self.anchor]
 		self._raw = count_co_occurrence(sites, 
-											min_distance=self.min_dist,
-											max_distance=self.max_dist,
+											min_dist=self.min_dist,
+											max_dist=self.max_dist,
+											min_overlap=self.min_overlap,
 											max_overlap=self.max_overlap,
-											binary=False,				#does not affect distance counting
+											binarize=False,				#does not affect distance counting
 											anchor=anchor_mode,			#integer representation of anchor
 											n_names=len(TF_names),
+											directional=directional,
 											task=2,						#task = count distances
 											rules=self.pairs,			#rules to count distances for
-											directional=directional
+											percentage=percentage,
+											percentage_bins=percentage_bins,
 											)
+		self.percentage = percentage
+		self.percentage_bins = percentage_bins
 
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
 		self._raw_to_human_readable() #fills in .distances
@@ -2875,7 +2958,11 @@ class DistObj():
 		#Converting to pandas format 
 		self.logger.debug("Converting raw count data to pretty dataframe")
 
-		columns = ['TF1', 'TF2'] + list(range(self.min_dist, self.max_dist + 1))
+		if self.percentage == False:
+			columns = ['TF1', 'TF2'] + list(range(self.min_dist, self.max_dist + 1))
+		else:
+			columns = ['TF1', 'TF2'] + list(range(self.percentage_bins+1))
+
 		self.distances = pd.DataFrame(self._raw, columns=columns)
 		
 		#Convert integers to TF names

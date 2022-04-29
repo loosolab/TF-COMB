@@ -1,5 +1,6 @@
 import sys
 import os
+from turtle import end_fill
 import pandas as pd
 import numpy as np
 import copy
@@ -70,10 +71,20 @@ class OneTFBS():
 class TFBSPair():
 	""" Collects information about a co-occurring pair of TFBS """
 
-	def __init__(self, TFBS1, TFBS2, distance, directional=False):
+	def __init__(self, TFBS1, TFBS2, anchor="inner", directional=False):
 
 		self.site1 = TFBS1 #OneTFBS object
 		self.site2 = TFBS2 #OneTFBS object
+
+		#Calculate distance depending on anchor
+		if anchor == "inner":
+			distance = self.site2.start - self.site1.end
+		elif anchor == "outer":
+			distance = self.site1.start - self.site2.end
+		elif anchor == "center":
+			TF1_anchor = (self.site1.start + self.site1.end) / 2
+			TF2_anchor = (self.site2.start + self.site2.end) / 2
+			distance = 	int(TF2_anchor - TF1_anchor)
 		self.distance = distance
 
 		#Calculate orientation scenario
@@ -192,10 +203,12 @@ class TFBSPairList(list):
 		#Write locations to file in format 'fmt'
 		if fmt == "bed":
 			if merge == True:
-				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site2.end), l.site1.name + "-" + l.site2.name, str(l.distance), "."]) for l in self]) + "\n"
+				starts = [min([l.site1.start, l.site2.start]) for l in self]
+				ends = [max([l.site1.end, l.site2.end]) for l in self]
+				s = "\n".join(["\t".join([l.site1.chrom, str(starts[i]), str(ends[i]), l.site1.name + "-" + l.site2.name, str(l.distance), "."]) for i, l in enumerate(self)]) + "\n"
 			else:
-				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.end), str(l.site1.end), l.site1.name, ".", l.site1.strand]) + "\n" + 
-								"\t".join([l.site2.chrom, str(l.site2.end), str(l.site2.end), l.site2.name, ".", l.site2.strand]) for l in self]) + "\n"
+				s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site1.end), l.site1.name, ".", l.site1.strand]) + "\n" + 
+								"\t".join([l.site2.chrom, str(l.site2.start), str(l.site2.end), l.site2.name, ".", l.site2.strand]) for l in self]) + "\n"
 				
 		elif fmt == "bedpe":
 			s = "\n".join(["\t".join([l.site1.chrom, str(l.site1.start), str(l.site1.end),
@@ -1563,176 +1576,6 @@ def add_region_overlap(a, b, att="overlap"):
 	return(a)
 
 
-#----------------------------- Analysis on pairs of TFBS ------------------------#
-
-def get_pair_locations(sites, TF1, TF2, TF1_strand = None,
-										   TF2_strand = None,
-										   min_distance = 0, 
-										   max_distance = 100, 
-										   max_overlap = 0,
-										   directional = False,
-										   anchor = "inner"):
-	""" Get genomic locations of a particular TF pair.
-	
-	Parameters
-	----------
-	sites : RegionList()
-		A list of TFBS regions.
-	TF1 : str 
-		Name of TF1 in pair.
-	TF2 : str 
-		Name of TF2 in pair.
-	TF1_strand : str, optional
-		Strand of TF1 in pair. Default: None (strand is not taken into account).
-	TF2_strand : str, optional
-		Strand of TF2 in pair. Default: None (strand is not taken into account).
-	min_distance : int, optional
-		Minimum distance allowed between two TFBS. Default: 0
-	max_distance : int, optional
-		Maximum distance allowed between two TFBS. Default: 100
-	max_overlap : float between 0-1, optional
-		Controls how much overlap is allowed for individual sites. A value of 0 indicates that overlapping TFBS will not be saved as co-occurring. 
-		Float values between 0-1 indicate the fraction of overlap allowed (the overlap is always calculated as a fraction of the smallest TFBS). A value of 1 allows all overlaps. Default: 0 (no overlap allowed).
-	directional : bool, optional
-		Decide if direction of found pairs should be taken into account, e.g. whether  "<---TF1---> <---TF2--->" is only counted as 
-		TF1-TF2 (directional=True) or also as TF2-TF1 (directional=False). Default: False.
-	anchor : str, optional
-		The anchor to use for calculating distance. Must be one of ["inner", "outer", "center"]
-
-	Returns
-	-------
-	List of TFBSPair objects
-		Each entry in the list is a TFBSPair object, which contains .site1, .site2, .distance and .orientation variables
-
-	See also
-	---------
-	count_within
-
-	"""
-
-	#Check input types
-	check_string(anchor, ["inner", "outer", "center"], "anchor")
-
-	#Subset sites to TF1/TF2 sites
-	sites = [site for site in sites if site.name in [TF1, TF2]]
-
-	locations = TFBSPairList() #empty list of regions
-
-	TF1_tup = (TF1, TF1_strand)
-	TF2_tup = (TF2, TF2_strand)
-	n_sites = len(sites)
-
-	#Find out which TF is queried
-	if directional == True:
-		TF1_to_check = [TF1_tup]
-	else:
-		TF1_to_check = [TF1_tup, TF2_tup]
-
-	#Loop over all sites
-	i = 0
-	while i < n_sites: #i is 0-based index, so when i == n_sites, there are no more sites
-		
-		#Get current TF information
-		TF1_chr, TF1_start, TF1_end, TF1_name, TF1_strand_i = sites[i].chrom, sites[i].start, sites[i].end, sites[i].name, sites[i].strand
-		this_TF1_tup = (TF1_name, None) if TF1_tup[-1] == None else (TF1_name, TF1_strand_i)
-
-		#Check whether TF is valid
-		if this_TF1_tup in TF1_to_check:
-
-			#Find possible associations with TF1 within window 
-			finding_assoc = True
-			j = 0
-			while finding_assoc == True:
-				
-				#Next site relative to TF1
-				j += 1
-				if j+i >= n_sites - 1: #next site is beyond end of list, increment i
-					i += 1
-					finding_assoc = False #break out of finding_assoc
-
-				else:	#There are still sites available
-
-					#Fetch information on TF2-site
-					TF2_chr, TF2_start, TF2_end, TF2_name, TF2_strand_i = sites[i+j].chrom, sites[i+j].start, sites[i+j].end, sites[i+j].name, sites[i+j].strand
-					this_TF2_tup = (TF2_name, None) if TF2_tup[-1] == None else (TF2_name, TF2_strand_i)	
-					
-					#Find out whether this TF2 is TF1/TF2
-					if this_TF1_tup == TF1_tup:
-						to_check = TF2_tup
-					elif this_TF1_tup == TF2_tup:
-						to_check = TF1_tup
-
-					#Check whether TF2 is either TF1/TF2
-					if this_TF2_tup == to_check:
-					
-						#Calculate distance between the two sites based on anchor
-						if anchor == "inner":
-							distance = TF2_start - TF1_end #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
-							if distance < 0:
-								distance = 0
-						elif anchor == "outer":
-							distance = TF2_end - TF1_start
-						elif anchor == "center":
-							TF1_mid = (TF1_start + TF1_end) / 2
-							TF2_mid = (TF2_start + TF2_end) / 2
-							distance = TF2_mid - TF1_mid
-
-						#True if these TFBS co-occur within window
-						if TF1_chr == TF2_chr and (distance <= max_distance):
-
-							if distance >= min_distance:
-							
-								# check if they are overlapping more than the threshold
-								valid_pair = 1
-								if distance == 0:
-
-									# Get the length of the shorter TF
-									short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start])
-
-									#Calculate overlap between TF1/TF2
-									overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
-									if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
-										overlap_bp = short_bp
-									
-									#Invalid pair, overlap is higher than threshold
-									if overlap_bp / (short_bp*1.0) > max_overlap: 
-										valid_pair = 0
-
-								#Save association
-								if valid_pair == 1:
-
-									#Save location
-									reg1 = sites[i] 
-									reg2 = sites[i+j]
-									pair = TFBSPair(reg1, reg2, distance, directional=directional)
-									locations.append(pair)
-						elif TF1_chr != TF2_chr: 
-							i += 1
-							finding_assoc = False   #break out of finding_assoc-loop
-
-						else: #This TF2 is on the same chromosome but more than max_distance away
-
-							#Establish if all valid sites were found for TF1
-							if anchor == "inner":
-
-								#The next site is out of inner window range; increment to next i
-								i += 1
-								finding_assoc = False   #break out of finding_assoc-loop
-							
-							else: #If anchor is outer or center, there might still be valid pairs for future TF2's
-
-								#Check if it will be possible to find valid pairs in next sites
-								if TF2_start > TF1_start + max_distance:
-									#no longer possible to find valid pairs for TF1; increment to next i
-									i += 1
-									finding_assoc = False   #break out of finding_assoc-loop
-		
-		else: #current TF1 is not TF1/TF2; go to next site
-			i += 1
-
-	return(locations)
-
-
 #--------------------------------- Background calculation ---------------------------------#
 
 def shuffle_array(arr, seed=1):
@@ -1771,14 +1614,7 @@ def shuffle_sites(sites, seed=1):
 	
 	return(sites_shuffled)
 
-def calculate_background(sites, min_distance, 
-								max_distance, 
-								max_overlap,
-								binary,
-								anchor,
-								n_TFs,
-								directional,
-								seed=1):
+def calculate_background(sites, seed=1, directional=False, **kwargs):
 	""" 
 	Wrapper to shuffle sites and count co-occurrence of the shuffled sites. 
 	
@@ -1786,14 +1622,12 @@ def calculate_background(sites, min_distance,
 	------------
 	sites : np.array
 		An array of sites in shape (n_sites,4), where each row is a site and columns correspond to chromosome, start, end, name.
-	min_distance
-	max_distance
-	max_overlap
-	binary
-	anchor
-	n_TFs
-	directional
-	seed
+	seed : int, optional
+		Seed for shuffling sites. Default: 1.
+	directional : bool
+		Decide if direction of found pairs should be taken into account. Default: False.
+	kwargs : arguments
+		Additional arguments for count_co_occurrence
 	"""
 	
 	#Shuffle sites
@@ -1803,13 +1637,7 @@ def calculate_background(sites, min_distance,
 	#print("Shuffling: {0}".format(e-s))
 	
 	s = datetime.datetime.now()
-	_, pair_counts = count_co_occurrence(shuffled, 
-													min_distance,
-													max_distance,
-													max_overlap, 
-													binary,
-													anchor,
-													n_TFs)
+	_, pair_counts = count_co_occurrence(shuffled, **kwargs)
 	e = datetime.datetime.now()
 	#print("counting: {0}".format(e-s))
 	pair_counts = tfcomb.utils.make_symmetric(pair_counts) if directional == False else pair_counts	#Deal with directionality
