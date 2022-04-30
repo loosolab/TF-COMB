@@ -3378,6 +3378,24 @@ class DistObj():
 
 		return df
 
+	def max_distance(self):
+		""" Get the distance with the maximum signal for each rule in .rules.
+		
+		Returns
+		---------
+		pandas.DataFrame containing "max_distance" per rule.
+		"""
+
+		self.check_distances()
+
+		distances = self.distances.columns[2:].tolist()
+		idx = self.distances.iloc[:,2:].idxmax(axis=1)
+		idx_distance = [distances[i] for i in idx]
+
+		df = pd.DataFrame(idx_distance, index=idx.index, columns=["max_distance"])
+		
+		return df
+
 
 	def analyze_hubs(self):
 		""" 
