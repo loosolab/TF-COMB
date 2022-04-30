@@ -863,9 +863,8 @@ class CombObj():
 		#---------- Count co-occurrences within shuffled background ---------#
 		if n_background > 0:
 			self.logger.info("Counting co-occurrence within background")
-			parameters = ["min_dist", "max_dist", "min_overlap", "max_overlap", "binarize"]
+			parameters = ["min_dist", "max_dist", "min_overlap", "max_overlap", "binarize", "directional"]
 			kwargs = {param: getattr(self, param) for param in parameters}
-			kwargs.update({"sites": sites, "seed": i, "directional": directional})
 			kwargs["anchor"] = anchor_int
 			kwargs["n_names"] = n_names #this is not necessarily the length of self.TF_names!
 
@@ -889,7 +888,8 @@ class CombObj():
 				for i in range(n_background):
 					self.logger.spam("Adding job for i = {0}".format(i))
 					kwargs.update({"seed": i})
-					job = pool.apply_async(tfcomb.utils.calculate_background, **kwargs)
+					args = (sites,)
+					job = pool.apply_async(tfcomb.utils.calculate_background, args, kwargs) 
 					jobs.append(job)
 				pool.close()
 				
