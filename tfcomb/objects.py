@@ -234,7 +234,7 @@ class CombObj():
 		"""
 
 		f_out = open(path, 'wb') 
-		pickle.dump(self, f_out)
+		dill.dump(self, f_out)
 
 
 	def from_pickle(self, path):
@@ -259,7 +259,7 @@ class CombObj():
 		filehandler = open(path, 'rb') 
 
 		try:
-			obj = pickle.load(filehandler)
+			obj = dill.load(filehandler)
 		except AttributeError as e:
 			if "new_block" in str(e):
 				s = f"It looks like the CombObj was built with pandas 1.3.x, but the current pandas version is {pd.__version__}."
