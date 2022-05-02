@@ -3039,7 +3039,7 @@ class DistObj():
 			scaled_mat = np.nan_to_num(scaled_mat)
 
 		elif how == "fraction":
-
+			
 			sum_count = distances_mat.sum(axis=1) #sum of each row
 			sum_count[sum_count==0] = np.nan
 
@@ -3692,7 +3692,7 @@ class DistObj():
 
 		return (datasource, peaks)
 
-	def plot(self, pair, method="signal", save=None, config=None, collapse=None):
+	def plot(self, pair, method="signal", style="hist", save=None, config=None, collapse=None, ax=None):
 		"""
 		Produces different plots.
 		
@@ -3703,6 +3703,8 @@ class DistObj():
 		method : str, optional
 			Plotting Method. One of ["hist", "corrected", "density", "linres", "signal", "smoothed"].
 			Default: signal
+		style : str, optional
+			What style to plot the datasource in. Can be one of: "Default: "hist".
 		save: str, optional
 			Path to save the plots to. If save is None plots won't be plotted. 
 			Default: None
@@ -3719,18 +3721,19 @@ class DistObj():
 			None if negative data should not be collapsed. ["min","max","mean","sum"] allowed as methods. see ._collapse_negative() for more information
 		"""
 
+		###datasource: default "datasource"
+		###style: hist, kde, line
+
 		# checks
 		self.check_distances()
 		self.check_pair(pair)
 		self.check_min_max_dist()
 
 		# check method given is supported
-		tfcomb.utils.check_type(method, [str], "method")
 		supported = ["hist", "corrected", "density", "linres", "signal", "smoothed"]
 		tfcomb.utils.check_string(method, supported)
 		if collapse is not None:
 			tfcomb.utils.check_string(collapse, ["min","max","mean","sum"])
-		
 
 		# check config is dict 
 		tfcomb.utils.check_type(config, [dict, type(None)], "config")
@@ -3745,32 +3748,54 @@ class DistObj():
 	
 		#---------------- Setup data to plot ------------#
 
-		# get datasource
-		if method == "corrected":
-			self.check_corrected()
-			source_table = self.corrected	
+		source_table = self.datasource
 
-		elif method == "signal":
-			source_table = self.datasource
+		#Replace config with default parameters
+		config = {} if config is None else config #initialize empty config
+		default = {"bins": self.datasource.shape[1]-2, "bw_adjust": 0.1}
+		for key in default:
+			if key not in config:
+				config[key] = default[key]
 
-		elif method == "smoothed":
-			self.check_smoothed()
-			source_table = self.smoothed
-
-		else: 
-			if self.is_smoothed():
-				source_table = self.smoothed
-			else:
-				source_table = self.distances
-
-		# collapse negative
+		#Check format of input config
+		tfcomb.utils.check_type(config["bins"], [int], "bins")
+		tfcomb.utils.check_value(config["bw_adjust"], vmin=0, name="bw_adjust")
+		
+		# collapse or keep negative distances
 		if collapse:
 			source_table, peak_df = self._collapse_negative(self, source_table, method="max")
 		else:
 			# no altered peak list (no replace with "neg" for negative distances)
 			peak_df = None 
 
-		#Establish x-values
+		#Establish x and y-values
+		x_data = source_table.columns[2:].tolist()
+		y_data = source_table.loc[ind].iloc[2:]
+
+		#Split neg from data if needed
+		if collapse:
+			neg = y_data[0]
+			y_data = y_data[1:]
+			x_data = x_data[1:]
+
+		"""
+		# get datasource
+		if method == "corrected":
+			self.check_corrected()
+			source_table = self.corrected	
+		elif method == "signal":
+			source_table = self.datasource
+		elif method == "smoothed":
+			self.check_smoothed()
+			source_table = self.smoothed
+		else: 
+			if self.is_smoothed():
+				source_table = self.smoothed
+			else:
+				source_table = self.distances
+		"""
+
+		"""
 		if method == "density":
 			param = 0.1
 			if(config is not None):
@@ -3782,6 +3807,7 @@ class DistObj():
 			zsc = True if self.zscores is not None else False
 			distances = source_table.columns[2:].to_numpy()
 			x_data = distances
+	
 		else:
 			param = self.max_dist - self.min_dist + 1
 			if(config is not None):
@@ -3791,14 +3817,14 @@ class DistObj():
 			if method == "smoothed":
 				zsc = True if self.zscores is not None else False
 			x_data = np.linspace(self.min_dist, self.max_dist + 1, param)
-		
+		"""
 
-		#Establish y-values
-		# get y_data
-		y_data = source_table.loc[ind].iloc[2:]
+		"""
 		if ((method == "signal") or (method == "smoothed")) and zsc:
 			y_data = self.zscores.loc[ind].iloc[2:]
+		"""
 
+		"""
 		# remove negative data if collapsed
 		if collapse:
 			neg = y_data[0]
@@ -3820,18 +3846,39 @@ class DistObj():
 				x_data = x_data[-self.min_dist:]
 			else:
 				x_data = x_data[1:]
+		"""
 
 		# standard ylbl, replace with specific option if needed
 		ylbl = "Count per Distance"
 
 		#---------------- Start plotting -------------#
 		# start subplot
-		fig, ax = plt.subplots(1, 1)
+		if ax == None:
+			fig, ax = plt.subplots(1, 1)
+
+		#Plot signal from source
+		if style == "kde":
+			# kde plot, see seaborn.kdeplot() for more information
+			sns.kdeplot(x_data, weights=y_data, bw_adjust=config["bw_adjust"], x="distance", ax=ax)
+
+		elif style == "hist":
+			plt.hist(x_data, weights=y_data, bins=config["bins"], density=False, alpha=0.6, color='tab:blue')
+
+		elif style == "line":
+			plt.plot(x_data, y_data)
+		
+		
+		#Plot additional elements (peaks / background)
+		if method == "signal":
+			pass
+
+		elif method == "correction":
+			pass
 
 		# plot according to method
 		if method == "density":
 			# kde plot, see seaborn.kdeplot() for more information
-			sns.kdeplot(x_data, weights=y_data, bw_adjust=param, x="distance").set_title(f"{tf1,tf2}")
+			sns.kdeplot(x_data, weights=y_data, bw_adjust=config["bw_adjust"], x="distance").set_title(f"{tf1,tf2}")
 
 		elif method == "signal":
 			# plot signal with peaks found
@@ -3839,8 +3886,7 @@ class DistObj():
 			self.check_peaks()	
 
 			if peak_df is None:
-				# only read access for peak_df - no copy needed
-				peak_df = self.peaks
+				peak_df = self.peaks # only read access for peak_df - no copy needed
 
 			peaks = peak_df.loc[((peak_df["TF1"] == tf1) & 
 								 (peak_df["TF2"] == tf2))].iloc[:,2]
@@ -3870,13 +3916,15 @@ class DistObj():
 
 			ylbl = 'Corrected count per distance'
 			
-		else: # corrected, linres, histogram, smoothed
-			plt.hist(x_data, weights=y_data, bins=param, density=False, alpha=0.6, color='tab:blue')
+		else: # corrected, linres, histogram, smoothed	
+			plt.hist(x_data, weights=y_data, bins=config["bins"], density=False, alpha=0.6, color='tab:blue')
+			
 			if method == "corrected":
 				# add linear regression line to plot, recalculate for corrected, should be a line on y=0, if not, something went wrong
 				linres = linregress(x_data, np.array(y_data, dtype=float))
 				plt.plot(x_data, linres.intercept + linres.slope*x_data, 'r', label='fitted line')
 				ylbl = "Corrected count per Distance"
+
 			elif method == "linres":
 				# add linear regression line to plot
 				self.check_linres()
@@ -3886,10 +3934,24 @@ class DistObj():
 		# add labels to plot
 		plt.xlabel('Distance in bp')
 		plt.ylabel(ylbl)
-	
+
+		#Add data for collapsed negative counts
+		if collapse: # adjust to collapsed
+			neg = y_data[0]
+			offset_neg = ""
+
+			plt.bar(offset_neg, neg, color='tab:orange')
+			xt[0] = offset_neg
+			xt = xt[:-1]
+			xtl = xt.tolist()
+			xtl[0] = "neg"
+
 		# make x-axis pretty
+		"""
 		xt = ax.get_xticks() 
 		if collapse: # adjust to collapsed
+			neg = y_data[0]
+
 			plt.bar(offset_neg, neg, color='tab:orange')
 			xt[0] = offset_neg
 			xt = xt[:-1]
@@ -3898,7 +3960,10 @@ class DistObj():
 		else:
 			xt = xt[1:-1]
 			xtl = xt.tolist()
-		ax.set_xticks(xt)
+		"""
+		#ax.set_xticks(xt)
+		xt = ax.get_xticks()
+		xtl = xt.tolist()
 		ax.set_xticklabels(xtl, rotation=self._XLBL_ROTATION, fontsize=self._XLBL_FONTSIZE)
 		
 		# add cross for negative if needed
@@ -3906,13 +3971,16 @@ class DistObj():
 			if neg_cross:
 				plt.plot(offset_neg, neg, "x")
 
-		# set pair as plot title
-		plt.title(pair)
+		# Make final adjustments to plot 
+		ax.set_title("{0}-{1}".format(*pair))
+
+		ax.spines['right'].set_visible(False)
+		ax.spines['top'].set_visible(False)
 
 		#save plot
 		if save is not None:
-			plt.savefig(save, dpi=600)
-			plt.close()
+			plt.savefig(save, dpi=600, bbox_inches="tight")
+
 	
 	def plot_network(self, color_node_by="TF1_count",
 						   color_edge_by="Distance", 
