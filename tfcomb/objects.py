@@ -3029,10 +3029,10 @@ class DistObj():
 		#Calculate scaling depending on "how"
 		if how == "min-max":
 
-		min_count = np.array([distances_mat.min(axis=1)]).T #convert to column vectors
-		max_count = np.array([distances_mat.max(axis=1)]).T #convert to column vectors
-		ranges = max_count - min_count #min-max range per pair
-		ranges[ranges==0] = np.nan
+			min_count = np.array([distances_mat.min(axis=1)]).T #convert to column vectors
+			max_count = np.array([distances_mat.max(axis=1)]).T #convert to column vectors
+			ranges = max_count - min_count #min-max range per pair
+			ranges[ranges==0] = np.nan
 
 			#Perform scaling and save to self.scaled
 			scaled_mat = (distances_mat - min_count) / ranges
