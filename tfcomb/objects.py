@@ -2975,26 +2975,52 @@ class DistObj():
 		self.distances["TF2"] = [idx_to_name[idx] for idx in self.distances["TF2"]]
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
 
-		# minmax normalization
-		distances_mat = self.distances.iloc[:,2:].to_numpy().astype(float) #float for nan replacement
+
+	#-------------------------------------------------------------------------------------------#
+	#------------------- Process counted distances (scale/smooth/correct)-----------------------#
+	#-------------------------------------------------------------------------------------------#
+	
+	#Scale signal
+	def scale(self, how="min-max"):
+		""" Scale the counted distances per pair. Saves the scaled counts into .scaled and updates .datasource. 
+		
+		Parameters
+		-----------
+		how : str, optional
+			How to scale the counts. Must be one of: ["min-max", "fraction"]. If "min-max", all counts are scaled between 0 and 1. 
+			If "fraction", the sum of all counts are scled between 0 and 1. Default: "min-max".
+		"""
+
+		check_string(how, ["min-max", "fraction"], "how")
+
+		distances_mat = self.datasource.iloc[:,2:].to_numpy().astype(float) #float for nan replacement
+
+		#Calculate scaling depending on "how"
+		if how == "min-max":
+
 		min_count = np.array([distances_mat.min(axis=1)]).T #convert to column vectors
 		max_count = np.array([distances_mat.max(axis=1)]).T #convert to column vectors
 		ranges = max_count - min_count #min-max range per pair
 		ranges[ranges==0] = np.nan
 
-		#Perform scaling and save to self.normalized
-		normalized_mat = (distances_mat - min_count) / ranges
-		normalized_mat = np.nan_to_num(normalized_mat)
+			#Perform scaling and save to self.scaled
+			scaled_mat = (distances_mat - min_count) / ranges
+			scaled_mat = np.nan_to_num(scaled_mat)
 
-		self.normalized = self.distances.copy()
-		self.normalized.iloc[:,2:] = normalized_mat
+		elif how == "fraction":
 
-		#Set datasource for future normalization/correction/analysis
-		self.datasource = self.normalized
+			sum_count = distances_mat.sum(axis=1) #sum of each row
+			sum_count[sum_count==0] = np.nan
 
-	#-------------------------------------------------------------------------------------------#
-	#------------------------ Process counted distances (correct/smooth)------------------------#
-	#-------------------------------------------------------------------------------------------#
+			scaled_mat = distances_mat / sum_count.reshape(-1,1)
+			scaled_mat = np.nan_to_num(scaled_mat) #rescale back to 0
+
+		#Set .scaled variable
+		self.scaled = self.datasource.copy()
+		self.scaled.iloc[:,2:] = scaled_mat
+
+		#Update datasource
+		self.datasource = self.scaled
 
 	#Smooth signals
 	def smooth(self, window_size=3):
