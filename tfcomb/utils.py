@@ -30,6 +30,7 @@ import matplotlib.animation
 import seaborn as sns
 import tqdm
 from IPython import display
+import warnings
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -370,6 +371,15 @@ class TFBSPairList(list):
 		#sort by distance, then relative TFBS start
 		sorted_pairs.sort_values(by=["site_distance", "site1_rel_start"], inplace=True)
 		scores = scores.loc[sorted_pairs.index]
+
+		# warn if the binding site length is not always the same
+		if (len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1 or
+			len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1):
+			warnings.warn("Differences in binding site length detected! This can have undesired effects when plotting. Refer to 'CombObj.TFBS_from_motifs(resolve_overlapping)' to solve.")
+
+
+
+
 
 		self._last_flank = flank
 		self._last_align = align
