@@ -16,9 +16,9 @@ import copy
 import glob
 import fnmatch
 import dill
-import pickle
 import collections
 import math
+import re
 
 #Statistics
 import qnorm #quantile normalization
@@ -706,7 +706,7 @@ class CombObj():
 			if len(self.TFBS) == len(self._sites):
 				create = 0
 			else:
-				self.debug("Length of .TFBS ({0}) is different than existing ._sites ({1}) attribute. Recreating _sites.".format(len(self.TFBS), len(self._sites)))	
+				self.logger.debug("Length of .TFBS ({0}) is different than existing ._sites ({1}) attribute. Recreating ._sites.".format(len(self.TFBS), len(self._sites)))	
 
 		if create == 1 or force == True or not hasattr(self, "name_to_idx"):
 
@@ -1149,14 +1149,29 @@ class CombObj():
 
 			#Get names from rules
 			self.logger.debug("Getting names")
-			selected_names = set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()) #check against set is faster than list
+			selected_names = list(set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()))
 
-			#Subset TFBS
+			#Do the TFs contain strand information? Collect this for subsetting
+			name_strands = {}
+			clean_names = []
+			for name in selected_names:
+				m = re.match("(.+)\(([+-.])\)$", name) #check if name is "NAME(+/./-)"
+				if m is not None:
+					name_clean = m.group(1) #name without strand
+					clean_names.append(name_clean)
+
+					name_strands[name_clean] = name_strands.get(name_clean, set()) | set([m.group(2)]) #add strand to set for this name
+				else:
+					clean_names.append(name) #name is already clean of strand info
+
+			#Subset TFBS using name and strand information
 			self.logger.debug("Setting TFBS in new object")
-			self.TFBS = RegionList([site for site in self.TFBS if site.name in selected_names])
+			clean_names = set(clean_names) #check against set is faster than list
+			self.TFBS = RegionList([site for site in self.TFBS if (site.name in clean_names) and (site.strand in name_strands.get(site.name, {site.strand}))]) #comparison for strand is a set
+			#if site is not in name_strands, site.strand is compared to itself
 
-			#Update TF names as well
-			self.TF_names = [name for name in self.TF_names if name in selected_names]
+			#Update TF names as well (names without strands)
+			self.TF_names = [name for name in self.TF_names if name in clean_names]
 
 
 	def simplify_rules(self):
@@ -1286,8 +1301,8 @@ class CombObj():
 		
 		Parameters
 		------------
-		custom_list : list
-			List of TF pairs fitting to TF1/TF2 combination within .rules.
+		custom_list : list of strings
+			List of TF pairs (e.g. a string "TF1-TF2") fitting to TF1/TF2 combination within .rules.
 		reduce_TFBS : bool, optional
 			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 
@@ -2895,6 +2910,13 @@ class DistObj():
 		self._prepare_TFBS() #prepare _sites and name_to_idx dict
 		sites = self._sites
 		
+		#Check if rules look stranded
+		rule_names = list(set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()))
+		strand_matching = [re.match("(.+)\(([+-.])\)$", name) for name in rule_names] #check if name is "NAME(+/./-)"
+		n_strand_names = sum([match is not None for match in strand_matching])
+		if n_strand_names > 0 and stranded == False:
+			raise InputError("TF names in .rules contain strand information, but stranded is set to False. Please set stranded to True to count distances for rules.")
+
 		#Should strand be taken into account?
 		if stranded == True:
 			sites = self._sites.copy() #don't change self._sites
@@ -2910,11 +2932,12 @@ class DistObj():
 					current_idx = current_idx + 1
 					name_to_idx[name] = current_idx
 				sites[0][-1] = name_to_idx[name] #set new idx based on stranded name
+			
 		else:
 			TF_names = self.TF_names
 			name_to_idx = self.name_to_idx
 
-		self.pairs = [(self.name_to_idx[TF1], self.name_to_idx[TF2]) for (TF1, TF2) in self.rules[["TF1", "TF2"]].values]	#list of TF1/TF rules to count distances for
+		self.pairs = [(name_to_idx[TF1], name_to_idx[TF2]) for (TF1, TF2) in self.rules[["TF1", "TF2"]].values]	#list of TF1/TF rules to count distances for
 		self.logger.spam("TF_names: {0}".format(TF_names))
 
 		#Sort sites by mid if anchor == center:
@@ -2942,17 +2965,22 @@ class DistObj():
 		self.percentage_bins = percentage_bins
 
 		# convert raw counts (numpy array with int encoded pair names) to better readable format (pandas DataFrame with TF names)
-		self._raw_to_human_readable() #fills in .distances
+		self._raw_to_human_readable(name_to_idx) #fills in .distances
 
 		self.logger.info("Done finding distances! Results are found in .distances")
 		self.logger.info("Run .linregress_all() to fit linear regression")
 	
-	def _raw_to_human_readable(self):
+	def _raw_to_human_readable(self, name_to_idx):
 		""" Get the raw distance in human readable format. Sets the variable '.distances' which is a pd.Dataframe with the columns:
 			TF1 name, TF2 name, count min_dist, count min_dist +1, ...., count max_dist).
 
 			Note: 
 			Normalization method is min_max normalization: (x[i] - min(x))/(max(x)-min(x))
+
+			Parameters
+			-----------
+			name_to_idx : dict
+				Dictionary encoding TF names to integers
 		"""
 
 		#Converting to pandas format 
@@ -2968,12 +2996,15 @@ class DistObj():
 		#Convert integers to TF names
 		# get names from int encoding
 		idx_to_name = {}
-		for name, idx in self.name_to_idx.items():
+		for name, idx in name_to_idx.items():
 			idx_to_name[idx] = name 
 
 		self.distances["TF1"] = [idx_to_name[idx] for idx in self.distances["TF1"]]
 		self.distances["TF2"] = [idx_to_name[idx] for idx in self.distances["TF2"]]
 		self.distances.index = self.distances["TF1"] + "-" + self.distances["TF2"]
+
+		#Set datasource for future normalization/correction/analysis
+		self.datasource = self.distances.copy()
 
 
 	#-------------------------------------------------------------------------------------------#
