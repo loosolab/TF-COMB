@@ -721,10 +721,16 @@ class TFBSPairList(list):
 		# TODO sanity check for len 1
 		lname = set(tmp_pairs["site1_name"]).pop()
 		rname = set(tmp_pairs["site2_name"]).pop()
-		
+
 		# compute x axis range (0 centered)
-		center = round(len(tmp_scores.columns) / 2)
-		xmin, xmax = -center, center
+		if self._last_align == "center":
+			center = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
+		elif self._last_align == "left":
+			center = pairs["site1_rel_end"][0]
+		elif self._last_align == "right":
+			center = pairs["site2_rel_start"][0]
+
+		xmin, xmax = -self._last_flank[0], self._last_flank[1]
 
 		# compute y axis range + 10% padding
 		points = tmp_scores.mean()
