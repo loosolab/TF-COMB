@@ -30,6 +30,7 @@ import matplotlib.animation
 import seaborn as sns
 import tqdm
 from IPython import display
+import warnings
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
@@ -138,6 +139,7 @@ class TFBSPairList(list):
 	_bigwig_path = None
 	_plotting_tables = None
 	_last_flank = None
+	_last_align = None
 	
 	def as_table(self):
 		""" Table representation of the pairs in the list """
@@ -281,15 +283,26 @@ class TFBSPairList(list):
 			self.comp_plotting_tables()
 		return self._plotting_tables
 
-	def comp_plotting_tables(self, flank=100):
+	def comp_plotting_tables(self, flank=100, align="center"):
 		"""
 		Prepare pair and score tables for plotting.
 
 		Parameter:
 		------------
-		flank : int, default 100
-			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites.
+		flank : int or tuple, default 100
+			Window size of TFBSpair. Adds given amount of bases in both directions counted from alignment anchor (see align) between binding sites. Use a tuple of ints to set left and right flank independently.
+		align : str, default 'center'
+			Position from which the flanking regions are added. Must be one of 'center', 'left', 'right'.
+				'center': Midpoint between binding positions (rounded down if uneven).
+				'left': Start of first binding position in pair.
+				'right': End of second binding position in pair.
 		"""
+		if align not in ["center", "left", "right"]:
+			raise ValueError(f"Parameter 'align' has to be one of ['center', 'left', 'right']. Got '{align}'.")
+
+		# flank tuple
+		if not isinstance(flank, tuple):
+			flank = (flank, flank)
 
 		# load bigwig file
 		signal_bigwig = pyBigWig.open(self.bigwig_path)
@@ -297,39 +310,57 @@ class TFBSPairList(list):
 		# get pairs as table & sort by distance
 		pairs = self.as_table().sort_values(by='site_distance')
 
-		# compute center point between binding pair
-		pairs["center"] = (pairs["site1_end"] + round(pairs["site_distance"] / 2)).astype(int)
-
-		pairs["window_start"] = pairs["center"] - flank
-		pairs["window_end"] = pairs["center"] + flank
-
 		scores = []
 		sorted_pairs = []
 
 		for (index, row) in pairs.iterrows():
-			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
-			
+			# compute positioning
 			if row["site1_name"] < row["site2_name"]:
-				values.reverse()
-				
+				# compute center and flanks
+				if align == "center":
+					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
+				elif align == "left":
+					row["center"] = row["site2_end"]
+				elif align == "right":
+					row["center"] = row["site1_start"]
+
+				row["window_start"] = row["center"] - flank[1]
+				row["window_end"] = row["center"] + flank[0]
+
 				# switch pair
 				site1 = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand"]
 				site2 = ["site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand"]
 				row[site1], row[site2] = row[site2].values, row[site1].values
 				
 				# compute relative positions
-				row["site1_rel_start"] = row["window_end"] - row["site1_start"]
-				row["site1_rel_end"] = row["window_end"] - row["site1_end"]
+				row["site1_rel_start"] = row["window_end"] - row["site1_end"]
+				row["site1_rel_end"] = row["window_end"] - row["site1_start"]
 				
-				row["site2_rel_start"] = row["window_end"] - row["site2_start"]
-				row["site2_rel_end"] = row["window_end"] - row["site2_end"]
+				row["site2_rel_start"] = row["window_end"] - row["site2_end"]
+				row["site2_rel_end"] = row["window_end"] - row["site2_start"]
 			else:
+				# compute center and flanks
+				if align == "center":
+					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
+				elif align == "left":
+					row["center"] = row["site1_start"]
+				elif align == "right":
+					row["center"] = row["site2_end"]
+
+				row["window_start"] = row["center"] - flank[0]
+				row["window_end"] = row["center"] + flank[1]
+
 				# compute relative positions
 				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
 				row["site1_rel_end"] = row["site1_end"] - row["window_start"]
 				
 				row["site2_rel_start"] = row["site2_start"] - row["window_start"]
 				row["site2_rel_end"] = row["site2_end"] - row["window_start"]
+
+			# get scores
+			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
+			if row["site1_name"] < row["site2_name"]:
+				values.reverse()
 
 			sorted_pairs.append(row)
 			scores.append(values)
@@ -341,10 +372,20 @@ class TFBSPairList(list):
 		sorted_pairs.sort_values(by=["site_distance", "site1_rel_start"], inplace=True)
 		scores = scores.loc[sorted_pairs.index]
 
+		# warn if the binding site length is not always the same
+		if (len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1 or
+			len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1):
+			warnings.warn("Differences in binding site length detected! This can have undesired effects when plotting. Refer to 'CombObj.TFBS_from_motifs(resolve_overlapping)' to solve.")
+
+
+
+
+
 		self._last_flank = flank
+		self._last_align = align
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -366,8 +407,16 @@ class TFBSPairList(list):
 				Figure dimensions.
 			output : str, default None 
 				Save plot to given file.
-			flank : int, default None
+			flank : int or int tuple, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+			align : str, default None
+				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
+			alpha : float, default 0.7
+				Alpha value for diagonal lines, TF binding positions and center line.
+			cmap : matplotlib colormap name or object, or list of colors, default 'seismic'
+				Color palette used in the main heatmap. Forwarded to seaborn.heatmap(cmap)
+			show_diagonal : boolean, default True
+				Shows diagonal lines for identifying preference in binding distance.
 		
 		Returns:
 		----------
@@ -388,8 +437,12 @@ class TFBSPairList(list):
 		fig = plt.figure(figsize=figsize)
 
 		# compute plotting tables with custom flank
-		if not flank is None and flank != self._last_flank:
-			self.comp_plotting_tables(flank=flank)
+		if not flank is None and flank != self._last_flank or not align is None and align != self._last_align:
+			params = {}
+			if flank: params["flank"] = flank
+			if align: params["align"] = align
+
+			self.comp_plotting_tables(**params)
 
 		# load data
 		pairs, scores = self.plotting_tables
@@ -474,7 +527,7 @@ class TFBSPairList(list):
 		plot = sns.heatmap(scores, 
 						yticklabels=False,
 						xticklabels=False,
-						cmap="seismic",
+						cmap=cmap,
 						center=None if logNorm_cbar else 0,
 						cbar=True,
 						cbar_ax=heatmap_led,
@@ -485,26 +538,81 @@ class TFBSPairList(list):
 		heatmap.set_title(f"{name1} <-> {name2}")
 
 		# center line
-		plot.vlines(x=len(scores.columns)/2,
+		if self._last_align == "center":
+			pos = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
+		elif self._last_align == "left":
+			pos = pairs["site1_rel_end"][0]
+		elif self._last_align == "right":
+			pos = pairs["site2_rel_start"][0]
+
+		plot.vlines(x=pos,
 					ymin=0, ymax=len(scores),
 					linestyles="dashed",
 					color="black",
-					alpha=0.9 if logNorm_cbar else 0.2,
+					alpha=alpha,
 					linewidth=1)
+
 		# binding sites
 		if show_binding:
-			plot.hlines(y=range(len(scores)),
-						xmin=pairs["site1_rel_start"],
-						xmax=pairs["site1_rel_end"],
-						color="gray",
-						linewidth=0.1,
-						alpha=0.7 if logNorm_cbar else 0.2)
-			plot.hlines(y=range(len(scores)),
-						xmin=pairs["site2_rel_start"],
-						xmax=pairs["site2_rel_end"],
-						color="gray",
-						linewidth=0.1,
-						alpha=0.7 if logNorm_cbar else 0.2)
+			for y, (_, row) in enumerate(pairs.iterrows()):
+				# left sites
+				plot.add_patch(matplotlib.patches.Rectangle(
+					xy=(row["site1_rel_start"], y),
+					width=row["site1_rel_end"] - row["site1_rel_start"],
+					height=1,
+					alpha=alpha,
+					color="gray",
+					edgecolor=None,
+					lw=0
+				))
+
+				# right sites
+				plot.add_patch(matplotlib.patches.Rectangle(
+					xy=(row["site2_rel_start"], y),
+					width=row["site2_rel_end"] - row["site2_rel_start"],
+					height=1,
+					alpha=alpha,
+					color="gray",
+					edgecolor=None,
+					lw=0
+				))
+
+		# diagonal binding lines
+		if show_diagonal:
+			linecolor="black"
+			linestyle="dotted"
+
+			# left
+			# start
+			plot.axline(
+				xy1=(pairs["site1_rel_start"].max(), 0),
+				xy2=(pairs["site1_rel_start"].min(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
+			# end
+			plot.axline(
+				xy1=(pairs["site1_rel_end"].max(), 0),
+				xy2=(pairs["site1_rel_end"].min(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
+
+			# right
+			# start
+			plot.axline(
+				xy1=(pairs["site2_rel_start"].min(), 0),
+				xy2=(pairs["site2_rel_start"].max(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
+			# end
+			plot.axline(
+				xy1=(pairs["site2_rel_end"].min(), 0),
+				xy2=(pairs["site2_rel_end"].max(), len(scores)),
+				color=linecolor,
+				alpha=alpha,
+				linestyle=linestyle)
 
 		# https://moonbooks.org/Articles/How-to-add-a-frame-to-a-seaborn-heatmap-figure-in-python-/
 		# make frame visible
@@ -554,7 +662,7 @@ class TFBSPairList(list):
 
 		return grid
 
-	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, output=None, flank=None, _ret_param=False):
+	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, output=None, flank=None, align=None, _ret_param=False):
 		"""
 		Create an aggregated footprint track on the paired binding sites.
 		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
@@ -575,8 +683,10 @@ class TFBSPairList(list):
 				Y-axis maximum limit.
 			output : str, default None
 				Save plot to given file.
-			flank : int, default None
+			flank : int or int tuple, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+			align : str, default None
+				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
 			_ret_param : bool, default False
 				Intended for internal animation use!
 				If True will cause the function to return a dict of function call parameters used to create plot.
@@ -591,8 +701,12 @@ class TFBSPairList(list):
 			raise ValueError("Either set dist or start and end parameter!")
 		
 		# compute plotting tables with custom flank
-		if not flank is None and flank != self._last_flank:
-			self.comp_plotting_tables(flank=flank)
+		if not flank is None and flank != self._last_flank or not align is None and align != self._last_align:
+			params = {}
+			if flank: params["flank"] = flank
+			if align: params["align"] = align
+
+			self.comp_plotting_tables(**params)
 
 		# load data
 		pairs, scores = self.plotting_tables
@@ -617,10 +731,16 @@ class TFBSPairList(list):
 		# TODO sanity check for len 1
 		lname = set(tmp_pairs["site1_name"]).pop()
 		rname = set(tmp_pairs["site2_name"]).pop()
-		
+
 		# compute x axis range (0 centered)
-		center = round(len(tmp_scores.columns) / 2)
-		xmin, xmax = -center, center
+		if self._last_align == "center":
+			center = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
+		elif self._last_align == "left":
+			center = pairs["site1_rel_end"][0]
+		elif self._last_align == "right":
+			center = pairs["site2_rel_start"][0]
+
+		xmin, xmax = -self._last_flank[0], self._last_flank[1]
 
 		# compute y axis range + 10% padding
 		points = tmp_scores.mean()
@@ -694,7 +814,7 @@ class TFBSPairList(list):
 		else:
 			return ax
 
-	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, interval=50, repeat_delay=0, repeat=False, output=None, flank=None):
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, interval=50, repeat_delay=0, repeat=False, output=None, flank=None, align=None):
 		"""
 		Combine a set of pairTrack plots to a .gif.
 			
@@ -721,8 +841,10 @@ class TFBSPairList(list):
 				Whether the animation repeats when the sequence of frames is completed.
 			output : str, default None
 				Save plot to given file.
-			flank : int, default None
+			flank : int or int tuple, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
+			align : str, default None
+				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
 		
 		Returns:
 		----------
@@ -730,8 +852,12 @@ class TFBSPairList(list):
 				Gif object ready to display in a jupyter notebook.
 		"""
 		# compute plotting tables with custom flank
-		if not flank is None and flank != self._last_flank:
-			self.comp_plotting_tables(flank=flank)
+		if not flank is None and flank != self._last_flank or not align is None and align != self._last_align:
+			params = {}
+			if flank: params["flank"] = flank
+			if align: params["align"] = align
+
+			self.comp_plotting_tables(**params)
 
 		# load data
 		pairs, scores = self.plotting_tables
