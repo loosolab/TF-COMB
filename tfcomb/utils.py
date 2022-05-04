@@ -375,8 +375,8 @@ class TFBSPairList(list):
 		scores = scores.loc[sorted_pairs.index]
 
 		# warn if the binding site length is not always the same
-		if (len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1 or
-			len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1):
+		if (len(set(sorted_pairs["site1_rel_end"] - sorted_pairs["site1_rel_start"])) > 1 or
+			len(set(sorted_pairs["site2_rel_end"] - sorted_pairs["site2_rel_start"])) > 1):
 			warnings.warn("Differences in binding site length detected! This can have undesired effects when plotting. Refer to 'CombObj.TFBS_from_motifs(resolve_overlapping)' to solve.")
 
 		self._last_flank = flank
