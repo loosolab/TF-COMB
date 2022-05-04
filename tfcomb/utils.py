@@ -578,7 +578,7 @@ class TFBSPairList(list):
 		# diagonal binding lines
 		if show_diagonal:
 			linecolor="black"
-			linestyle="dotted"
+			linestyle="solid"
 
 			# left
 			# start
