@@ -383,7 +383,7 @@ class TFBSPairList(list):
 		self._last_align = align
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True, legend_name_score="Binding Score"):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -415,6 +415,8 @@ class TFBSPairList(list):
 				Color palette used in the main heatmap. Forwarded to seaborn.heatmap(cmap)
 			show_diagonal : boolean, default True
 				Shows diagonal lines for identifying preference in binding distance.
+			legend_name_score : str, default 'Binding Score'
+				Name of the score legend (upper legend).
 		
 		Returns:
 		----------
@@ -509,7 +511,7 @@ class TFBSPairList(list):
 		strand_led = fig.add_subplot(legend_grid[1])
 
 		# legend label
-		heatmap_led.set_title("Open Chromatin Score")
+		heatmap_led.set_title(legend_name_score)
 		strand_led.set_title("TF Binding Strand")
 
 		###### define plots ######
