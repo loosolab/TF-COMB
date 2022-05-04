@@ -314,53 +314,55 @@ class TFBSPairList(list):
 		sorted_pairs = []
 
 		for (index, row) in pairs.iterrows():
-			# compute positioning
+			# switch pair to always start with same TF
 			if row["site1_name"] < row["site2_name"]:
-				# compute center and flanks
-				if align == "center":
-					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
-				elif align == "left":
-					row["center"] = row["site2_end"]
-				elif align == "right":
-					row["center"] = row["site1_start"]
-
-				row["window_start"] = row["center"] - flank[1]
-				row["window_end"] = row["center"] + flank[0]
-
-				# switch pair
-				site1 = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand"]
+				site1 = ["site1_chrom", "site1_end", "site1_start", "site1_name", "site1_strand"]
 				site2 = ["site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand"]
 				row[site1], row[site2] = row[site2].values, row[site1].values
-				
-				# compute relative positions
-				row["site1_rel_start"] = row["window_end"] - row["site1_end"]
-				row["site1_rel_end"] = row["window_end"] - row["site1_start"]
-				
-				row["site2_rel_start"] = row["window_end"] - row["site2_end"]
-				row["site2_rel_end"] = row["window_end"] - row["site2_start"]
-			else:
-				# compute center and flanks
-				if align == "center":
-					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
-				elif align == "left":
-					row["center"] = row["site1_start"]
-				elif align == "right":
-					row["center"] = row["site2_end"]
 
-				row["window_start"] = row["center"] - flank[0]
-				row["window_end"] = row["center"] + flank[1]
+				# get anchor point (center) to which flanks are added
+				if align == "center":
+					anchor = row["site1_end"] - row["site_distance"] // 2
+				elif align == "left":
+					anchor = row["site1_start"]
+				elif align == "right":
+					anchor = row["site2_end"]
+
+				# compute window from anchor point
+				row["window_start"] = anchor + flank[0]
+				row["window_end"] = anchor - flank[1]
+
+				# compute relative positions
+				row["site1_rel_start"] = row["window_start"] - row["site1_start"]
+				row["site1_rel_end"] = row["window_start"] - row["site1_end"]
+
+				row["site2_rel_start"] = row["window_start"] - row["site2_start"]
+				row["site2_rel_end"] = row["window_start"] - row["site2_end"]
+
+				# fetch scores
+				values = signal_bigwig.values(row["site1_chrom"], row["window_end"], row["window_start"])
+				values.reverse()
+			else:
+				# get anchor point (center) to which flanks are added
+				if align == "center":
+					anchor = row["site1_end"] - row["site_distance"] // 2
+				elif align == "left":
+					anchor = row["site1_start"]
+				elif align == "right":
+					anchor = row["site2_end"]
+
+				# compute window from anchor point
+				row["window_start"] = anchor - flank[0]
+				row["window_end"] = anchor + flank[1]
 
 				# compute relative positions
 				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
 				row["site1_rel_end"] = row["site1_end"] - row["window_start"]
-				
+
 				row["site2_rel_start"] = row["site2_start"] - row["window_start"]
 				row["site2_rel_end"] = row["site2_end"] - row["window_start"]
 
-			# get scores
-			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
-			if row["site1_name"] < row["site2_name"]:
-				values.reverse()
+				values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
 
 			sorted_pairs.append(row)
 			scores.append(values)
@@ -376,10 +378,6 @@ class TFBSPairList(list):
 		if (len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1 or
 			len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1):
 			warnings.warn("Differences in binding site length detected! This can have undesired effects when plotting. Refer to 'CombObj.TFBS_from_motifs(resolve_overlapping)' to solve.")
-
-
-
-
 
 		self._last_flank = flank
 		self._last_align = align
