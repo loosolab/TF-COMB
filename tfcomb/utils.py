@@ -345,7 +345,7 @@ class TFBSPairList(list):
 			else:
 				# get anchor point (center) to which flanks are added
 				if align == "center":
-					anchor = row["site1_end"] - row["site_distance"] // 2
+					anchor = row["site1_end"] + row["site_distance"] // 2
 				elif align == "left":
 					anchor = row["site1_start"]
 				elif align == "right":
