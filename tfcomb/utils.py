@@ -294,8 +294,8 @@ class TFBSPairList(list):
 		align : str, default 'center'
 			Position from which the flanking regions are added. Must be one of 'center', 'left', 'right'.
 				'center': Midpoint between binding positions (rounded down if uneven).
-				'left': Start of first binding position in pair.
-				'right': End of second binding position in pair.
+				'left': End of first binding position in pair.
+				'right': Start of second binding position in pair.
 		"""
 		if align not in ["center", "left", "right"]:
 			raise ValueError(f"Parameter 'align' has to be one of ['center', 'left', 'right']. Got '{align}'.")
@@ -324,9 +324,9 @@ class TFBSPairList(list):
 				if align == "center":
 					anchor = row["site1_end"] - row["site_distance"] // 2
 				elif align == "left":
-					anchor = row["site1_start"]
+					anchor = row["site1_end"]
 				elif align == "right":
-					anchor = row["site2_end"]
+					anchor = row["site2_start"]
 
 				# compute window from anchor point
 				row["window_start"] = anchor + flank[0]
@@ -347,9 +347,9 @@ class TFBSPairList(list):
 				if align == "center":
 					anchor = row["site1_end"] + row["site_distance"] // 2
 				elif align == "left":
-					anchor = row["site1_start"]
+					anchor = row["site1_end"]
 				elif align == "right":
-					anchor = row["site2_end"]
+					anchor = row["site2_start"]
 
 				# compute window from anchor point
 				row["window_start"] = anchor - flank[0]
