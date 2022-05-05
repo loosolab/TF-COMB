@@ -383,7 +383,7 @@ class TFBSPairList(list):
 		self._last_align = align
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True, legend_name_score="Binding Score"):
+	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True, legend_name_score="Binding Score", xtick_num=10):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -417,6 +417,8 @@ class TFBSPairList(list):
 				Shows diagonal lines for identifying preference in binding distance.
 			legend_name_score : str, default 'Binding Score'
 				Name of the score legend (upper legend).
+			xtick_num : int, default 10
+				Number of ticks shown on the x-axis. Disable ticks with None or values <0.
 		
 		Returns:
 		----------
@@ -517,13 +519,22 @@ class TFBSPairList(list):
 		###### define plots ######
 		### main heatmap ###
 		
+		# get normalization function
 		if logNorm_cbar == None:
 			norm = None
 		elif logNorm_cbar == "centerLogNorm":
 			norm = MidpointLogNorm(lin_thres=1, lin_scale=1, midpoint=0)
 		elif logNorm_cbar == "SymLogNorm":
 			norm = matplotlib.colors.SymLogNorm(linthresh=1, linscale=1)
-			
+		
+		# get center line position
+		if self._last_align == "center":
+			pos = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
+		elif self._last_align == "left":
+			pos = pairs["site1_rel_end"][0]
+		elif self._last_align == "right":
+			pos = pairs["site2_rel_start"][0]
+
 		plot = sns.heatmap(scores, 
 						yticklabels=False,
 						xticklabels=False,
@@ -534,17 +545,22 @@ class TFBSPairList(list):
 						norm=norm,
 						ax=heatmap)
 
+		# set title
 		name1, name2 = set(pairs["site1_name"]).pop(), set(pairs["site2_name"]).pop()
 		heatmap.set_title(f"{name1} <-> {name2}")
 
-		# center line
-		if self._last_align == "center":
-			pos = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
-		elif self._last_align == "left":
-			pos = pairs["site1_rel_end"][0]
-		elif self._last_align == "right":
-			pos = pairs["site2_rel_start"][0]
+		# show evenly spaced xticks
+		if xtick_num and xtick_num > 0:
+			xtickpositions = np.linspace(0, len(scores.columns), xtick_num, dtype=int)
+			xticklabels = np.linspace(-pos, len(scores.columns) - pos, xtick_num, dtype=int)
+			# replace nearest tick to 0 with 0
+			tick_index = np.absolute(xticklabels).argmin()
+			xticklabels[tick_index], xtickpositions[tick_index] = 0, pos
 
+			plot.set_xticks(xtickpositions)
+			plot.set_xticklabels(xticklabels)
+
+		# center line
 		plot.vlines(x=pos,
 					ymin=0, ymax=len(scores),
 					linestyles="dashed",
