@@ -3178,7 +3178,104 @@ class DistObj():
 	#--------------------------- Analysis to get preferred distances ---------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def analyze_signal_all(self, threads=1, prominence="zscore", stringency=2, min_count=1, save=None):
+	def _get_zscores(self, datasource, mixture=False, threads=1):
+		"""
+		Calculate zscores for the data in datasource. 
+
+		Parameters
+		--------------
+		mixture : bool, optional
+			Whether to estimate zscore using all datapoints (False) or to use a mixture model (True). Default: False. 
+		threads : int, optional
+
+		"""
+		#Get zscores in chunks
+		pool = mp.Pool(threads)
+		chunks = self.chunk_table(datasource, threads)
+		jobs = []
+		for chunk in chunks:
+			job = pool.apply_async(self._zscore_chunk, (chunk, mixture, ))
+			jobs.append(job)
+
+		#Collect results
+		pool.close()
+		pool.join() #waits for all jobs
+		results = [job.get() for job in jobs]
+
+		#Each result consists of the zscore table and a dict containing backgruond information
+		self.zscores = pd.concat([result[0] for result in results])
+		self.bg_dist = {}
+		for d in [result[1] for result in results]:
+			self.bg_dist.update(d) #add results to bg_dist
+
+	@staticmethod
+	def _zscore_chunk(datasource, mixture=False):
+
+		#Fetch information from data
+		indices = datasource.index.tolist() #all index names e.g. TF1-TF2
+		distance_cols = datasource.columns.tolist()[2:]
+
+		#Regular zscore
+		stds = datasource[distance_cols].std(ddof=0, axis=1)
+		stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
+		means = datasource[distance_cols].mean(axis=1)
+
+		#save information on background distribution
+		bg_dist = {}
+		for i, idx in enumerate(indices):
+			bg_dist[idx] = [(means[i], stds[i], 1.0)] #mean, std, weight for each pair
+
+		# Calculate zscore (x-mean)/std
+		zsc = datasource[distance_cols].subtract(means, axis=0).divide(stds, axis=0).fillna(0) 
+
+		#Save zscores to object
+		zscores = datasource.copy()
+		zscores.iloc[:,2:] = zsc
+
+		#If mixture == True, try to update with mixture model zscores
+		if mixture == True:
+		
+			for idx in datasource.index.tolist(): #index name e.g. TF1-TF2
+
+				X = datasource.loc[idx].iloc[2:].values.astype(float)
+
+				#Fit kernel to input data to increase signal
+				kernel = stats.gaussian_kde(X)
+				vals = kernel.resample(1000).reshape(-1, 1)
+
+				#The data is either 1 or two components; find which one
+				models = []
+				for n in [1,2]:
+					try:
+						model = GaussianMixture(n).fit(vals)
+						models.append(model)
+					except:
+						pass
+				
+				#If it was possible to fit one/two components; else, zscore stays original
+				if len(models) > 0:
+					AIC = [m.aic(X.reshape(-1, 1)) for m in models]
+
+					M_best = models[np.argmin(AIC)] #model with lowest AIC (1 or two components)
+					means = M_best.means_.ravel()
+					stds =  np.sqrt(M_best.covariances_.ravel())
+					weights = M_best.weights_
+
+					#Sort components based no weight (largest component is background)
+					idx_sort = np.argsort(-M_best.weights_)
+
+					#Add components to bg_dist in order
+					bg_dist[idx] = []
+					for i in idx_sort:
+						bg_dist[idx].append((means[i], stds[i], weights[i]))
+
+					dist_mean, dist_std, _ = bg_dist[idx][0] #the first distribution (largest component) is used as background
+					zscore = (X - dist_mean) / dist_std
+					zscores.loc[idx, distance_cols] = zscore #update ztscores for this idx
+
+		return (zscores, bg_dist)
+
+	def analyze_signal_all(self, threads=1, method="zscore", threshold=2, min_count=1, save=None):
 		""" 
 		After background correction is done, the signal is analyzed for peaks, 
 		indicating preferred binding distances. There can be more than one peak (more than one preferred binding distance) per 
