@@ -25,6 +25,8 @@ import qnorm #quantile normalization
 from scipy.stats import linregress
 from kneed import KneeLocator
 import statsmodels.api as sm
+from sklearn.mixture import GaussianMixture
+from scipy import stats
 
 #Modules for plotting
 import matplotlib.pyplot as plt
@@ -3262,41 +3264,31 @@ class DistObj():
 		Parameters
 		----------
 		threads : int
-			Number of threads used
-			Default: 1
-		prominence : number or ndarray or sequence or ["zscore"]
-			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information). 
-			If "zscore", the zscore for the pairs is used. Attention, this also changes the scale and output column names.
-			If a number or ndarray is given, it will be directly passed to the .find_peaks() function.
-			Default: "zscore"
-		stringency : float
-			stringency the prominence threshold should be multiplied with. 
-			Default: 2
+			Number of threads used. Default: 1.
+		method : str
+			Method for transforming counts. Can be one of: "zscore", "zscore-mixture" or "flat". 
+			If "zscore", the zscore for the pairs is used.
+			If "zscore", a modified z-score on a Gaussian Mixture Model of counts is used.
+			If "flat", no transformation is performed.
+			Default: "zscore".
+		threshold : float
+			The lower threshold for selecting peaks. Default: 2.
 		min_count : int
 			Minimum count of TF1-TF2 occurrences for a preferred distance to be called. Default: 1 (all occurrences are considered).
 		save : str
-			Path to save the plots to. If save is None plots won't be plotted. 
-			Default: None
+			Path to save the peaks table to. Default: None (table is not written).
 
 		Returns
 		-------
 		None 
-			Fills the object variable self.peaks, self.smooth_window, self.peaking_count
-		
-		See also
-		--------
-		tfcomb.objects.correct_all
-		tfcomb.utils.fast_rolling_mean
+			Fills the object variable self.peaks, self.peaking_count
 		"""
 
 		# Check given input	
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
-
-		if isinstance(prominence, str):
-			tfcomb.utils.check_string(prominence, ["zscore"])
-		else:
-			tfcomb.utils.check_value(prominence)
+		tfcomb.utils.check_value(threshold, name="threshold")
+		tfcomb.utils.check_string(method, ["zscore", "zscore-mixture", "flat"], name="method")
 
 		# sanity checks
 		self.check_datasource("distances")
@@ -3310,36 +3302,30 @@ class DistObj():
 
 		#Set threshold on the number of sites
 		if min_count > 1:
-			counts = self.distances[distance_cols].sum(axis=1)
+			n = datasource.shape[0]
+			counts = self.distances[distance_cols].sum(axis=1) #raw distances for counting sites
 			datasource = datasource.loc[counts >= min_count, :]
+			self.logger.info("Reduced number of rules from {0} to {1} having min_count >= {2}".format(n, datasource.shape[0], min_count))
 
 		# save params
-		self.stringency = stringency
-		self.prominence = prominence
+		self.method = method
+		self.threshold = threshold
 
-		if (prominence == "zscore"):
-			stds = datasource[distance_cols].std(ddof=0, axis=1)
-			stds[stds == 0] = np.nan #possible divide by zero in zscore calculation
-			means = datasource[distance_cols].mean(axis=1)
+		#Set input to functions 
+		self.logger.info("Calculating zscores for signals")
+		if method == "zscore":
+			self._get_zscores(datasource, threads=threads)
+			signal = self.zscores
 			
-			# Calculate zscore (x-mean)/std
-			zsc = datasource[distance_cols].subtract(means, axis=0).divide(stds, axis=0).fillna(0) 
+		elif method == "zscore-mixture":
+			self._get_zscores(datasource, mixture=True, threads=threads)
+			signal = self.zscores
 
-			textcols = datasource[['TF1', 'TF2']]
-			zsc = pd.concat((textcols, zsc), axis=1)
+		elif method == "flat":
+			signal = datasource #no change in signal
 
-			zsc = zsc.set_index(["TF1", "TF2"], drop=False)
-			zsc.index = zsc["TF1"] + "-" + zsc["TF2"]
-			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, zsc)
-			self.zscores = zsc
-			method = "zscore"
-
-			# update datasource
-			#self.datasource = self.zscores
-
-		else:
-			res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, datasource)
-			method = "flat"
+		#Find peaks from input signal
+		res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, signal)
 
 		#Collect results from all pairs to pandas dataframe
 		res = pd.concat([pd.DataFrame(pair_res) for pair_res in res]).reset_index(drop=True)
@@ -3347,8 +3333,7 @@ class DistObj():
 		#Format order of columns
 		columns = ["TF1", "TF2", "Distance", "peak_heights", "prominences", "Threshold"]
 		res = res[columns]
-		# distances are float - change to int
-		res["Distance"] = res["Distance"].astype(int) 
+		res["Distance"] = res["Distance"].astype(int) # distances are float - change to int
 		res.rename(columns={"peak_heights":"Peak Heights",
 							"prominences": "Prominences"}, inplace=True)
 		self.peaks = res
