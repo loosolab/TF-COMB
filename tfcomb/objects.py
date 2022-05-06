@@ -2662,33 +2662,32 @@ class DistObj():
 	#---------------------------------- Checks on variables-------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def check_distances(self):
-		""" Utility function to check if distances were set. If not, InputError is raised. """
+	def check_datasource(self, att):
+		""" Utility function to check if distances in .<att> were set. If not, InputError is raised. 
 
-		if self.distances is None:
-			raise InputError("No distances evaluated yet. Please run .count_distances() first.")
+		Paramters
+		----------
+		att : str
+			Attribute name for a dataframe in self.
+		"""
 			
-		#If self.distances is present, check if it is a Dataframe
-		tfcomb.utils.check_type(self.distances, pd.DataFrame, ".distances")
+		df = getattr(self, att) #fetched dataframe for this att
+		if df is None:
 	
+			if att == "distances" or att == "datasource":
+				raise InputError("No distances evaluated yet. Please run .count_distances() first.")
+			elif att == "corrected" or att == "uncorrected":
+				raise InputError("Distances are not corrected yet. Please run .correct_background() first.")
+			elif att == "scaled":
+				raise InputError("Distance are not yet scaled. Please run .scale() first.")
+			elif att == "smoothed":
+				raise InputError("Distances are not yet smoothed. Please run .smooth() first.")
+			elif att == "zscores":
+				raise InputError("Distances were not analyzed yet. Please run .analyze_signal_all() first.")
 	
-	def check_corrected(self):
-		""" Utility function to check if corrected were set. If not, InputError is raised. """
+		#If self.<att> is present, check if it is a Dataframe
+		tfcomb.utils.check_type(df, pd.DataFrame, att)
 
-		if self.corrected is None:
-			raise InputError("Distances not corrected yet. Please run .correct_background() first.")
-			
-		#If self.corrected is present, check if it is a Dataframe
-		tfcomb.utils.check_type(self.corrected, pd.DataFrame, ".corrected")
-	
-	def check_smoothed(self):
-		""" Utility function to check if corrected were set. If not, InputError is raised. """
-
-		if self.smoothed is None:
-			raise InputError("Values not smoothed yet. Please run .correct_all() with smoothing enabled first.")
-			
-		#If self.corrected is present, check if it is a Dataframe
-		tfcomb.utils.check_type(self.smoothed, pd.DataFrame, ".smoothed")
 	
 	def check_peaks(self):
 		""" Utility function to check if peaks were called. If not, InputError is raised. """
@@ -3119,7 +3118,7 @@ class DistObj():
 		"""
 
 		#Check input parameters
-		self.check_distances()
+		self.check_datasource("distances")
 		tfcomb.utils.check_value(frac, vmin=0, vmax=1, name="frac")
 		tfcomb.utils.check_value(threads, vmin=1, vmax=os.cpu_count(), integer=True, name="threads")
 
@@ -3321,8 +3320,7 @@ class DistObj():
 			tfcomb.utils.check_value(prominence)
 
 		# sanity checks
-		self.check_distances()
-		self.check_min_max_dist()
+		self.check_datasource("distances")
 	
 
 		#----- Find preferred peaks -----#
@@ -3519,7 +3517,7 @@ class DistObj():
 
 		""" 
 
-		self.check_distances()
+		self.check_datasource("distances")
 
 		#Calculate weighted average
 		sums = self.distances.iloc[:,2:].sum(axis=1).values
@@ -3540,7 +3538,7 @@ class DistObj():
 		pandas.DataFrame containing "max_distance" per rule.
 		"""
 
-		self.check_distances()
+		self.check_datasource("distances")
 
 		distances = self.distances.columns[2:].tolist()
 		idx = self.distances.iloc[:,2:].idxmax(axis=1)
@@ -3755,7 +3753,7 @@ class DistObj():
 		"""
 
 		self.check_min_max_dist()
-		self.check_distances()
+		self.check_datasource("distances")
 		tfcomb.utils.check_dir(save_path)
 
 		# warn user
