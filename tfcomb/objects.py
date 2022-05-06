@@ -3690,6 +3690,52 @@ class DistObj():
 	#---------------------------------------------- Plotting -----------------------------------------------------#
 	#-------------------------------------------------------------------------------------------------------------#
 	
+	def plot_bg_estimation(self, pair):
+		""" Plot the background estimation for pair for debugging background estimation
+
+		Parameters
+		------------
+		pair : tuple(str, str)
+			TF names to plot. e.g. ("NFYA","NFYB")
+		"""
+
+		TF1, TF2 = pair
+		ind = TF1 + "-" + TF2 # construct index
+
+		#Get counts for distances
+		distances = self.datasource.columns.tolist()[2:]
+		counts = self.datasource.loc[ind, distances]
+
+		#Initialize plot
+		_, ax = plt.subplots(ncols=2, figsize=(10,4))
+
+		#Plot distribution of distances
+		sns.histplot(x=distances, weights=counts, ax=ax[0], bins=len(distances))
+		ax[0].set_xlabel("Distance in bp")
+		ax[0].set_ylabel("Counts per bp")
+
+		#Plot hist of distances
+		sns.histplot(x=counts, ax=ax[1], stat="probability", color="grey")
+		ax[1].set_xlabel("Counts per distance")
+
+		#Add background distributions
+		dist_list = self.bg_dist.get(ind, [])
+		for i, (mu, std, weight) in enumerate(dist_list):
+
+			name = "Background distribution" if i == 0 else "Upper distribution"
+
+			#Create normal dist with mu/std
+			x = np.linspace(min(counts), max(counts), 100)
+			rv = stats.norm(mu, std)
+			pdf = rv.pdf(x)
+
+			ax[1].plot(x, pdf, label="{0} ({1:.1f}%)".format(name, weight*100))
+
+		#Final adjustments
+		ax[1].legend()
+		plt.subplots_adjust(wspace=0.3)
+
+
 	def _plot_all(self, save_path, method):
 		"""
 		Plots all pairs.
