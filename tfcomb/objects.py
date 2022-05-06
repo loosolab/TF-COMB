@@ -878,7 +878,7 @@ class CombObj():
 				p = Progress(n_background, 10, self.logger) #Setup progress object
 				for i in range(n_background):
 					kwargs.update({"seed": i})
-					l.append(tfcomb.utils.calculate_background(**kwargs))
+					l.append(tfcomb.utils.calculate_background(sites, **kwargs))
 					p.write_progress(i)
 
 			else:
@@ -957,6 +957,7 @@ class CombObj():
 		"""
 		
 		#Check input parameters
+		self.check_pair(pair)
 		self._check_TFBS()
 		self._prepare_TFBS() #prepare TFBS sites if not already existing
 		self.logger.debug("kwargs given in function: {0}".format(kwargs))
@@ -999,7 +1000,7 @@ class CombObj():
 			#Fetch locations in .TFBS
 			site1 = self.TFBS[site1_idx]
 			site2 = self.TFBS[site2_idx]
-			locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string)
+			locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string, directional=True)
 
 		#Check strandedness
 		if TF1_strand != None or TF2_strand != None:
@@ -2522,6 +2523,7 @@ class DistObj():
 		self.network = None			 # Network obj
 
 		self.distances = None 	     # Pandas DataFrame of size n_pairs x maxDist
+		self.uncorrected = None      # Pandas DataFrame of size n_pairs x maxDist
 		self.corrected = None        # Pandas DataFrame of size n_pairs x maxDist
 		self.linres = None           # Pandas DataFrame of size n_pairs x 3
 		self.normalized = None       # Pandas DataFrame of size n_pairs x maxDist
@@ -2554,6 +2556,7 @@ class DistObj():
 		self.max_overlap = 0         # Maximum overlap. Default 0.
 		self.directional = False     # True if direction is taken into account, false otherwise 
 		self.anchor = "inner"		 # How to count distances: inner, outer or center.
+		self.percentage = False		 # Whether to count distances as bp or percentages
 
 		# private constants
 		self._XLBL_ROTATION = 90    # label rotation degree for plotting x labels
@@ -2666,16 +2669,16 @@ class DistObj():
 
 	def check_datasource(self, att):
 		""" Utility function to check if distances in .<att> were set. If not, InputError is raised. 
-
+		
 		Paramters
 		----------
 		att : str
 			Attribute name for a dataframe in self.
 		"""
-			
+
 		df = getattr(self, att) #fetched dataframe for this att
 		if df is None:
-	
+
 			if att == "distances" or att == "datasource":
 				raise InputError("No distances evaluated yet. Please run .count_distances() first.")
 			elif att == "corrected" or att == "uncorrected":
@@ -2686,7 +2689,7 @@ class DistObj():
 				raise InputError("Distances are not yet smoothed. Please run .smooth() first.")
 			elif att == "zscores":
 				raise InputError("Distances were not analyzed yet. Please run .analyze_signal_all() first.")
-	
+
 		#If self.<att> is present, check if it is a Dataframe
 		tfcomb.utils.check_type(df, pd.DataFrame, att)
 
@@ -2720,16 +2723,17 @@ class DistObj():
 		----------
 		pair : tuple(str,str)
 			TF names for which the test should be performed. e.g. ("NFYA","NFYB")
-
 		"""
 
 		#check member size
 		if len(pair) != 2:
 			raise InputError(f'{pair} is not valid. It should contain exactly two TF names per pair. e.g. ("NFYA","NFYB")')
+		
 		# check tf names are string
 		tf1,tf2 = pair 
 		tfcomb.utils.check_type(tf1, str, "TF1 from pair")
 		tfcomb.utils.check_type(tf2, str, "TF2 from pair")
+
 		# check rules are filled
 		if self.rules is None:
 			raise InputError(".rules not filled. Please run .fill_rules() first.")
@@ -2948,7 +2952,8 @@ class DistObj():
 		self._raw_to_human_readable(name_to_idx) #fills in .distances
 
 		self.logger.info("Done finding distances! Results are found in .distances")
-		self.logger.info("Run .linregress_all() to fit linear regression")
+		self.logger.info("You can now run .smooth() and/or .correct_background() to preprocess sites before finding peaks.")
+		self.logger.info("Or you can find peaks directly using .analyze_signal_all()")
 	
 	def _raw_to_human_readable(self, name_to_idx):
 		""" Get the raw distance in human readable format. Sets the variable '.distances' which is a pd.Dataframe with the columns:
@@ -3117,6 +3122,7 @@ class DistObj():
 		results = [job.get() for job in jobs]
 
 		#Join tables
+		self.uncorrected = self.datasource #used for plotting
 		self.lowess = pd.concat([result[0] for result in results])
 		self.corrected = pd.concat([result[1] for result in results])
 		self.datasource = self.corrected #update datasource
@@ -3292,7 +3298,7 @@ class DistObj():
 
 		# sanity checks
 		self.check_datasource("distances")
-	
+		
 
 		#----- Find preferred peaks -----#
 		self.logger.info(f"Analyzing Signal with threads {threads}")
@@ -3316,7 +3322,7 @@ class DistObj():
 		if method == "zscore":
 			self._get_zscores(datasource, threads=threads)
 			signal = self.zscores
-			
+
 		elif method == "zscore-mixture":
 			self._get_zscores(datasource, mixture=True, threads=threads)
 			signal = self.zscores
@@ -3416,11 +3422,11 @@ class DistObj():
 		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
 		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks, datasource)
 		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
-
+		
 		# merge noisiness
 		self.peaks = self.peaks.merge(noisiness)
 		self.peaks.index = self.peaks["TF1"] + "-" + self.peaks["TF2"]
-		
+
 	
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" 
@@ -3844,7 +3850,7 @@ class DistObj():
 		# check method given is supported
 		tfcomb.utils.check_string(style, ["hist", "kde", "line"], name="style")
 
-		supported_methods = ["peaks", "correction", "datasource", "scaled", "corrected", "smoothed"]
+		supported_methods = ["peaks", "correction", "datasource", "distances", "scaled", "corrected", "smoothed"]
 		tfcomb.utils.check_string(method, supported_methods)
 
 		if collapse is not None:
@@ -3876,17 +3882,19 @@ class DistObj():
 		if method == "peaks":
 			if self.zscores is None: #'peaks' was chosen, but signals were not yet analyzed. Falling back to signal.
 				method = "signal"
-		source_table = self.datasource
+				source_table = self.datasource
 			else:	
 				source_table = self.zscores
 				ylbl = "Z-score normalized counts"
 		elif method == "correction":
+			if style == "kde":
+				raise InputError("Style 'kde' is not valid for method 'correction'. Please select another style or method.")
 			self.check_datasource("uncorrected")
 			source_table = self.uncorrected
 		else:
 			self.check_datasource(method)
 			source_table = getattr(self, method)
-		
+
 		# collapse or keep negative distances
 		if collapse:
 			source_table, peak_df = self._collapse_negative(source_table, method=collapse) #replaces all negative distances/peaks with "neg"
@@ -3906,8 +3914,8 @@ class DistObj():
 			x_neg_data = neg_pos
 			y_neg_data = y_data[0]
 			x_data = x_data[1:]
-				y_data = y_data[1:]
-			
+			y_data = y_data[1:]
+
 		#Replace config with default parameters
 		config = {} if config is None else config #initialize empty config
 		default = {"bins": len(x_data), "bw_adjust": 0.1}
@@ -3927,8 +3935,8 @@ class DistObj():
 		#Plot signal from source using different styles
 		if style == "kde": # kde plot, see seaborn.kdeplot() for more information
 
-			if sum(y_data < 0) > 0:
-				raise InputError("Style 'kde' is not valid for input distances below 0, e.g. if distances were corrected or if plotting zscores. Please select another method or style.") 
+			if min(y_data) < 0:
+				raise InputError("Style 'kde' is not valid for negative input data, e.g. if counts were corrected or if plotting zscores. Please select another method or style.") 
 
 			sns.kdeplot(x_data, weights=y_data, bw_adjust=config["bw_adjust"], x="distance", ax=ax, color=color)
 
@@ -3936,9 +3944,9 @@ class DistObj():
 
 			#get location of bins
 			_, bin_edges = np.histogram(x_data, weights=y_data, bins=config["bins"], range=(min(x_data), max(x_data)+1)) #range ensures that the last bin is included
-		
+
 			ax.hist(x_data, weights=y_data, bins=bin_edges-0.5, density=False, color=color)
-		
+
 			#if collapsed, plot positive and negative data separately
 			if collapse:
 				plt.bar(x_neg_data, y_neg_data, color='tab:orange') #plt.bar already aligns the bar to the center position, so no -0.5 adjustment is needed
@@ -3949,7 +3957,7 @@ class DistObj():
 
 		elif style == "line":
 			ax.plot(x_data, y_data, color=color)
-
+		
 
 		#------------ Plot additional elements (peaks / background) ----------#
 		if method == "peaks":
@@ -3979,16 +3987,16 @@ class DistObj():
 
 			plt.axhline(thresh, ls="--", color="grey", label="Threshold")
 			ax.legend()
-			
+
 		elif method == "correction":
-			
+
 			#Add lowess line
 			lowess = self.lowess.loc[ind, x_data]
 			plt.plot(x_data, lowess, color="red", label="Lowess smoothing", lw=2)
 			ax.legend()
 
 		#-------- Done plotting data; making final changes to axes -------#
-		
+
 		# add labels to plot
 		if self.percentage == True:
 			ax.set_xlabel('Distance (%)')
