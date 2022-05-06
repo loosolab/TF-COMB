@@ -1780,22 +1780,15 @@ def set_contrast(contrast, available_contrasts):
 
 # ------------------------- chunk operations ---------------------------------------- #
 
-def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
+def analyze_signal_chunks(datasource, threshold):
 	""" Evaluating signal for chunks. 
 		
 		Parameters
 		----------
-		pairs : list<tuple(str,str)>
-			TF names for which the preferred binding distance(s) should be found. e.g. ("NFYA","NFYB")
 		datasource : pd.DataFrame 
 			A (sub-)Dataframe with the (corrected) distance counts for the pairs
-		distances : list
-			A list of valid column names for the distances  
-		stringency : number
-			stringency the prominence threshold should be multiplied with.
-		prominence : number or ndarray or sequence
-			prominence parameter for peak calling (see scipy.signal.find_peaks() for detailed information)
-			Default: 0
+		threshold : float
+			Threshold for prominence and height in peak calling (see scipy.signal.find_peaks() for detailed information)
 
 		Returns
 		--------
@@ -1805,44 +1798,29 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 		See also
 		--------
 		tfcomb.object.analyze_signal_all
-
-		Note
-		-----
-		Constraint: DataFrame with corrected distance counts need to contain a signal for each pair given within pairs.
-
 	"""
 
 	# make sure index is correct
-	datasource = datasource.reset_index()
+	#datasource = datasource.reset_index()
 	datasource.index = datasource["TF1"] + "-" + datasource["TF2"]
+	distances = datasource.columns.tolist()[2:]
+	pairs = zip(datasource["TF1"], datasource["TF2"]) #.index().tolist() #list of pair tuples, e.g. ("NFYA","NFYB")
 
 	# get data column
 	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
 
+	#Calculate peaks for each row in datasource
 	results = []
 	for pair in pairs:
+
 		# get pair
 		tf1, tf2 = pair
 		ind = "-".join(pair)
 
+		signal = datasource.loc[ind, distances].values
+		x = [0] + list(signal) + [0]
 		# signal.find_peaks() will not find peaks on first and last position without having 
 		# an other number left and right. 
-		try:
-			signal = datasource.loc[ind].loc[distance_cols].values
-		except:
-			raise ValueError(f"No corrected distances found for pair  {ind}")	
-		x = [0] + list(signal) + [0]
-
-		# determine prominence
-		if prominence =="zscore":
-			prom = 1
-		elif prominence =="median":
-			prom = datasource.loc[ind].loc["median"].values
-		else:
-			prom = prominence
-		
-		# calc threshold 
-		threshold = prom * stringency
 
 		#Find positions of peaks
 		peaks_idx, properties = find_peaks(x, prominence=threshold, height=threshold)
@@ -1854,19 +1832,17 @@ def analyze_signal_chunks(pairs, datasource, distances, stringency, prominence):
 		peak_distances = [distance_cols[idx] for idx in peaks_idx]
 
 		n_peaks = len(peak_distances)
-		# insert tf1,tf2 names number of peaks times
-		properties["TF1"] = [tf1]*n_peaks
+		properties["TF1"] = [tf1]*n_peaks # insert tf1,tf2 names number of peaks times
 		properties["TF2"] = [tf2]*n_peaks
 
 		properties["Distance"] = peak_distances
 		properties["Threshold"] = threshold
 
-
 		results.append(properties)
 		
 	return results
 
-def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", height_multiplier=0.75):
+def evaluate_noise_chunks(signals, peaks, method="median", height_multiplier=0.75):
 	""" 
 	Evaluate the noisiness of a signal for chunks (a chunk can also be the whole dataset). 
 
@@ -1875,11 +1851,7 @@ def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", hei
 	pairs : list(tuples(str,str))
 		list of pairs to perform analysis on 
 	signals : pd.Dataframe 
-		A (sub-)Dataframe containing signal data for each pair (pairs without signal raises error)
-	peaks : pd.DataFrame
-		A (sub-)DataFrame containing all peaks for the given pairs (pairs without peaks are possible)
-	distances : list()
-		list with distance columns, either integer (usually between min distance and max distance) or artificall "neg" column
+		A (sub-)Dataframe containing signal data for pairs
 	method : str, otional
 		Method used to get noise measurement, either "median" or "min_max" allowed.
 		Default: "median" 
@@ -1898,34 +1870,25 @@ def evaluate_noise_chunks(pairs, signals, peaks, distances, method="median", hei
 
 	"""
 	# make sure index is correct
-	signals = signals.reset_index()
 	signals.index = signals["TF1"] + "-" + signals["TF2"]
-
-	peaks = peaks.reset_index()
-	peaks.index = peaks["TF1"] + "-" + peaks["TF2"]
+	pairs = zip(signals["TF1"], signals["TF2"])
 
 	check_value(height_multiplier, vmin=0, vmax=1)
 
-	# get data column
-	distance_cols = np.array([-1 if d == "neg" else d for d in distances]) #neg counts as -1
+	# get data for each pair
 	results = []
 	for pair in pairs:
-		# get pair
+		
 		tf1, tf2 = pair
 		ind = "-".join(pair)
-		try:
-			signal = signals.loc[ind].loc[distance_cols].values
-		except:
-			raise ValueError(f"No signal found for pair  {ind}")	
 		
-		# get peaks for specific pair
-		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)]
+		#Read information for pair
+		signal = signals.loc[ind].iloc[2:] #get signal for pair
+		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)] # get peaks for specific pair
 
 		results.append([tf1, tf2, _get_noise_measure(peaks_pair, signal, method, height_multiplier)])
 		
 	return results
-
-
 
 def _get_noise_measure(peaks, signal, method, height_multiplier):
 	#check method input

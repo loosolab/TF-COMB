@@ -2798,47 +2798,26 @@ class DistObj():
 									"evaluate_noise_chunks"], name="function")
 
 		self.logger.debug(f"Multiprocessing chunks for {func}")
+		
 		# open Pool for multiprocessing
 		pool = mp.Pool(threads)
 
-		# get valid distance columns
-		distances = self.distances.columns[2:].tolist()
-		
-		# calculate chunks. multiprocess every function call will result in mp overhead, therefore chunk it
-		if func == tfcomb.utils.evaluate_noise_chunks:
-			# list all TF pairs based on distances
-			#ind= self.peaks.index
-			names = list(zip(list(self.peaks.TF1.values), list(self.peaks.TF2.values))) # "tf names may contain "-"
-		else:
-			# list all TF pairs based on distances
-			#ind = datatable.index 
-			names = list(zip(list(self.distances.TF1.values), list(self.distances.TF2.values))) # "tf names may contain "-"
-
-		names = list(set(names))
-		n_names = len(names)
-		chunks = math.ceil(n_names/threads) # last chunk will be chunks - (threads - 1) smaller
-
+		#Chunk table into threads. multiprocess every function call will result in mp overhead, therefore chunk it
+		chunks = self.chunk_table(datatable, threads)
 		
 		# start one chunk per thread
 		jobs = []
-		for i in range(threads):
+		for chunk in chunks: #range(threads):
 
-			# get name subset for chunk
-			subset_names = names[(i*chunks):(i*chunks+chunks)]
-			subset_ind = s = ["-".join(x) for x in subset_names]
-
-			# subset distance information for names in this chunk
-			counts = datatable.sort_index().loc[subset_ind]
-
+			#Apply function with parameters and add to pool
 			if func == tfcomb.utils.analyze_signal_chunks:
-				# apply function with params
-				job = pool.apply_async(func, args=(subset_names, counts, distances, self.stringency, self.prominence, ))
+				job = pool.apply_async(func, args=(chunk, self.threshold, )) # apply function with params
 
 			elif func == tfcomb.utils.evaluate_noise_chunks:
-				# subset peaks
-				peaks = self.peaks.sort_index().loc[subset_ind]
-				# apply function with params
-				job = pool.apply_async(func, args=(subset_names, counts, peaks, distances, self._noise_method, self._height_multiplier, ))
+				# subset peaks to those in chunk
+				peaks_sub = self.peaks.loc[chunk.index.tolist()]
+				job = pool.apply_async(func, args=(chunk, peaks_sub, self._noise_method, self._height_multiplier, )) # apply function with params
+
 			jobs.append(job)
 
 		# accept no new jobs
@@ -3443,17 +3422,20 @@ class DistObj():
 		self._height_multiplier = height_multiplier
 		
 		datasource = self.datasource
-		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
 
+		#Subset datasource to TFs with peaks
+		peak_pairs = set(self.peaks.index)
+		datasource = datasource[datasource.index.isin(peak_pairs)]
+
+		#Evaluate noisiness
+		self.logger.info(f"Evaluating noisiness of the signals with {threads} threads")
 		res = self._multiprocess_chunks(threads, tfcomb.utils.evaluate_noise_chunks, datasource)
 		noisiness = pd.DataFrame(res, columns=["TF1", "TF2", "Noisiness"])
 
 		# merge noisiness
 		self.peaks = self.peaks.merge(noisiness)
-
-		#res = pd.DataFrame(res[0], columns=["TF1", "TF2", "Distance", "Peak Heights", "Prominences", "Threshold", "TF1_TF2_count", "Noisiness"])
+		self.peaks.index = self.peaks["TF1"] + "-" + self.peaks["TF2"]
 		
-		#self.peaks = res
 	
 	def rank_rules(self, by=["Distance_percent", "Peak Heights", "Noisiness"], calc_mean=True):
 		""" 
