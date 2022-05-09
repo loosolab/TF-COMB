@@ -383,7 +383,20 @@ class TFBSPairList(list):
 		self._last_align = align
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True, legend_name_score="Binding Score", xtick_num=10):
+	def pairMap(self,
+				logNorm_cbar=None,
+				show_binding=True,
+				flank_plot="strand",
+				figsize=(7, 14),
+				output=None,
+				flank=None,
+				align=None,
+				alpha=0.7,
+				cmap="seismic",
+				show_diagonal=True,
+				legend_name_score="Binding Score",
+				xtick_num=10,
+				log=np.log1p):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -418,7 +431,10 @@ class TFBSPairList(list):
 			legend_name_score : str, default 'Binding Score'
 				Name of the score legend (upper legend).
 			xtick_num : int, default 10
-				Number of ticks shown on the x-axis. Disable ticks with None or values <0.
+				Number of ticks shown on the x-axis. Disable ticks with None or values < 0.
+			log : function, default numpy.log1p
+				Function applied to each row of scores. Excludes 0 and will use absolute value for negative numbers adding the sign afterwards.
+				Use any of the numpy.log functions. For example numpy.log, numpy.log10 or numpy.log1p. None to disable.
 		
 		Returns:
 		----------
@@ -448,6 +464,18 @@ class TFBSPairList(list):
 
 		# load data
 		pairs, scores = self.plotting_tables
+
+		# log scores
+		if log:
+			def log_row(row):
+				out = np.zeros(len(row))
+				
+				out[row > 0] = log(row[row > 0])
+				out[row < 0] = -log(np.abs(row[row < 0]))
+				
+				return pd.Series(out)
+
+			scores = scores.apply(axis=1, func=log_row)
 
 		# load custom colorbar normalizaition class
 		# https://stackoverflow.com/a/65260996
