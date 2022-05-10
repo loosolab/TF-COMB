@@ -396,7 +396,8 @@ class TFBSPairList(list):
 				show_diagonal=True,
 				legend_name_score="Bigwig Score",
 				xtick_num=10,
-				log=np.log1p):
+				log=np.log1p,
+				dpi=300):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 		
@@ -435,6 +436,8 @@ class TFBSPairList(list):
 			log : function, default numpy.log1p
 				Function applied to each row of scores. Excludes 0 and will use absolute value for negative numbers adding the sign afterwards.
 				Use any of the numpy.log functions. For example numpy.log, numpy.log10 or numpy.log1p. None to disable.
+			dpi : float, default 300
+				The resolution of the figure in dots-per-inch.
 		
 		Returns:
 		----------
@@ -452,7 +455,7 @@ class TFBSPairList(list):
 		# should be set by default but for some reason it isn't for matplotlib 3.5.1/ numpy 1.21.5
 		np.seterr(under='ignore')
 
-		fig = plt.figure(figsize=figsize)
+		fig = plt.figure(figsize=figsize, dpi=dpi)
 
 		# compute plotting tables with custom flank
 		if not flank is None and flank != self._last_flank or not align is None and align != self._last_align:
@@ -571,7 +574,8 @@ class TFBSPairList(list):
 						cbar=True,
 						cbar_ax=heatmap_led,
 						norm=norm,
-						ax=heatmap)
+						ax=heatmap,
+						rasterized=True)
 
 		# set title
 		name1, name2 = set(pairs["site1_name"]).pop(), set(pairs["site2_name"]).pop()
@@ -607,7 +611,8 @@ class TFBSPairList(list):
 					alpha=alpha,
 					color="gray",
 					edgecolor=None,
-					lw=0
+					lw=0,
+					rasterized=True
 				))
 
 				# right sites
@@ -618,7 +623,8 @@ class TFBSPairList(list):
 					alpha=alpha,
 					color="gray",
 					edgecolor=None,
-					lw=0
+					lw=0,
+					rasterized=True
 				))
 
 		# diagonal binding lines
@@ -677,7 +683,8 @@ class TFBSPairList(list):
 							cmap=cmap,
 							cbar=True,
 							cbar_ax=strand_led,
-							ax=strand1)
+							ax=strand1,
+							rasterized=True)
 
 		colorbar = plot.collections[0].colorbar 
 		r = colorbar.vmax - colorbar.vmin 
@@ -692,7 +699,8 @@ class TFBSPairList(list):
 					xticklabels=False,
 					cmap=cmap,
 					cbar=False,
-					ax=strand2)
+					ax=strand2,
+					rasterized=True)
 		
 		# save plot
 		if output:
