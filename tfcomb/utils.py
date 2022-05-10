@@ -394,7 +394,7 @@ class TFBSPairList(list):
 				alpha=0.7,
 				cmap="seismic",
 				show_diagonal=True,
-				legend_name_score="Binding Score",
+				legend_name_score="Bigwig Score",
 				xtick_num=10,
 				log=np.log1p):
 		"""
@@ -428,7 +428,7 @@ class TFBSPairList(list):
 				Color palette used in the main heatmap. Forwarded to seaborn.heatmap(cmap)
 			show_diagonal : boolean, default True
 				Shows diagonal lines for identifying preference in binding distance.
-			legend_name_score : str, default 'Binding Score'
+			legend_name_score : str, default 'Bigwig Score'
 				Name of the score legend (upper legend).
 			xtick_num : int, default 10
 				Number of ticks shown on the x-axis. Disable ticks with None or values < 0.
