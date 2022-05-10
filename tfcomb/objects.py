@@ -3538,6 +3538,29 @@ class DistObj():
 		
 		return pd.Series(occurrences)		
 
+	def count_peaks(self):
+		"""
+		Counts the number of identified distance peaks per rules. 
+
+		Returns
+		---------
+		pd.DataFrame
+			A dataframe containing 'n_peaks' (column) for each TF1-TF2 rule (index)
+		"""
+		self.check_peaks()
+
+		peak_counts = self.peaks.groupby(["TF1", "TF2"]).size().to_frame().rename(columns={0:"n_peaks"}).reset_index()
+		peak_counts.index = peak_counts["TF1"] + "-" + peak_counts["TF2"]
+		peak_counts.drop(columns=["TF1", "TF2"], inplace=True)
+
+		#Merge peak counts with rules
+		counts = self.rules[["TF1", "TF2"]]
+		counts = counts.merge(peak_counts, left_index=True, right_index=True, how="left")
+		counts = counts.fillna(0) #Fill with 0 for rules without peaks
+		counts["n_peaks"] = counts["n_peaks"].astype(int)
+
+		return(counts)
+
 	def classify_rules(self):
 		""" 
 		Classify all rules True if at least one peak was found, False otherwise.  
