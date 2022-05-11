@@ -714,7 +714,7 @@ class TFBSPairList(list):
 
 		return grid
 
-	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, output=None, flank=None, align=None, _ret_param=False):
+	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, ylabel="Bigwig signal", output=None, flank=None, align=None, figsize=(6, 4), dpi=70, _ret_param=False):
 		"""
 		Create an aggregated footprint track on the paired binding sites.
 		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
@@ -733,12 +733,18 @@ class TFBSPairList(list):
 				Y-axis minimum limit.
 			ymax : int, default None
 				Y-axis maximum limit.
+			ylabel : str, default 'Bigwig signal'
+				Label for the y-axis.
 			output : str, default None
 				Save plot to given file.
 			flank : int or int tuple, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 			align : str, default None
 				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
+			figsize : int tuple, default (3, 3)
+				Figure dimensions.
+			dpi : float, default 70
+				The resolution of the figure in dots-per-inch.
 			_ret_param : bool, default False
 				Intended for internal animation use!
 				If True will cause the function to return a dict of function call parameters used to create plot.
@@ -806,12 +812,12 @@ class TFBSPairList(list):
 
 		
 		##### plot #####
-		fig, ax = plt.subplots()
+		fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 		
 		# add aggregated line
 		parameter["set"] = {"ylim": (ymin, ymax),
 							"xlim": (xmin, xmax),
-							"ylabel": "Bigwig signal",
+							"ylabel": ylabel,
 							"xlabel": "Basepair",
 							"title": f"Distance: {dist} | Sites aggregated: {len(tmp_pairs)}\n{lname} <--> {rname}"}
 		
@@ -866,7 +872,7 @@ class TFBSPairList(list):
 		else:
 			return ax
 
-	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, interval=50, repeat_delay=0, repeat=False, output=None, flank=None, align=None):
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, ylabel="Bigwig signal", interval=50, repeat_delay=0, repeat=False, output=None, flank=None, align=None, figsize=(6, 4), dpi=70):
 		"""
 		Combine a set of pairTrack plots to a .gif.
 			
@@ -885,6 +891,8 @@ class TFBSPairList(list):
 				Y-axis minimum limit
 			ymax : int, default None
 				Y-axis maximum limit
+			ylabel : str, default 'Bigwig signal'
+				Label for the y-axis.
 			interval : int, default 50
 				Delay between frames in milliseconds
 			repeat_delay : int, default 0
@@ -897,6 +905,10 @@ class TFBSPairList(list):
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 			align : str, default None
 				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
+			figsize : int tuple, default (6, 4)
+				Figure dimensions.
+			dpi : float, default 70
+				The resolution of the figure in dots-per-inch.
 		
 		Returns:
 		----------
@@ -935,6 +947,7 @@ class TFBSPairList(list):
 													end=start + site_num if start + site_num < len(pairs) else len(pairs),
 													ymin=ymin,
 													ymax=ymax,
+													ylabel=ylabel,
 													_ret_param=True
 													)
 									)
@@ -955,6 +968,7 @@ class TFBSPairList(list):
 				parameter_list.append(self.pairTrack(dist=d,
 													ymin=ymin,
 													ymax=ymax,
+													ylabel=ylabel,
 													_ret_param=True
 													)
 									)
@@ -964,7 +978,7 @@ class TFBSPairList(list):
 				
 		##### Setup animation #####
 		# setup figure to draw on
-		fig, axes = plt.subplots()
+		fig, axes = plt.subplots(figsize=figsize, dpi=dpi)
 		line, = axes.plot([])
 		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
 		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
@@ -1007,7 +1021,7 @@ class TFBSPairList(list):
 		
 		# save animation
 		if output:
-			anim_created.save(output, dpi=300)
+			anim_created.save(output, dpi=dpi)
 			pbar.reset()
 		
 		# prepare output
@@ -1020,7 +1034,7 @@ class TFBSPairList(list):
 		
 		return html
 
-	def pairLines(self, x, y, figsize=(6, 4), output=None):
+	def pairLines(self, x, y, figsize=(6, 4), dpi=70, output=None):
 		"""
 		Compare miscellaneous values between TF-pair.
 		
@@ -1032,6 +1046,8 @@ class TFBSPairList(list):
 				Data to show on the y-axis. Set None to get a list of options.
 			figsize : int tuple, default (6, 4)
 				Figure dimensions.
+			dpi : float, default 70
+				The resolution of the figure in dots-per-inch.
 			output : str, default None
 				Save plot to given file.
 
@@ -1086,7 +1102,7 @@ class TFBSPairList(list):
 			hue1, hue2 = hue1 + "_1", hue2 + "_2"
 		
 		##### plotting #####
-		plt.figure(figsize=figsize)
+		plt.figure(figsize=figsize, dpi=dpi)
 		
 		plot = sns.lineplot(x=x1.append(x2).values,
 							y=y1.append(y2).values,
