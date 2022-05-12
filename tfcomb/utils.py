@@ -856,13 +856,13 @@ class TFBSPairList(list):
 											"alpha": 0.2})
 		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][1]))
 		
-		# show plot if not in parameter mode
-		if not _ret_param:
-			plt.show()
-		
 		# save plot
 		if output:
 			plt.savefig(output)
+
+		# show plot if not in parameter mode
+		if not _ret_param:
+			plt.show()
 
 		# close figure
 		plt.close()
