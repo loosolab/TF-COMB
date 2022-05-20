@@ -34,18 +34,28 @@ from IPython import display
 
 #----------------- Minimal TFBS class based on the TOBIAS 'OneRegion' class -----------------#
 
-class OneTFBS():
+class OneTFBS(list):
 	""" Collects location information about one single TFBS """
 
-	def __init__(self, **kwargs):
+	def __init__(self, lst=[]):
+		
+		super(OneTFBS, self).__init__(lst)
+
+		bed_fmt = ["chrom", "start", "end", "name", "score", "strand"]
 
 		#Initialize attributes
-		for att in ["chrom", "start", "end", "name", "score", "strand"]:
+		for att in bed_fmt:
 			setattr(self, att, None)
 
+		#Set attributes from list
+		for i in range(min(len(self), len(bed_fmt))):
+			setattr(self, bed_fmt[i], self[i])
+
 		#Overwrite attributes with kwargs
-		for att, value in kwargs.items():
-			setattr(self, att, value)
+		if hasattr(lst, "__dict__"):
+			kwargs = lst.__dict__
+			for att, value in kwargs.items():
+				setattr(self, att, value)
 
 		self.get_width = OneRegion.get_width
 	
@@ -57,21 +67,24 @@ class OneTFBS():
 	def __repr__(self):
 		return(self.__str__())
 
-	def from_oneregion(self, oneregion):
-		self.chrom = oneregion.chrom
-		self.start = oneregion.start
-		self.end = oneregion.end
-		self.name = oneregion.name
-		self.score = oneregion.score
-		self.strand = oneregion.strand
-
-		return(self)
-
 
 class TFBSPair():
 	""" Collects information about a co-occurring pair of TFBS """
 
-	def __init__(self, TFBS1, TFBS2, anchor="inner", directional=False):
+	def __init__(self, TFBS1, TFBS2, anchor="inner", simplify=False):
+		"""
+		
+		Parameters
+		-----------
+		TFBS1 : OneTFBS
+			OneTFBS object for the first TFBS.
+		TFBS2 : OneTFBS
+			OneTFBS object for the second TFBS.
+		anchor : str
+			Anchor is used to calculate distances. Must be one of "inner", "outer" or "center". Default: "inner".
+		simplify : boolean
+			Whether to simplify the orientation to "opposite" (convergent/divergent) and "same" (TF1-TF2/TF2-TF1). Default: False.
+		"""
 
 		self.site1 = TFBS1 #OneTFBS object
 		self.site2 = TFBS2 #OneTFBS object
@@ -86,6 +99,17 @@ class TFBSPair():
 			TF2_anchor = (self.site2.start + self.site2.end) / 2
 			distance = 	int(TF2_anchor - TF1_anchor)
 		self.distance = distance
+
+		self._set_orientation(simplify=simplify)
+
+	def _set_orientation(self, simplify=True):
+		""" Sets the .orientation attribute of pair dependent on the relative orientation of sites in TFBSPair. 
+		
+		Parameters
+		-------------
+		simplify : bool
+			Whether to simplify the orientation of sites to "opposite" (convergent/divergent) and "same" (TF1-TF2/TF2-TF1). Default: True.
+		"""
 
 		#Calculate orientation scenario
 		if self.site1.strand == self.site2.strand:
@@ -123,8 +147,8 @@ class TFBSPair():
 				elif self.site1.strand == "-" and self.site2.strand == "+":
 					self.orientation = "divergent"
 
-		#Simplify orientation if directional = False
-		if directional == False:
+		#Simplify orientation if chosen
+		if simplify == True:
 			translation_dict = {"convergent": "opposite", 
 								"divergent": "opposite", 
 								"TF1-TF2": "same",
@@ -949,6 +973,70 @@ class TFBSPairList(list):
 		
 		return plot
 
+	def set_orientation(self, simplify=False):
+		""" Fill orientation of each TF pair """
+
+		for pair in self:
+			pair._set_orientation(simplify=simplify)
+
+
+	def plot_distances(self, groupby="orientation", figsize=None, group_order=None):
+		""" Plot the distribution of distances between TFBS-pairs.
+		
+		Parameters
+		-----------
+		groupby : str
+			An attribute of each pair to group distances by. If None, all distances are shown without grouping. Default: "orientation".
+		figsize : tuple of ints
+			Set the figure size, e.g. (8,10). Default: None (default matplotlib figuresize).
+		"""
+
+		#get all possible values in groupby
+		#group_values = set([pair.getattr("orientation") for pair in self])
+
+		#Collect distances per group
+		distances = {}
+		if groupby is not None:
+			for pair in self:
+				pair_group = getattr(pair, groupby)
+				distances[pair_group] = distances.get(pair_group, []) + [pair.distance]
+		else:
+			distances["all"] = [pair.distance for pair in self]
+
+		#Setup figure
+		fig, axarr = plt.subplots(len(distances), sharex=True, sharey=True, figsize=figsize)
+
+		#adjust for one-group plotting
+		if len(distances) == 1:
+			axarr = [axarr] #make axarr subscriptable
+
+		#Plot distances per group
+		if group_order == None:
+			group_order = list(distances.keys())
+		else:
+			#todo: check that groups are in distances
+			pass
+
+		for i, group in enumerate(group_order):
+			lst = distances[group]
+			axarr[i].hist(lst, bins=int(max(lst)) + 1)
+			
+			axarr[i].set_ylabel("Count")
+			axarr[i].text(1, 0.5, f"({group})",
+						horizontalalignment='left',
+						verticalalignment='center',
+						transform=axarr[i].transAxes)
+
+		#Make final adjustments
+		for ax in axarr:
+			ax.spines['right'].set_visible(False)
+			ax.spines['top'].set_visible(False)
+			
+		_ = axarr[-1].set_xlabel("Distance")
+
+
+		return axarr
+
 #------------------------------ Notebook / script exceptions -----------------------------#
 
 def _is_notebook():
@@ -1421,7 +1509,7 @@ def calculate_TFBS(regions, motifs, genome, resolve="merge"):
 		region_TFBS = motifs.scan_sequence(seq, region)
 
 		#Convert RegionLists to TFBS class
-		region_TFBS = RegionList([OneTFBS().from_oneregion(region) for region in region_TFBS])
+		region_TFBS = RegionList([OneTFBS(region) for region in region_TFBS])
 		region_TFBS.loc_sort()
 
 		TFBS_list += region_TFBS
@@ -1747,7 +1835,11 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, 
 
 def is_symmetric(matrix):
 	""" Check if a matrix is symmetric around the diagonal """
-	b = np.allclose(matrix, matrix.T, equal_nan=True)
+
+	if matrix.shape[0] != matrix.shape[1]:
+		b = False #not symmetric if matrix is not square
+	else:
+		b = np.allclose(matrix, matrix.T, equal_nan=True)
 	return(b)
 
 def make_symmetric(matrix):
@@ -1872,7 +1964,7 @@ def evaluate_noise_chunks(signals, peaks, method="median", height_multiplier=0.7
 	# make sure index is correct
 	signals.index = signals["TF1"] + "-" + signals["TF2"]
 	pairs = zip(signals["TF1"], signals["TF2"])
-
+	
 	check_value(height_multiplier, vmin=0, vmax=1)
 
 	# get data for each pair
@@ -1881,7 +1973,7 @@ def evaluate_noise_chunks(signals, peaks, method="median", height_multiplier=0.7
 		
 		tf1, tf2 = pair
 		ind = "-".join(pair)
-		
+
 		#Read information for pair
 		signal = signals.loc[ind].iloc[2:] #get signal for pair
 		peaks_pair = peaks[(peaks.TF1 == tf1) & (peaks.TF2 == tf2)] # get peaks for specific pair
@@ -1951,39 +2043,6 @@ def _expand_peak(start_pos, cut_off, signal):
 				right = pos_right - 1 # we are one to far right
 			pos_right += 1
 	return(left, right)
-
-def fast_rolling_mean(arr, w):
-	"""
-	Adaption of tobias.signals.fast_rolling_math to avoid NaN in flanking positions
-	Rolling operation "mean" of arr with window size w 
-
-	Parameters
-	----------
-	arr : np.ndarray[np.float64_t, ndim=1]
-		array to perform operation on
-	w : int
-		window size 
-
-	See also
-	--------
-	tobias.utils.signals.fast_rolling_math 
-	"""
-
-	lf = int(np.ceil( (w-1) / 2.0))
-	rf = int(np.floor( (w-1) / 2.0))
-	#Expand the array with the first value to the left 
-	arr = np.concatenate((np.repeat(arr[0], lf), arr))
-	#Expand the array with the last value to the right 
-	arr = np.concatenate((arr, np.repeat(arr[-1], rf)))
-
-	# use fast_rolling_math from tobias.utils.signals
-	roll_arr = fast_rolling_math(arr.astype(float), w, "mean")
-
-
-	#remove nan's ( artifical new flanks)
-	roll_arr = roll_arr[~np.isnan(roll_arr)]
-
-	return roll_arr
 
 def getAllAttr(object, private=False, functions=False):
 	"""
