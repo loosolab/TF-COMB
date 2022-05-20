@@ -950,10 +950,6 @@ class CombObj():
 		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
 			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
 
-		See also
-		---------
-		tfcomb.utils.get_pair_results
-		tfcomb.CombObj.count_withinmo
 		"""
 		
 		#Check input parameters
@@ -977,6 +973,7 @@ class CombObj():
 		
 		#Sort sites based on the anchor position
 		sites = self._sites
+		if kwargs["anchor"] == "center":
 		sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
 		idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
 		sites = sites[sort_idx, :]
@@ -988,7 +985,7 @@ class CombObj():
 
 		#Fetch locations from TFBS list
 		locations = tfcomb.utils.TFBSPairList([None]*n_locations)
-		#TFBS_sorted = [self.TFBS[i] for i in sort_idx]
+		if kwargs["anchor"] == "center":
 		for i in range(n_locations):
 
 			site1_idx = idx_mat[i, 0] #location in sorted sites
@@ -1000,7 +997,17 @@ class CombObj():
 			#Fetch locations in .TFBS
 			site1 = self.TFBS[site1_idx]
 			site2 = self.TFBS[site2_idx]
-			locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string, directional=True)
+				locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string)
+		else:
+			for i in range(n_locations):
+
+				site1_idx = idx_mat[i, 0] #no need to convert idx back to original, since sites were not sorted
+				site2_idx = idx_mat[i, 1]
+
+				#Fetch locations in .TFBS
+				site1 = self.TFBS[site1_idx]
+				site2 = self.TFBS[site2_idx]
+				locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string)
 
 		#Check strandedness
 		if TF1_strand != None or TF2_strand != None:
