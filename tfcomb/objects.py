@@ -3046,14 +3046,16 @@ class DistObj():
 		self.datasource = self.scaled
 
 	#Smooth signals
-	def smooth(self, window_size=3):
+	def smooth(self, window_size=3, reduce=True):
 		""" Helper function for smoothing all rules with a given window size.
 			
 		Parameters
 		----------
-		window_size : int 
-			Window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides.
-			To avoid flanking NaN regions the signal is expanded with the first/last value (see tobias.utils.signals.fast_rolling_math). Default: 3.
+		window_size : int, optional 
+			Window size for the rolling smoothing window. A bigger window produces larger flanking ranks at the sides. Default: 3.
+		reduce : bool, optional
+			Reduce the distances to the positions with a full window, i.e. if the window size is 3, the first and last distances are removed.
+			This prevents flawed enrichment of peaks at the borders of the distances. Default: True. 
 
 		Returns
 		--------
@@ -3068,9 +3070,20 @@ class DistObj():
 
 		self.logger.info(f"Smoothing signals with window size {window_size}")
 		mat = self.datasource.iloc[:,2:].to_numpy() #distances counted
-		smoothed_mat = np.array([tfcomb.utils.fast_rolling_mean(mat[row,:], window_size) for row in range(len(mat))]) #smooth values per
-		self.smoothed = self.datasource.copy() #create dataframe from datasource
-		self.smoothed.iloc[:,2:] = smoothed_mat 
+		distances = self.datasource.columns[2:]
+		smoothed_mat = np.array([tfcomb.counting.rolling_mean(mat[row,:].astype(float), window_size) for row in range(len(mat))]) #smooth values per pair
+		
+		#Cut the borders of smoothed mat if reduce == True
+		if reduce == True:
+			lf = int(np.floor((window_size - 1) / 2.0))
+			rf = int(np.ceil((window_size - 1)/ 2.0))
+			smoothed_mat = smoothed_mat[:,lf:-rf]
+			distances = distances[lf:-rf]
+		
+		#Create final table
+		smoothed_table = pd.DataFrame(smoothed_mat, columns=distances).reset_index(drop=True)
+		self.smoothed = pd.concat([self.datasource.iloc[:,:2].reset_index(drop=True), smoothed_table], axis=1)
+		self.smoothed.index = self.datasource.index #reset index
 
 		#Save information about smoothing to object
 		self.smooth_window = window_size

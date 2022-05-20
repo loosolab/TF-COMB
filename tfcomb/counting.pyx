@@ -4,6 +4,41 @@ import numpy as np
 cimport numpy as np
 import cython
 
+
+#---------------------------------------------------------------------------------------#
+def rolling_mean(np.ndarray[np.float64_t, ndim=1] arr, int w):
+	"""
+	Rolling mean of arr with window size w. The mean of the border regions are calculated on the reduced window, 
+	e.g. with a window size of 3, the first and last windows only consists of 2 values.
+	"""
+
+	cdef int L = arr.shape[0]
+	cdef np.ndarray[np.float64_t, ndim=1] mean_arr = np.zeros(L)   #mean of values per window
+	
+	cdef int i, j, w_start, w_end, n_vals
+	cdef int lf = int(np.floor((w - 1) / 2.0))
+	cdef int rf = int(np.ceil((w - 1)/ 2.0))
+	cdef float valsum
+
+	#Mean per window
+	for i in range(L):
+		
+		#Ranges of window
+		w_start = max(0, i-lf)
+		w_end = min(i+rf+1, L) #w_end includes +1
+
+		#Sum in window
+		valsum = 0
+		for j in range(w_start, w_end):
+			valsum += arr[j]
+		n_vals = w_end - w_start
+
+		#Mean of window
+		mean_arr[i] = valsum / (n_vals*1.0)
+
+	return mean_arr
+
+
 #---------------------------------------------------------------------------------------#
 @cython.cdivision(True)		#no check for zero division
 @cython.boundscheck(False)	#dont check boundaries
