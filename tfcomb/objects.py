@@ -3849,7 +3849,7 @@ class DistObj():
 
 		return (datasource, peaks)
 
-	def plot(self, pair, method="peaks", style="hist", save=None, config=None, collapse=None, ax=None, color='tab:blue'):
+	def plot(self, pair, method="peaks", style="hist", save=None, config=None, collapse=None, ax=None, color='tab:blue', max_dist=None):
 		"""
 		Produces different plots.
 		
@@ -3882,6 +3882,8 @@ class DistObj():
 			Plot to an existing axis object. Default: None (a new axis will be created).
 		color : str, optional
 			Color of the plot hist/line/kde. Default: "tab:blue".
+		max_dist : int, optional
+			Option to set the max_dist independent of the max_dist used for counting distances. Default: None (max_dist is not changed).
 		"""
 
 		#---------------- Input checks ------------------#
@@ -3916,10 +3918,7 @@ class DistObj():
 	
 		#---------------- Setup data to plot --------------#
 
-		if hasattr(self, "corrected"):
-			ylbl = "Corrected count per distance"
-		else:
-			ylbl = "Count per Distance" # standard ylbl, replace with specific option if needed
+		ylbl = "Count per distance" # standard ylbl, replace with specific option if needed
 	
 		#Select datasource to plot
 		if method == "peaks":
@@ -3929,6 +3928,13 @@ class DistObj():
 			else:	
 				source_table = self.zscores
 				ylbl = "Z-score normalized counts"
+
+				#check that pair was in zscores
+				if not ind in self.zscores.index:
+					self.logger.warning("TF pair '{0}' distances were counted, but not analyzed due to thresholds set in analyze_signal_all. Falling back to viewing signal.".format(ind))
+					method = "signal"
+					source_table = self.datasource
+
 		elif method == "correction":
 			if style == "kde":
 				raise InputError("Style 'kde' is not valid for method 'correction'. Please select another style or method.")
@@ -3938,6 +3944,11 @@ class DistObj():
 			self.check_datasource(method)
 			source_table = getattr(self, method)
 
+			if method == "corrected":
+				ylbl = "Corrected count per distance"
+			if method == "scaled": 
+				ylbl = "Scaled count per distance"
+
 		# collapse or keep negative distances
 		if collapse:
 			source_table, peak_df = self._collapse_negative(source_table, method=collapse) #replaces all negative distances/peaks with "neg"
@@ -3945,8 +3956,14 @@ class DistObj():
 			peak_df = self.peaks
 
 		#Establish x and y-values
-		x_data = source_table.columns[2:].tolist() #x_data is distances
-		y_data = source_table.loc[ind].iloc[2:].tolist()
+		x_data = source_table.columns[2:].values #x_data is distances
+		y_data = source_table.loc[ind].iloc[2:].values
+
+		#Reduce to max_dist if chosen
+		if max_dist is not None:
+			x_bool = [x <= max_dist for x in x_data]
+			x_data = x_data[x_bool]
+			y_data = y_data[x_bool]
 
 		#Split neg from data if neg was collapsed
 		if collapse:
@@ -4016,9 +4033,9 @@ class DistObj():
 			if len(peak_positions) > 0:
 
 				# get indices of the peaks (mainly needed for ranges not starting with position 0)
-				peak_idx = [x_data.index(peak) for peak in peak_positions if peak in x_data]
-				x_crosses = [x_data[idx] for idx in peak_idx] #x-values for peaks
-				y_crosses = [y_data[idx] for idx in peak_idx] #y-values for peaks
+				peak_idx = [list(x_data).index(peak) for peak in peak_positions if peak in x_data]
+				x_crosses = x_data[peak_idx] #x-values for peaks
+				y_crosses = y_data[peak_idx] #y-values for peaks
 
 				# check if at least one peak is at the negative position
 				if collapse:
