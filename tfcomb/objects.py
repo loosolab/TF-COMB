@@ -3501,7 +3501,7 @@ class DistObj():
 	#------------------- Additional functionality/analysis for distances -----------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def mean_distance(self):
+	def mean_distance(self, source="datasource"):
 		""" Get the mean distance for each rule in .rules.
 		
 		Returns:
@@ -3510,12 +3510,13 @@ class DistObj():
 
 		""" 
 
-		self.check_datasource("distances")
+		self.check_datasource(source)
+		datasource = getattr(self, source)
 
 		#Calculate weighted average
-		sums = self.distances.iloc[:,2:].sum(axis=1).values
-		weights = self.distances.iloc[:,2:].div(sums, axis=0)
-		distances = self.distances.columns[2:].tolist()
+		sums = datasource.iloc[:,2:].sum(axis=1).values
+		weights = datasource.iloc[:,2:].div(sums, axis=0)
+		distances = datasource.columns[2:].tolist()
 		avg = (weights * distances).sum(axis=1)
 
 		#Convert series to df
@@ -3523,21 +3524,24 @@ class DistObj():
 
 		return df
 
-	def max_distance(self):
+	def max_distance(self, source="datasource"):
 		""" Get the distance with the maximum signal for each rule in .rules.
 		
+		Parameters
+		-----------
+		source : str
+			The name of the datasource to use for calculation. Default: "datasource" (the current state of data).
+
 		Returns
 		---------
 		pandas.DataFrame containing "max_distance" per rule.
 		"""
 
-		self.check_datasource("distances")
+		self.check_datasource(source)
+		datasource = getattr(self, source)
 
-		distances = self.distances.columns[2:].tolist()
-		idx = self.distances.iloc[:,2:].idxmax(axis=1)
-		idx_distance = [distances[i] for i in idx]
-
-		df = pd.DataFrame(idx_distance, index=idx.index, columns=["max_distance"])
+		df = datasource.iloc[:,2:].idxmax(axis=1).to_frame() #idxmax directly gives the name of column
+		df.columns = ["max_distance"]
 		
 		return df
 
