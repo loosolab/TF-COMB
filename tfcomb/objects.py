@@ -93,6 +93,13 @@ class CombObj():
 		self.rules = None  		 #filled in by .market_basket()
 		self.network = None		 #filled by .build_network()
 
+		#Default parameters
+		self.min_dist = 0
+		self.max_dist = 100
+		self.directional = False
+		self.min_overlap = 0
+		self.max_overlap = 0
+		self.anchor = "inner"
 		self.anchor_to_int = {"inner": 0, "outer": 1, "center": 2}
 
 		#Variable for storing DistObj for distance analysis
@@ -134,7 +141,6 @@ class CombObj():
 		#Merge TFBS
 		combined.TFBS = RegionList(self.TFBS + obj.TFBS)
 		combined.TFBS.loc_sort() 				#sort TFBS by coordinates
-		combined.TFBS = combined.TFBS.remove_duplicates() #remove duplicated sites 
 
 		#Set .TF_names of the new list
 		counts = {r.name: "" for r in combined.TFBS}
@@ -506,7 +512,7 @@ class CombObj():
 
 		#Read sites from file
 		self.logger.info("Reading sites from '{0}'...".format(bed_file))
-		read_TFBS = RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(bed_file)])
+		read_TFBS = RegionList([OneTFBS(region) for region in RegionList().from_bed(bed_file)])
 		
 		#Add TFBS to internal .TFBS list and process
 		self.logger.info("Processing sites")
@@ -573,7 +579,7 @@ class CombObj():
 
 		TFBS = RegionList()
 		for f in condition_files:
-			TFBS += RegionList([OneTFBS().from_oneregion(region) for region in RegionList().from_bed(f)])
+			TFBS += RegionList([OneTFBS(region) for region in RegionList().from_bed(f)])
 
 		#Add TFBS to internal .TFBS list and process
 		self.TFBS += TFBS
@@ -1008,9 +1014,9 @@ class CombObj():
 		#Sort sites based on the anchor position
 		sites = self._sites
 		if kwargs["anchor"] == "center":
-		sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
-		idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
-		sites = sites[sort_idx, :]
+			sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
+			idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
+			sites = sites[sort_idx, :]
 
 		#Get locations via counting function
 		kwargs["anchor"] = self.anchor_to_int[kwargs["anchor"]] #convert anchor string to int
@@ -1020,17 +1026,17 @@ class CombObj():
 		#Fetch locations from TFBS list
 		locations = tfcomb.utils.TFBSPairList([None]*n_locations)
 		if kwargs["anchor"] == "center":
-		for i in range(n_locations):
+			for i in range(n_locations):
 
-			site1_idx = idx_mat[i, 0] #location in sorted sites
-			site1_idx = idx_to_original[site1_idx] #original idx in self.TFBS (before sorting)
+				site1_idx = idx_mat[i, 0] #location in sorted sites
+				site1_idx = idx_to_original[site1_idx] #original idx in self.TFBS (before sorting)
 
-			site2_idx = idx_mat[i, 1]
-			site2_idx = idx_to_original[site2_idx]
+				site2_idx = idx_mat[i, 1]
+				site2_idx = idx_to_original[site2_idx]
 
-			#Fetch locations in .TFBS
-			site1 = self.TFBS[site1_idx]
-			site2 = self.TFBS[site2_idx]
+				#Fetch locations in .TFBS
+				site1 = self.TFBS[site1_idx]
+				site2 = self.TFBS[site2_idx]
 				locations[i] = TFBSPair(TFBS1=site1, TFBS2=site2, anchor=anchor_string)
 		else:
 			for i in range(n_locations):
@@ -2613,6 +2619,7 @@ class DistObj():
 		self.set_verbosity = lambda *args, **kwargs: CombObj.set_verbosity(self, *args, **kwargs)
 		self._prepare_TFBS = lambda *args, **kwargs: CombObj._prepare_TFBS(self, *args, **kwargs)
 		self._get_sort_idx = lambda *args, **kwargs: CombObj._get_sort_idx(*args, **kwargs)
+		self.check_pair = lambda *args: CombObj.check_pair(self, *args)
 
 	def __str__(self):
 		""" Returns a string representation of the DistObj depending on what variables are already stored """
@@ -2879,6 +2886,8 @@ class DistObj():
 			Fills the object variable .distances.
 
 		"""
+
+		#todo; reset any previous counts
 
 		#Replace directional/stranded with internal values
 		directional = self.directional if directional is None else directional
@@ -3191,10 +3200,12 @@ class DistObj():
 
 		Parameters
 		--------------
+		datasource : pd.DataFrame
+			The datasource table to calculate zscore on (can be a subset of all rules).
 		mixture : bool, optional
 			Whether to estimate zscore using all datapoints (False) or to use a mixture model (True). Default: False. 
 		threads : int, optional
-
+			Find z-scores using multiprocessing. 
 		"""
 		#Get zscores in chunks
 		pool = mp.Pool(threads)
@@ -3293,9 +3304,8 @@ class DistObj():
 		threads : int
 			Number of threads used. Default: 1.
 		method : str
-			Method for transforming counts. Can be one of: "zscore", "zscore-mixture" or "flat". 
+			Method for transforming counts. Can be one of: "zscore" or "flat". 
 			If "zscore", the zscore for the pairs is used.
-			If "zscore", a modified z-score on a Gaussian Mixture Model of counts is used.
 			If "flat", no transformation is performed.
 			Default: "zscore".
 		threshold : float
@@ -3315,7 +3325,7 @@ class DistObj():
 		if save is not None:
 			tfcomb.utils.check_writeability(save)
 		tfcomb.utils.check_value(threshold, name="threshold")
-		tfcomb.utils.check_string(method, ["zscore", "zscore-mixture", "flat"], name="method")
+		tfcomb.utils.check_string(method, ["zscore", "flat"], name="method")
 
 		# sanity checks
 		self.check_datasource("distances")
@@ -3344,7 +3354,8 @@ class DistObj():
 			self._get_zscores(datasource, threads=threads)
 			signal = self.zscores
 
-		elif method == "zscore-mixture":
+		elif method == "zscore-mixture": #under development; not applicable at the moment
+			#If "zscore-mixture", a modified z-score on a Gaussian Mixture Model of counts is used.
 			self._get_zscores(datasource, mixture=True, threads=threads)
 			signal = self.zscores
 
@@ -3352,6 +3363,7 @@ class DistObj():
 			signal = datasource #no change in signal
 
 		#Find peaks from input signal
+		self.logger.info("Finding preferred distances")
 		res = self._multiprocess_chunks(threads, tfcomb.utils.analyze_signal_chunks, signal)
 
 		#Collect results from all pairs to pandas dataframe
@@ -3393,8 +3405,9 @@ class DistObj():
 		#----- Save stats on run -----#
 		self.peaking_count = self.peaks.drop_duplicates(["TF1", "TF2"]).shape[0] #number of pairs with any peaks
 
-		# QoL safe of threshold and method
-		self.thresh = self.peaks[["TF1", "TF2", "Threshold"]]
+		# QoL save of threshold and method
+		self.thresh = self.rules[["TF1", "TF2"]] #save threshold for all rules, even those without peaks
+		self.thresh["Threshold"] = threshold
 		self.thresh["method"] = method
 
 		# Save dataframe
