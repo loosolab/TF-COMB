@@ -218,6 +218,40 @@ class CombObj():
 		if self.rules is None or not isinstance(self.rules, pd.DataFrame):
 			raise InputError("No market basket rules found in .rules. The rules are found by running .market_basket().")
 	
+	def check_pair(self, pair):
+		""" Utility function to check if a pair is valid. 
+		
+		Parameters
+		----------
+		pair : tuple(str,str)
+			TF names for which the test should be performed. e.g. ("NFYA","NFYB")
+		"""
+
+		#check member size
+		if len(pair) != 2:
+			raise InputError(f'{pair} is not valid. It should contain exactly two TF names per pair. e.g. ("NFYA","NFYB")')
+		
+		# check tf names are string
+		tf1,tf2 = pair 
+		tfcomb.utils.check_type(tf1, str, "TF1 from pair")
+		tfcomb.utils.check_type(tf2, str, "TF2 from pair")
+
+		# check rules are filled
+		if type(self) == DistObj and self.rules is None:
+			raise InputError(".rules not filled. Please run .fill_rules() first.")
+
+		# check tf1 is present within object
+		if tf1 not in self.TF_names:
+			raise InputError(f"{tf1} (TF1) is not valid as it is not present in the current object.")
+
+		# check tf1 is present within object
+		if tf2 not in self.TF_names:
+			raise InputError(f"{tf2} (TF2) is not valid as it is not present in the current object.")
+		
+		if type(self) == DistObj:
+			if len(self.rules.loc[((self.rules["TF1"] == tf1) & (self.rules["TF2"] == tf2))]) == 0:
+				raise InputError(f"No rules for pair {tf1} - {tf2} found.")
+
 	#-------------------------------------------------------------------------------#
 	#----------------------------- Save / import object ----------------------------#
 	#-------------------------------------------------------------------------------#
@@ -2722,39 +2756,6 @@ class DistObj():
 		
 		if self.min_dist > self.max_dist:
 			raise InputError(".min_dist must be lesser or equal .max_dist")
-
-	def check_pair(self, pair):
-		""" Utility function to check if a pair is valid. 
-		
-		Parameters
-		----------
-		pair : tuple(str,str)
-			TF names for which the test should be performed. e.g. ("NFYA","NFYB")
-		"""
-
-		#check member size
-		if len(pair) != 2:
-			raise InputError(f'{pair} is not valid. It should contain exactly two TF names per pair. e.g. ("NFYA","NFYB")')
-		
-		# check tf names are string
-		tf1,tf2 = pair 
-		tfcomb.utils.check_type(tf1, str, "TF1 from pair")
-		tfcomb.utils.check_type(tf2, str, "TF2 from pair")
-
-		# check rules are filled
-		if self.rules is None:
-			raise InputError(".rules not filled. Please run .fill_rules() first.")
-
-		# check tf1 is present within rules
-		if tf1 not in set(self.rules.TF1):
-			raise InputError(f"{tf1} (TF1) is no valid key for a pair")
-
-		# check tf1 is present within rules
-		if tf2 not in set(self.rules.TF2):
-			raise InputError(f"{tf2} (TF2) is no valid key for a pair")
-		
-		if len(self.rules.loc[((self.rules["TF1"] == tf1) & (self.rules["TF2"] == tf2))]) == 0:
-			raise InputError(f"No rules for pair {tf1} - {tf2} found.")
 
 
 	#-------------------------------------------------------------------------------------------#
