@@ -1251,7 +1251,7 @@ class CombObj():
 
 		self.rules = sub_rules #overwrite .rules with simplified rules
 		
-	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True, inplace=False):
+	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True, inplace=False, how="inner"):
 		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
 		
 		Parameters
@@ -1266,6 +1266,8 @@ class CombObj():
 			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 		inplace : bool, optional
 			Whether to make selection on current CombObj. If False, 
+		how: string, optional
+            How to join TF1 and TF2 subset. Default: inner
 
 		Raises
 		--------
@@ -1285,6 +1287,7 @@ class CombObj():
 		check_type(TF_list, list, name="TF_list")
 		check_type(TF1, bool, "TF1")
 		check_type(TF2, bool, "TF2")
+		check_string(how, ["left", "right", "outer", "inner", "cross"])
 
 		#Create selected subset
 		selected = self.rules
@@ -1310,7 +1313,7 @@ class CombObj():
 
 		#Join selections from TF1 and TF2
 		if len(selections) > 1:
-			selected = selections[0].merge(selections[1]) #inner merge
+			selected = selections[0].merge(selections[1], how=how) 
 		else:
 			selected = selections[0]
 
@@ -2582,7 +2585,7 @@ class DistObj():
 		self.peaking_count = None    # Number of pairs with at least one peak 
 		self.zscores = None			 # calculated zscores
 		self.stringency = None       # stringency param
-		self.prominence = None       # zscore, median or array of flat values
+		self.prominence = None       # zscore or array of flat values
 		self._noise_method = None 	 # private storage noise_method
 		self._height_multiplier = None # private storage height_mulitplier
 		self._collapsed = None 		#stores the negative values to be able to expand negative section again
