@@ -3867,7 +3867,15 @@ class DistObj():
 
 		return (datasource, peaks)
 
-	def plot(self, pair, method="peaks", style="hist", save=None, config=None, collapse=None, ax=None, color='tab:blue', max_dist=None):
+	def plot(self, pair, method="peaks", 
+						style="hist", 
+						show_peaks=True, 
+						save=None, 
+						config=None, 
+						collapse=None, 
+						ax=None, 
+						color='tab:blue', 
+						max_dist=None):
 		"""
 		Produces different plots.
 		
@@ -3883,6 +3891,8 @@ class DistObj():
 			Default: 'peaks'.
 		style : str, optional
 			What style to plot the datasource in. Can be one of: ["hist", "kde", "line"]. Default: "hist".
+		show_peaks : bool, optional
+			Whether to show the identified peak(s) (if any were found) in the plot. Default: True.
 		save: str, optional
 			Path to save the plots to. If save is None plots won't be plotted. 
 			Default: None
@@ -4038,14 +4048,27 @@ class DistObj():
 		
 
 		#------------ Plot additional elements (peaks / background) ----------#
+
 		if method == "peaks":
+
+			thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
+						(self.thresh["TF2"] == tf2))].iloc[0,2]
+
+			ax.axhline(thresh, ls="--", color="grey", label="Threshold") #plot the threshold in the z-score range
+
+		elif method == "correction":
+
+			#Add lowess line
+			lowess = self.lowess.loc[ind, x_data]
+			plt.plot(x_data, lowess, color="red", label="Lowess smoothing", lw=2)
+			ax.legend()
+
+		#Show peaks in plot
+		if show_peaks == True:
 
 			#Fetch peaks and threshold line
 			peak_positions = peak_df.loc[((peak_df["TF1"] == tf1) & 
 								          (peak_df["TF2"] == tf2))].iloc[:,2]   #peak positions in bp
-			
-			thresh = self.thresh.loc[((self.thresh["TF1"] == tf1) & 
-									(self.thresh["TF2"] == tf2))].iloc[0,2]
 
 			#If any peaks were found
 			if len(peak_positions) > 0:
@@ -4061,16 +4084,7 @@ class DistObj():
 						x_crosses.insert(0, x_neg_data)
 						y_crosses.insert(0, y_neg_data)
 
-				plt.plot(x_crosses, y_crosses, "x", color="red", label="Peaks")
-
-			plt.axhline(thresh, ls="--", color="grey", label="Threshold")
-			ax.legend()
-
-		elif method == "correction":
-
-			#Add lowess line
-			lowess = self.lowess.loc[ind, x_data]
-			plt.plot(x_data, lowess, color="red", label="Lowess smoothing", lw=2)
+				ax.plot(x_crosses, y_crosses, "x", color="red", label="Peaks") #plot peaks as crosses
 			ax.legend()
 
 		#-------- Done plotting data; making final changes to axes -------#
