@@ -1991,7 +1991,7 @@ def _get_noise_measure(peaks, signal, method, height_multiplier):
 
 	# cut all peaks out of the signal
 	for cut in cuts:
-		signal[cut[0]:cut[1]] = np.nan
+		signal.iloc[cut[0]:cut[1]] = np.nan
 
 	measure = None
 	if method == "median":
@@ -2005,9 +2005,9 @@ def _get_cut_points(peaks, height_multiplier, signal):
 	cuts =[]
 	for idx,row in peaks.iterrows():
 		# get the peak distance
-		peak = row.Distance
+		peak = row.Distance - int(signal.index[0]) # subract min distance for peak offset
 		# get the peak height 
-		peak_height = signal[peak]
+		peak_height = signal.iloc[peak]
 		# determine cutoff, in common sense this should be "going ~25% down the peak size"
 		cut_off = height_multiplier * peak_height
 		cuts.append(_expand_peak(peak, cut_off, signal))
@@ -2027,7 +2027,7 @@ def _expand_peak(start_pos, cut_off, signal):
 			if pos_left <= -1: # check if position less than start of signal
 				found_left = True
 				left = 0
-			elif signal[pos_left] <= cut_off:
+			elif signal.iloc[pos_left] <= cut_off:
 				found_left = True
 				left = pos_left  + 1 # we are one to far left
 			pos_left -= 1
@@ -2038,7 +2038,7 @@ def _expand_peak(start_pos, cut_off, signal):
 			if  pos_right == len(signal): # check if position higher than end of signal
 				found_right = True
 				right = len(signal) - 1
-			elif signal[pos_right] < cut_off:
+			elif signal.iloc[pos_right] < cut_off:
 				found_right = True
 				right = pos_right - 1 # we are one to far right
 			pos_right += 1
