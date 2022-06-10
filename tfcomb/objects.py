@@ -1714,7 +1714,7 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via <CombObj>.distObj")
 
-	def analyze_distances(self, parent_directory=None, threads=4, **kwargs):
+	def analyze_distances(self, parent_directory=None, threads=4, correction=True, scale=True, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
@@ -1738,9 +1738,12 @@ class CombObj():
 			subfolder_peaks = parent_directory
 		
 		#Perform steps in standard workflow
+		if scale:
+			self.distObj.scale()
+
 		self.distObj.smooth(window_size=3)
-		self.distObj.linregress_all(threads=threads, save=subfolder_linres)
-		self.distObj.correct_all(threads=threads, save=subfolder_corrected)
+		if correction:
+			self.distObj.correct_background(threads=threads)
 		self.distObj.analyze_signal_all(threads=threads, save=subfolder_peaks, **kwargs)
 
 		if parent_directory is not None:
@@ -3128,10 +3131,6 @@ class DistObj():
 
 		Returns
 		----------
-		None 
-			None
-		None 
-			None
 		None 
 			Fills the object variable .corrected
 		"""
