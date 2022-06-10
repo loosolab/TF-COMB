@@ -63,7 +63,8 @@ class CombObj():
 
 	>>> C = tfcomb.objects.CombObj()
 
-	Verbosity of the output log can be set using the 'verbosity' parameter:
+	# Verbosity of the output log can be set using the 'verbosity' parameter: \n
+
 	>>> C = tfcomb.objects.CombObj(verbosity=2)
 
 	"""
@@ -225,12 +226,15 @@ class CombObj():
 			raise InputError("No market basket rules found in .rules. The rules are found by running .market_basket().")
 	
 	def check_pair(self, pair):
-		""" Utility function to check if a pair is valid. 
+		""" Checks if a pair is valid and present. 
 		
 		Parameters
 		----------
 		pair : tuple(str,str)
 			TF names for which the test should be performed. e.g. ("NFYA","NFYB")
+		
+		Raises
+		----------
 		"""
 
 		#check member size
@@ -1253,7 +1257,7 @@ class CombObj():
 		
 	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True, inplace=False, how="inner"):
 		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
-		
+
 		Parameters
 		------------
 		TF_list : list
@@ -1267,7 +1271,7 @@ class CombObj():
 		inplace : bool, optional
 			Whether to make selection on current CombObj. If False, 
 		how: string, optional
-            How to join TF1 and TF2 subset. Default: inner
+			How to join TF1 and TF2 subset. Default: inner
 
 		Raises
 		--------
@@ -1527,7 +1531,7 @@ class CombObj():
 		TF2_col : str, optional
 			The column in table corresponding to "TF2" name. If merge == "TF1", 'TF2' is ignored. Default: "TF2".
 		prefix : str, optional
-			A prefix to add to the columns. Can be useful for adding the same information to both TF1 and TF2 (e.g. by using "TF1_" and "TF2_" prefixes),
+			A prefix to add to the columns. Can be useful for adding the same information to both TF1 and TF2 (e.g. by using "TF1" and "TF2" prefixes),
 			or adding same-name columns from different tables. Default: None (no prefix).
 		"""
 
@@ -1754,11 +1758,11 @@ class CombObj():
 	def analyze_orientation(self):
 		""" Analyze preferred orientation of sites in .TFBS. This is a wrapper for tfcomb.analysis.orientation().
 		
-		Returns: 
+		Returns 
 		--------
 		pd.DataFrame
 		
-		See also:
+		See also
 		----------
 		tfcomb.analysis.orientation
 		"""
@@ -2724,7 +2728,7 @@ class DistObj():
 	def check_datasource(self, att):
 		""" Utility function to check if distances in .<att> were set. If not, InputError is raised. 
 		
-		Paramters
+		Parameters
 		----------
 		att : str
 			Attribute name for a dataframe in self.
@@ -3520,7 +3524,7 @@ class DistObj():
 	def mean_distance(self, source="datasource"):
 		""" Get the mean distance for each rule in .rules.
 		
-		Returns:
+		Returns
 		---------
 		pandas.DataFrame containing "mean_distance" per rule.
 
