@@ -3,6 +3,7 @@ import os
 from turtle import end_fill
 import pandas as pd
 import numpy as np
+import math
 import copy
 from copy import deepcopy
 import time
@@ -12,8 +13,6 @@ from scipy.signal import find_peaks
 import random
 import string
 import multiprocessing as mp
-from kneed import DataGenerator, KneeLocator
-import statsmodels.stats.multitest
 import importlib
 
 import pysam
@@ -182,7 +181,7 @@ class TFBSPairList(list):
 
 		for p in self:
 			attributes = getAllAttr(p)
-			
+
 			# add site prefixes/ get attributes for both TFs
 			site1 = {f"site1_{key}": value for key, value in getAllAttr(attributes.pop("site1")).items()}
 			site2 = {f"site2_{key}": value for key, value in getAllAttr(attributes.pop("site2")).items()}
@@ -198,6 +197,13 @@ class TFBSPairList(list):
 		# convert types to best possible
 		# https://stackoverflow.com/a/65915289
 		table = table.apply(pd.to_numeric, errors='ignore').convert_dtypes()
+
+		#Sort columns
+		col_order = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_score", "site1_strand",
+					 "site2_chrom", "site2_start", "site2_end", "site2_name", "site2_score", "site2_strand"]
+		order_dict = {col: i for i, col in enumerate(col_order)}
+		columns = sorted(table.columns, key= lambda x: order_dict.get(x, 10**10))
+		table = table[columns]
 
 		return table
 		
@@ -455,7 +461,7 @@ class TFBSPairList(list):
 			show_diagonal : boolean, default True
 				Shows diagonal lines for identifying preference in binding distance.
 		
-		Returns:
+		Returns
 		----------
 			matplotlib.gridspec.GridSpec:
 				Object containing the finished pairMap.
@@ -1386,7 +1392,7 @@ def check_string(astring, allowed, name=None):
 		name = "string" if name is None else f'\'{name}\''
 		raise InputError("The {0} given ({1}) is not valid - it must be one of: {2}".format(name, astring, allowed))
 
-def check_value(value, vmin=-np.inf, vmax=np.inf, integer=False, name=None):
+def check_value(value, vmin=-math.inf, vmax=math.inf, integer=False, name=None):
 	"""
 	Check whether given 'value' is a valid value (or integer) and if it is within the bounds of vmin/vmax.
 
@@ -1708,12 +1714,12 @@ def resolve_overlaps(sites, how="merge", per_name=True):
 					merged_end = max([previous_site.end, current_site.end])
 					
 					#merge site into the previous; keep previous score/strand
-					merged = OneTFBS(**{"chrom": current_site.chrom, 
-									  "start": previous_site.start, 
-									  "end": merged_end, 
-									  "name": previous_site.name, 
-									  "score": previous_site.score,
-									  "strand": previous_site.strand})
+					merged = OneTFBS([current_site.chrom, 
+									  previous_site.start, 
+									  merged_end, 
+									  previous_site.name, 
+									  previous_site.score,
+									  previous_site.strand])
 					
 					new_sites[previous_i] = merged
 					new_sites[current_i] = None
@@ -1981,7 +1987,6 @@ def make_symmetric(matrix):
 	symmetric[di] = matrix_T[di]
 
 	return(symmetric)
-
 
 def set_contrast(contrast, available_contrasts):
 	""" Utility function for the plotting functions of tfcomb.objects.DiffCombObj """

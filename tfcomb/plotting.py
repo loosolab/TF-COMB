@@ -33,9 +33,9 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	Parameters
 	----------
 	rules_table : pandas.DataFrame
-		Dataframe containing 
+		Dataframe containing data to plot. 
 	yaxis : str, optional
-		Default: "confidence".
+		Column containing yaxis information. Default: "confidence".
 	size_by : str
 		Default: "TF1_TF2_support".
 	color_by : str
@@ -73,11 +73,13 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 
 	# Tweak the figure to finalize
 	labels = list(rules_table.index)
-	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
+	ax.set_ylabel(yaxis, fontsize=12)
+	ax.set_xlabel("Co-occurring pairs", fontsize=12)
+
 	ax.set_xticks(range(len(labels))) #explicitly set xticks to prevent matplotlib error
 	ax.set_xticklabels(labels, rotation=45, ha="right")
-	#ax.grid()
-	#ax.set_axisbelow(True) #prevent grid from plotting above points
+	ax.grid(color="0.9") #very light grey
+	ax.set_axisbelow(True) #prevent grid from plotting above points
 	
 	ax.spines['right'].set_visible(False)
 	ax.spines['top'].set_visible(False)

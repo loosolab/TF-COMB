@@ -1,12 +1,10 @@
-"""
-objects.py: Contains CombObj, DiffCombObj and DistObj classes
+#objects.py: Contains CombObj, DiffCombObj and DistObj classes
+#
+#@author: Mette Bentsen and Vanessa Heger
+#@contact: mette.bentsen (at) mpi-bn.mpg.de
+#@license: MIT
 
-@author: Mette Bentsen and Vanessa Heger
-@contact: mette.bentsen (at) mpi-bn.mpg.de
-@license: MIT
-"""
 
-from operator import sub
 import os 
 import pandas as pd
 import itertools
@@ -1757,7 +1755,7 @@ class CombObj():
 		""" Analyze preferred orientation of sites in .TFBS. This is a wrapper for tfcomb.analysis.orientation().
 		
 		Returns 
-		--------
+		-----------
 		pd.DataFrame
 		
 		See also
@@ -3419,7 +3417,7 @@ class DistObj():
 		# QoL save of threshold and method
 		self.thresh = self.rules[["TF1", "TF2"]] #save threshold for all rules, even those without peaks
 		self.thresh["Threshold"] = threshold
-		self.thresh["method"] = method
+		self.thresh["Method"] = method
 
 		# Save dataframe
 		if save is not None:
@@ -3971,24 +3969,35 @@ class DistObj():
 	
 		#Select datasource to plot
 		if method == "peaks":
-			if self.zscores is None: #'peaks' was chosen, but signals were not yet analyzed. Falling back to signal.
+
+			#Checking if peaks were analyzed
+			if not hasattr(self, "thresh"):   #'peaks' was chosen, but signals were not yet analyzed. Falling back to signal.
 				method = "signal"
 				source_table = self.datasource
+
 			else:	
-				source_table = self.zscores
-				ylbl = "Z-score normalized counts"
 
 				#check that pair was in zscores
-				if not ind in self.zscores.index:
+				if not ind in self.thresh.index:
 					self.logger.warning("TF pair '{0}' distances were counted, but not analyzed due to thresholds set in analyze_signal_all. Falling back to viewing signal.".format(ind))
 					method = "signal"
 					source_table = self.datasource
+				
+				#check which method was used for calculating peaks
+				if self.thresh.loc[ind, "Method"] == "flat":
+					source_table = self.datasource
+
+				elif self.thresh.loc[ind, "Method"] == "zscore":
+					source_table = self.zscores
+					ylbl = "Z-score normalized counts"
+
 
 		elif method == "correction":
 			if style == "kde":
 				raise InputError("Style 'kde' is not valid for method 'correction'. Please select another style or method.")
 			self.check_datasource("uncorrected")
 			source_table = self.uncorrected
+
 		else:
 			self.check_datasource(method)
 			source_table = getattr(self, method)

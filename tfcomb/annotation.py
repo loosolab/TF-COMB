@@ -121,8 +121,8 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 		for idx, row in regions.iterrows():
 			elements = row.iloc[:6].tolist()
 			d = {"peak_chr": elements[0],
-				 "peak_start": elements[1],
-				 "peak_end": elements[2],
+				 "peak_start": int(elements[1]),
+				 "peak_end": int(elements[2]),
 				 "peak_id": elements[3],
 				 "peak_score": elements[4],
 				 "peak_strand": elements[5]}
