@@ -413,8 +413,8 @@ class TFBSPairList(list):
 			show_binding : bool, default True
 				Shows the TF binding positions as a grey background.
 			flank_plot : str, default 'strand'
-				["strand", "orientation"]
-				Decide if the plots flanking the heatmap should be colored for strand or strand-orientation.
+				["strand", "orientation", None]
+				Decide if the plots flanking the heatmap should be colored for strand, strand-orientation or disabled.
 			figsize : int tuple, default (7, 14)
 				Figure dimensions.
 			output : str, default None 
@@ -447,8 +447,8 @@ class TFBSPairList(list):
 		# check parameter values
 		if not logNorm_cbar in [None, "centerLogNorm", "SymLogNorm"]:
 			raise ValueError(f"Parameter 'logNorm_cbar' has to be one of [None, \"centerLogNorm\", \"SymLogNorm\"]. But found {logNorm_cbar}.")
-		if not flank_plot in ["strand", "orientation"]:
-			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\"]. But found {flank_plot}")
+		if not flank_plot in ["strand", "orientation", None]:
+			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\", None]. But found {flank_plot}")
 
 		# fixes FloatingPointError: underflow encountered in multiply
 		# https://stackoverflow.com/a/61756043
@@ -669,38 +669,39 @@ class TFBSPairList(list):
 		for _, spine in plot.spines.items():
 			spine.set_visible(True)
 
-		### strand left ###
-		#https://stackoverflow.com/a/57994641
-		col = ["site1_strand"] if flank_plot == "strand" else ["site_orientation"]
-		
-		str_to_int = {j:i for i, j in enumerate(pd.unique(pairs[col[0]].values))}
+		if flank_plot is not None:
+			### strand left ###
+			#https://stackoverflow.com/a/57994641
+			col = ["site1_strand"] if flank_plot == "strand" else ["site_orientation"]
+			
+			str_to_int = {j:i for i, j in enumerate(pd.unique(pairs[col[0]].values))}
 
-		cmap = sns.color_palette("tab10", len(str_to_int))
+			cmap = sns.color_palette("tab10", len(str_to_int))
 
-		plot = sns.heatmap(pairs[col].replace(str_to_int),
-							yticklabels=False,
-							xticklabels=False,
-							cmap=cmap,
-							cbar=True,
-							cbar_ax=strand_led,
-							ax=strand1,
-							rasterized=True)
+			plot = sns.heatmap(pairs[col].replace(str_to_int),
+								yticklabels=False,
+								xticklabels=False,
+								cmap=cmap,
+								cbar=True,
+								cbar_ax=strand_led,
+								ax=strand1,
+								rasterized=True)
 
-		colorbar = plot.collections[0].colorbar 
-		r = colorbar.vmax - colorbar.vmin 
-		colorbar.set_ticks([colorbar.vmin + r / len(str_to_int) * (0.5 + i) for i in range(len(str_to_int))])
-		colorbar.set_ticklabels(list(str_to_int.keys()))
+			colorbar = plot.collections[0].colorbar 
+			r = colorbar.vmax - colorbar.vmin 
+			colorbar.set_ticks([colorbar.vmin + r / len(str_to_int) * (0.5 + i) for i in range(len(str_to_int))])
+			colorbar.set_ticklabels(list(str_to_int.keys()))
 
-		### strand right ###
-		col = ["site2_strand"] if flank_plot == "strand" else ["site_orientation"]
-		
-		sns.heatmap(pairs[col].replace(str_to_int),
-					yticklabels=False,
-					xticklabels=False,
-					cmap=cmap,
-					cbar=False,
-					ax=strand2,
-					rasterized=True)
+			### strand right ###
+			col = ["site2_strand"] if flank_plot == "strand" else ["site_orientation"]
+			
+			sns.heatmap(pairs[col].replace(str_to_int),
+						yticklabels=False,
+						xticklabels=False,
+						cmap=cmap,
+						cbar=False,
+						ax=strand2,
+						rasterized=True)
 		
 		# save plot
 		if output:
