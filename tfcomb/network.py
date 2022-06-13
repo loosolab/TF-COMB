@@ -3,10 +3,13 @@ from datetime import datetime
 import copy
 import multiprocessing as mp
 import pandas as pd
+import numpy as np
 import random
 import itertools
 import scipy
 import re
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid.inset_locator import inset_axes
 
 #Network analysis
 import networkx as nx
@@ -290,13 +293,11 @@ def get_degree(G, weight=None, direction="both"):
 	if weight is None:
 
 		if direction == "both":
-			unweighted = dict(G.degree())
+			d = dict(G.degree())
 		elif direction == "in":
-			unweighted = dict(G.in_degree())
+			d = dict(G.in_degree())
 		elif direction == "out":
-			unweighted = dict(G.out_degree())
-		
-		df = pd.DataFrame.from_dict(unweighted, orient="index")
+			d = dict(G.out_degree())
 		
 	else:
 		tfcomb.utils.check_type(weight, [str], "weight")
@@ -305,41 +306,87 @@ def get_degree(G, weight=None, direction="both"):
 		if weight in edge_attributes:
 
 			if direction == "both":
-				weighted = dict(G.degree(weight=weight))
+				d = dict(G.degree(weight=weight))
 			elif direction == "in":
-				weighted = dict(G.in_degree(weight=weight))
+				d = dict(G.in_degree(weight=weight))
 			elif direction == "out":
-				weighted = dict(G.out_degree(weight=weight))
-
-			df = pd.DataFrame.from_dict(weighted, orient="index")
+				d = dict(G.out_degree(weight=weight))
 			
 		else:
 			raise ValueError("Weight '{0}' is not an edge attribute of given network. Available attributes are: {1}".format(weight, edge_attributes))
 	
+	#Convert dict to df
+	df = pd.DataFrame.from_dict(d, orient="index")
 	df.columns = ["degree"] 
 	df.sort_values("degree", inplace=True, ascending=False)    
 
+	#Add attribute to nodes
+	att = direction + "_degree" if direction in ["in", "out"] else "degree" 
+	for node in d:
+		G.nodes[node][att] = d[node] 
+
 	return(df)
 
-#Graph partitioning 
-def partition_louvain(G, weight=None, attribute_name="partition", logger=None):
+def get_betweenness_centrality(G, weight=None):
 	"""
-	Partition a network using community louvain. Sets the attribute
+	
+
+	Parameters
+	-----------
+	G : networkx.Graph
+		An instance of networkx.Graph
+	weight : 
+		Edge attribute. Default: None.
+	"""
+	pass
+
+
+	nx.betweenness_centrality(G, weight=weight)
+
+	#Add attribute to nodes
+	
+
+
+def subset_graph(G, nodes, depth=0):
+	"""
+	Subset a graph to a subset of nodes and their neighborhoods at the depth given by 'depth'.
+
+	Parameters
+	-------------
+	G : networkx.Graph
+		An instance of networkx.Graph.
+	nodes : str or list of str
+		Nodes to keep.
+	depth : int, optional
+		Default: 0 (only edges between given nodes)
+	"""
+
+	if isinstance(nodes, str):
+		nodes = [nodes]
+
+	#Get all sources
+	networkx.single_source_dijkstra(G, )
+
+
+#Graph clustering
+def cluster_louvain(G, weight=None, attribute_name="cluster", logger=None):
+	"""
+	Cluster a network using community louvain clustering. By default, sets the attribute "cluster" to each node.
 
 	Parameters
 	----------
 	G : networkx.Graph 
-		An instance of a network graph to partition
+		An instance of a network graph to cluster.
 	weight : str
 		Attribute in graph to use as weight. The higher the weight, the stronger the link. Default: None.
 	attribute_name : str
-		The attribute name to use for saving partition. Default: "partition".
+		The attribute name to use for saving clustering. Default: "cluster".
 	logger : a logger object
 		An instance of a logger. Default: No logging.
 
 	Returns
 	--------
-	None - partition is added to 'G' in place.
+	None - clustering is added to 'G' in place.
 
 	"""
 
@@ -377,25 +424,27 @@ def partition_louvain(G, weight=None, attribute_name="partition", logger=None):
 
 	logger.debug("'weight' is set to: '{0}'".format(weight))	
 		
-	#Partition network
+	#Cluster network
 	logger.debug("Running community_louvain.best_partition()")
-	partition_dict = community_louvain.best_partition(G, weight=weight, random_state=1) #random_state ensures that results are reproducible
-	partition_dict_fmt = {key: {attribute_name: str(value + 1)} for key, value in partition_dict.items()}
+	cluster_dict = community_louvain.best_partition(G, weight=weight, random_state=1) #random_state ensures that results are reproducible
+	cluster_dict_fmt = {key: {attribute_name: str(value + 1)} for key, value in cluster_dict.items()}
 
 	#Add partition information to each node
-	for node_i in partition_dict_fmt:
-		G.nodes[node_i][attribute_name] = partition_dict_fmt[node_i][attribute_name]
+	for node_i in cluster_dict_fmt:
+		G.nodes[node_i][attribute_name] = cluster_dict_fmt[node_i][attribute_name]
 	#nx.set_node_attributes(G, partition_dict_fmt) #overwrites previous attributes; solved by loop over dict
 
 	#No return - G is changed in place
 
-def partition_blockmodel(g):
-	""" Partitioning of a graph tool graph using stochastic block model minimization.
+def cluster_blockmodel(g, attribute_name="cluster"):
+	""" Clustering of a graph-tool graph using stochastic block model minimization.
 	
 	Parameters
 	-----------
 	g : a graph.tool graph
-	
+		An instance of a graph.tool graph.
+	attribute_name : str
+		The attribute name to use for saving clustering. Default: "cluster".
 	"""
 	
 	#check if graph-tool is installed
@@ -407,15 +456,14 @@ def partition_blockmodel(g):
 	blocks = state.get_blocks()
 
 	#Add vertex property to graph
-	partition_prop = g.new_vertex_property("string")
-	g.vertex_properties["partition"] = partition_prop
+	clustering_prop = g.new_vertex_property("string")
+	g.vertex_properties[attribute_name] = clustering_prop
 	
 	n_nodes = g.num_vertices()
 	for i in range(n_nodes):
-		g.vertex_properties["partition"][i] = blocks[i]
+		g.vertex_properties[attribute_name][i] = blocks[i]
 
 	#No return - g was changed in place
-
 
 def get_node_table(G):
 	""" Get a table containing node names and node attributes for G.
@@ -432,6 +480,7 @@ def get_node_table(G):
 	if isinstance(G, nx.Graph):
 		nodeview = G.nodes(data=True)
 		table  = pd.DataFrame().from_dict(dict(nodeview), orient='index')
+
 	else:
 		#check if graph-tool is installed
 		if tfcomb.utils.check_graphtool() == True:
@@ -443,7 +492,6 @@ def get_node_table(G):
 			n_nodes = G.num_vertices()
 			properties = list(G.vertex_properties.keys())
 		
-
 			data = {}
 			for i in range(n_nodes):
 				data[i] = {prop: G.vertex_properties[prop][i] for prop in properties}
@@ -451,7 +499,7 @@ def get_node_table(G):
 			table = pd.DataFrame.from_dict(data, orient="index")
 		
 		else:
-			raise ValueError("Unknown format of input Graph")
+			raise InputError("Unknown format of input Graph")
 
 	return(table)
 
@@ -460,7 +508,7 @@ def get_edge_table(G):
 
 	Parameters
 	-----------
-	G : a networkx Graph object 
+	G : a networkx Graph object.
 	
 	Returns
 	--------
@@ -475,12 +523,18 @@ def get_edge_table(G):
 
 def create_random_network(nodes, edges):
 	""" 
-	Create a random network with the given nodes and the number of edges.
+	Create a random network with the given list of nodes and total number of edges.
 
+	Parameters
+	-------------
 	nodes : list
 		List of nodes to use in network.
 	edges : int
 		Number of edges between nodes.
+
+	Returns
+	---------
+	networkx.Graph containing random edges between nodes.
 	"""
 
 	G_rand = nx.Graph()
@@ -493,5 +547,59 @@ def create_random_network(nodes, edges):
 	
 	return(G_rand)
 
-def powerlaw():
-	""" """
+def plot_powerlaw(G, title="Node degree powerlaw fit", color="blue", save=None):
+	""" 
+	Fit and plot a powerlaw distribution to the node degrees in the network. 
+
+	Parameters
+	------------
+	G : a networkx Graph object
+		Networkx containing nodes and edges to analyze.
+	title : str, optional
+		The title of the resulting plot. Default: "Node degree powerlaw fit".
+	color : str, optional
+		The color of the data plotted. Default: "blue".
+	save : str, optional
+		If not None, save the plot to the given path. Default: None.
+
+	Returns
+	--------
+	ax : matplotlib.axes
+		Axes object containing the plot.
+	"""
+
+	tfcomb.utils.check_module("powerlaw")
+	import powerlaw
+
+	#Get node degrees
+	degrees = tfcomb.network.get_degree(G)
+	
+	#Fit power-law
+	data = list(degrees["degree"].values)
+	fit = powerlaw.Fit(data, discrete=True, estimate_discrete=True, verbose=False, xmin=1)
+	
+	#todo: Calculate R2
+	#print(fit.alpha)
+	#10**-1.4
+	
+	#### Plot
+	fig, ax = plt.subplots()
+
+	fit.power_law.plot_pdf(color='black', linestyle='--', label='Powerlaw fit')
+	fit.plot_pdf(color=color, label="Data (n={0})".format(len(degrees)))
+	plt.legend(fontsize=12, loc="upper right")
+	
+	ax1in = inset_axes(ax, width = "30%", height = "30%", loc=3)
+	ax1in.hist(data, density=True, color=color)
+	ax1in.set_xticks([])
+	ax1in.set_yticks([])
+	ax1in.set_title("Histogram", fontsize=12)
+	
+	ax.set_xlabel("Node degree", fontsize=12)
+	ax.set_ylabel("Density", fontsize=12)
+	ax.set_title(title, fontsize=16)
+
+	if save is not None:
+		fig.savefig(save, dpi=600, bbox_inches="tight")
+
+	return(ax)

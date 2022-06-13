@@ -50,7 +50,7 @@ organism_to_taxid = dict(zip(taxid_table[0], taxid_table[1]))
 
 def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=1):
 	"""
-	Annotate regions with genes from .gtf using UROPA _[1]. 
+	Annotate regions with genes from .gtf using UROPA [1]_. 
 
 	Parameters
 	----------
@@ -73,26 +73,23 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 	None
 		The .annotation attribute is added to each region in input regions. See 'Examples' of how to access this information.
 
-	Reference
+	References
 	----------
-	.. [1] Kondili M, Fust A, Preussner J, Kuenne C, Braun T, and Looso M. 
-	UROPA: a tool for Universal RObust Peak Annotation. Scientific Reports 7 (2017), doi: 10.1038/s41598-017-02464-y
-
+		.. [1] Kondili M, Fust A, Preussner J, Kuenne C, Braun T, and Looso M. UROPA: a tool for Universal RObust Peak Annotation. Scientific Reports 7 (2017), doi: 10.1038/s41598-017-02464-y
 
 	Examples
 	---------
-	custom_config = {"queries": [{"distance": [10000, 1000], 
-								  "feature_anchor": "start", 
-								  "feature": "gene"}],
-					"priority": True, 
-					"show_attributes": "all"}
+	>>> custom_config = {"queries": [{"distance": [10000, 1000], 
+	...					 "feature_anchor": "start", 
+	...					 "feature": "gene"}],
+	...					 "priority": True, 
+	...					 "show_attributes": "all"}
 	
-	#Annotate regions (data/ refers to the data directory of the tfcomb github repository)
-	regions = pd.read_csv("data/GM12878_hg38_chr4_ATAC_peaks.bed")				
-	annotate_regions(regions, gtf="data/chr4_genes.gtf",
+	#Annotate regions (data/ refers to the data directory of the tfcomb github repository) \n
+	
+	>>> regions = pd.read_csv("data/GM12878_hg38_chr4_ATAC_peaks.bed")				
+	>>> annotate_regions(regions, gtf="data/chr4_genes.gtf",
 							  config=custom_config)
-
-	#TODO
 	"""
 	
 	#Check input types
