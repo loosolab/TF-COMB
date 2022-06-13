@@ -940,8 +940,7 @@ class CombObj():
 				jobs = []
 				for i in range(n_background):
 					self.logger.spam("Adding job for i = {0}".format(i))
-					kwargs.update({"seed": i})
-					args = (sites,)
+					args = (sites, i) #sites, seed
 					job = pool.apply_async(tfcomb.utils.calculate_background, args, kwargs) 
 					jobs.append(job)
 				pool.close()
