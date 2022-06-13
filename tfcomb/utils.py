@@ -1696,6 +1696,67 @@ def resolve_overlaps(sites, how="merge", per_name=True):
 	
 	return(resolved)
 
+def add_region_overlap(a, b, att="overlap"):
+	""" Overlap regions in regionlist 'a' with regions from regionlist 'b' and add 
+	a boolean attribute to the regions in 'a' containing overlap status with 'b'. 
+	
+	Parameters
+	------------
+	a : list of OneTFBS objects
+		A list of objects containing genomic locations.
+	b : list of OneTFBS objects
+		A list of objects containing genomic locations to overlap with 'a' regions.
+	att : str, optional
+		The name of the attribute to add to 'a' objects. Default: "overlap".
+	"""
+	
+	a = a.copy()
+	b = b.copy()
+	
+	a.sort(key=lambda region: (region.chrom, region.start, region.end))
+	b.sort(key=lambda region: (region.chrom, region.start, region.end))
+	
+	#Establish order of chromosomes
+	chromlist = sorted(list(set([region.chrom for region in a] + [region.chrom for region in b])))
+	chrom_pos = {chrom: chromlist.index(chrom) for chrom in chromlist}
+		
+	## Find overlap yes/no
+	a_n = len(a)
+	b_n = len(b)
+	
+	a_i = 0 #initialize
+	b_i = 0
+	while a_i < a_n and b_i < b_n:
+
+		a_chrom, a_start, a_end = a[a_i].chrom, a[a_i].start, a[a_i].end
+		b_chrom, b_start, b_end = b[b_i].chrom, b[b_i].start, b[b_i].end
+		
+		#Check possibility of overlap
+		if a_chrom == b_chrom:
+
+			if a_end <= b_start:	#current a is placed before current b
+				a_i += 1
+
+			elif a_start >= b_end:	#current a is placed after current b 
+				b_i += 1
+
+			else: #a region overlaps b region
+				setattr(a[a_i], att, True) #save overlap
+				a_i += 1 #see if next a also overlaps this b
+
+		elif chrom_pos[a_chrom] > chrom_pos[b_chrom]: 	#if a_chrom is after current b_chrom
+			b_i += 1
+
+		elif chrom_pos[b_chrom] > chrom_pos[a_chrom]:	#if b_chrom is after current a_chrom
+			a_i += 1
+	
+	#The additional sites are False
+	for site_a in a:
+		if not hasattr(site_a, att):
+			setattr(site_a, att, False)
+		
+	return(a)
+
 
 #----------------------------- Analysis on pairs of TFBS ------------------------#
 
