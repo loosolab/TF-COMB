@@ -122,6 +122,11 @@ class CombObj():
 	def __repr__(self):
 		return(self.__str__())
 	
+	def __getstate__(self):
+		""" Get state for pickling"""
+
+		return {k:v for (k, v) in self.__dict__.items() if k != "_sites"} #do not pickle the internal _sites array 
+
 	def __add__(self, obj):
 		"""
 		Internal method to add two CombObj together using: `CombObj1 + CombObj2 = new_CombObj`. This merges the .TFBS of both objects under the hood.
@@ -867,15 +872,17 @@ class CombObj():
 
 			name_to_idx = {}
 			TF_names = [] #names in order of idx
-			current_idx = -1
+			current_idx = 0 #initialize index at 0
 
 			for i, site in enumerate(self.TFBS):
 				name = "{0}({1})".format(site.name, site.strand)
 				if name not in name_to_idx:
 					TF_names.append(name)
-					current_idx = current_idx + 1
+
 					name_to_idx[name] = current_idx
-				sites[0][-1] = name_to_idx[name] #set new idx based on stranded name
+					current_idx += 1 #increment for next name
+
+				sites[i][-1] = name_to_idx[name] #set new idx based on stranded name
 		else:
 			TF_names = self.TF_names
 		self.logger.spam("TF_names: {0}".format(TF_names))
@@ -962,8 +969,6 @@ class CombObj():
 	def get_pair_locations(self, pair, 
 								 TF1_strand = None, 
 								 TF2_strand = None, 
-								 save = None,
-								 fmt = "bed",
 								 **kwargs):
 		""" 
 		Get genomic locations of a particular TF pair. Requires .TFBS to be filled. 
@@ -978,18 +983,12 @@ class CombObj():
 			Strand of TF1 in pair. Default: None (strand is not taken into account).
 		TF2_strand : str, optional
 			Strand of TF2 in pair. Default: None (strand is not taken into account).
-		save : str, optional
-			Path to save the pair locations to. Default: None (no file is written).
-		fmt : str, optional
-			If 'save' is set, 'fmt' controls the format of the output file. Bust be one of "bed" or "bedpe". If "bed", the TF1/TF2 sites will be written as one region spanning TF1.start-TF2.end. If "bedpe", the sites are written in BEDPE format. Default: "bed".
 		kwargs : arguments
 			Any additional arguments are passed to tfcomb.utils.get_pair_locations.
 
 		Returns
 		-------
-		List of tuples in the form of: [(OneRegion, OneRegion, distance), (...)]
-			Each entry in the list is a tuple of OneRegion() objects giving the locations of TF1/TF2 + the distance between the two regions
-
+		tfcomb.utils.TFBSPairList
 		"""
 		
 		#Check input parameters
@@ -1013,19 +1012,19 @@ class CombObj():
 		
 		#Sort sites based on the anchor position
 		sites = self._sites
-		if kwargs["anchor"] == "center":
+		if anchor_string == "center":
 			sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
 			idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
 			sites = sites[sort_idx, :]
 
 		#Get locations via counting function
-		kwargs["anchor"] = self.anchor_to_int[kwargs["anchor"]] #convert anchor string to int
+		kwargs["anchor"] = self.anchor_to_int[anchor_string] #convert anchor string to int
 		idx_mat = tfcomb.counting.count_co_occurrence(sites, task=3, rules=[(TF1_int, TF2_int)], **kwargs)
 		n_locations = idx_mat.shape[0]
 
 		#Fetch locations from TFBS list
 		locations = tfcomb.utils.TFBSPairList([None]*n_locations)
-		if kwargs["anchor"] == "center":
+		if anchor_string == "center":
 			for i in range(n_locations):
 
 				site1_idx = idx_mat[i, 0] #location in sorted sites
@@ -1767,11 +1766,16 @@ class CombObj():
 	#------------------------------------ Network analysis -------------------------------------#
 	#-------------------------------------------------------------------------------------------#
 
-	def build_network(self):
+	def build_network(self, **kwargs):
 		""" 
 		Builds a TF-TF co-occurrence network for the rules within object. This is a wrapper for the tfcomb.network.build_nx_network() function, 
 		which uses the python networkx package. 
-			 
+		
+		Parameters
+		------------
+		kwargs : arguments
+			Any additional arguments are passed to tfcomb.network.build_nx_network().
+
 		Returns
 		-------
 		None - fills the .network attribute of the `CombObj` with a networkx.Graph object
@@ -1779,20 +1783,22 @@ class CombObj():
 
 		#Build network
 		self.logger.debug("Building network using tfcomb.network.build_network")
-		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity)
+		self.network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, verbosity=self.verbosity, **kwargs)
 		self.logger.info("Finished! The network is found within <CombObj>.network.")
-		
+	
 
-	def partition_network(self, method="louvain", weight=None):
+	def cluster_network(self, method="louvain", weight=None):
 		"""
-		Creates a partition of nodes within network and add a new node attribute "partition" to the network. 
+		Creates a clustering of nodes within network and add a new node attribute "cluster" to the network. 
 		
 		Parameters
 		-----------
 		method : str, one of ["louvain", "blockmodel"]
 			The method Default: "louvain".
-
+		weight : str, optional
+			The name of the edge attribute to use as weight. Default: None (not weighted).
 		"""
+
 		#Fetch network from object
 		if self.network is None:
 			self.logger.info("The .network attribute is not available - running .build_network()")
@@ -1800,8 +1806,8 @@ class CombObj():
 			
 		#Decide method of partitioning
 		if method == "louvain":
-			tfcomb.network.partition_louvain(self.network, weight=weight, logger=self.logger) #this adds "partition" to the network
-			self.logger.info("Added 'partition' attribute to the network attributes")
+			tfcomb.network.cluster_louvain(self.network, weight=weight, logger=self.logger) #this adds "partition" to the network
+			self.logger.info("Added 'cluster' attribute to the network attributes")
 
 			node_table = tfcomb.network.get_node_table(self.network)
 
@@ -1811,7 +1817,7 @@ class CombObj():
 			self._gt_network = tfcomb.network.build_network(self.rules, node_table=self.TF_table, tool="graph-tool", verbosity=self.verbosity)
 
 			#Partition network
-			tfcomb.network.partition_blockmodel(self._gt_network)
+			tfcomb.network.cluster_blockmodel(self._gt_network)
 
 			node_table = tfcomb.network.get_node_table(self._gt_network)
 			node_table.set_index("TF1", drop=False, inplace=True)
@@ -2932,7 +2938,7 @@ class DistObj():
 					TF_names.append(name)
 					current_idx = current_idx + 1
 					name_to_idx[name] = current_idx
-				sites[0][-1] = name_to_idx[name] #set new idx based on stranded name
+				sites[i][-1] = name_to_idx[name] #set new idx based on stranded name
 			
 		else:
 			TF_names = self.TF_names
@@ -3125,10 +3131,6 @@ class DistObj():
 
 		Returns
 		----------
-		None 
-			None
-		None 
-			None
 		None 
 			Fills the object variable .corrected
 		"""
@@ -3694,9 +3696,16 @@ class DistObj():
 		distances = datasource.columns.tolist()[2:]
 		lags = range(1,len(distances)) #lag 1 to end of distances
 		
-		fig = tsaplots.plot_acf(signal, lags=len(lags), zero=False, alpha=None, title=f"Autocorrelation for {name}")
-		plt.xlabel("Lag (bp)")
-		plt.ylabel("Correlation coefficient")
+		fig, ax = plt.subplots()
+		fig = tsaplots.plot_acf(signal, lags=len(lags), zero=False, alpha=None, title=f"Autocorrelation for {name}", ax=ax)
+
+		ax.spines['right'].set_visible(False)
+		ax.spines['top'].set_visible(False)
+
+		ax.set_xlabel("Lag (bp)")
+		ax.set_ylabel("Correlation coefficient")
+
+		return ax
 
 	def build_network(self):
 		""" 
@@ -3875,7 +3884,8 @@ class DistObj():
 						collapse=None, 
 						ax=None, 
 						color='tab:blue', 
-						max_dist=None):
+						max_dist=None,
+						**kwargs):
 		"""
 		Produces different plots.
 		
@@ -3912,6 +3922,8 @@ class DistObj():
 			Color of the plot hist/line/kde. Default: "tab:blue".
 		max_dist : int, optional
 			Option to set the max_dist independent of the max_dist used for counting distances. Default: None (max_dist is not changed).
+		kwargs : arguments
+			Additional arguments are passed to plt.hist().
 		"""
 
 		#---------------- Input checks ------------------#
@@ -4033,7 +4045,7 @@ class DistObj():
 			#get location of bins
 			_, bin_edges = np.histogram(x_data, weights=y_data, bins=config["bins"], range=(min(x_data), max(x_data)+1)) #range ensures that the last bin is included
 
-			ax.hist(x_data, weights=y_data, bins=bin_edges-0.5, density=False, color=color)
+			ax.hist(x_data, weights=y_data, bins=bin_edges-0.5, density=False, color=color, **kwargs)
 
 			#if collapsed, plot positive and negative data separately
 			if collapse:
@@ -4066,26 +4078,29 @@ class DistObj():
 		#Show peaks in plot
 		if show_peaks == True:
 
-			#Fetch peaks and threshold line
-			peak_positions = peak_df.loc[((peak_df["TF1"] == tf1) & 
-								          (peak_df["TF2"] == tf2))].iloc[:,2]   #peak positions in bp
+			#Check if peaks were calculated
+			if peak_df is not None:
 
-			#If any peaks were found
-			if len(peak_positions) > 0:
+				#Fetch peaks and threshold line
+				peak_positions = peak_df.loc[((peak_df["TF1"] == tf1) & 
+											(peak_df["TF2"] == tf2))].iloc[:,2]   #peak positions in bp
 
-				# get indices of the peaks (mainly needed for ranges not starting with position 0)
-				peak_idx = [list(x_data).index(peak) for peak in peak_positions if peak in x_data]
-				x_crosses = x_data[peak_idx] #x-values for peaks
-				y_crosses = y_data[peak_idx] #y-values for peaks
+				#If any peaks were found
+				if len(peak_positions) > 0:
 
-				# check if at least one peak is at the negative position
-				if collapse:
-					if "neg" in peak_positions.tolist():
-						x_crosses.insert(0, x_neg_data)
-						y_crosses.insert(0, y_neg_data)
+					# get indices of the peaks (mainly needed for ranges not starting with position 0)
+					peak_idx = [list(x_data).index(peak) for peak in peak_positions if peak in x_data]
+					x_crosses = x_data[peak_idx] #x-values for peaks
+					y_crosses = y_data[peak_idx] #y-values for peaks
 
-				ax.plot(x_crosses, y_crosses, "x", color="red", label="Peaks") #plot peaks as crosses
-			ax.legend()
+					# check if at least one peak is at the negative position
+					if collapse:
+						if "neg" in peak_positions.tolist():
+							x_crosses.insert(0, x_neg_data)
+							y_crosses.insert(0, y_neg_data)
+
+					ax.plot(x_crosses, y_crosses, "x", color="red", label="Peaks") #plot peaks as crosses
+					ax.legend()
 
 		#-------- Done plotting data; making final changes to axes -------#
 
