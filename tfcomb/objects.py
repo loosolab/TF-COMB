@@ -63,7 +63,8 @@ class CombObj():
 
 	>>> C = tfcomb.objects.CombObj()
 
-	Verbosity of the output log can be set using the 'verbosity' parameter:
+	# Verbosity of the output log can be set using the 'verbosity' parameter: \n
+
 	>>> C = tfcomb.objects.CombObj(verbosity=2)
 
 	"""
@@ -230,12 +231,15 @@ class CombObj():
 			raise InputError("No market basket rules found in .rules. The rules are found by running .market_basket().")
 	
 	def check_pair(self, pair):
-		""" Utility function to check if a pair is valid. 
+		""" Checks if a pair is valid and present. 
 		
 		Parameters
 		----------
 		pair : tuple(str,str)
 			TF names for which the test should be performed. e.g. ("NFYA","NFYB")
+		
+		Raises
+		----------
 		"""
 
 		#check member size
@@ -1250,9 +1254,9 @@ class CombObj():
 
 		self.rules = sub_rules #overwrite .rules with simplified rules
 		
-	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True, inplace=False):
+	def select_TF_rules(self, TF_list, TF1=True, TF2=True, reduce_TFBS=True, inplace=False, how="inner"):
 		""" Select rules based on a list of TF names. The parameters TF1/TF2 can be used to select for which TF to create the selection on (by default: both TF1 and TF2).
-		
+
 		Parameters
 		------------
 		TF_list : list
@@ -1265,6 +1269,8 @@ class CombObj():
 			Whether to reduce the .TFBS of the new object to the TFs remaining in `.rules` after selection. Setting this to 'False' will improve speed, but also increase memory consumption. Default: True.
 		inplace : bool, optional
 			Whether to make selection on current CombObj. If False, 
+		how: string, optional
+			How to join TF1 and TF2 subset. Default: inner
 
 		Raises
 		--------
@@ -1284,6 +1290,7 @@ class CombObj():
 		check_type(TF_list, list, name="TF_list")
 		check_type(TF1, bool, "TF1")
 		check_type(TF2, bool, "TF2")
+		check_string(how, ["left", "right", "outer", "inner", "cross"])
 
 		#Create selected subset
 		selected = self.rules
@@ -1309,7 +1316,7 @@ class CombObj():
 
 		#Join selections from TF1 and TF2
 		if len(selections) > 1:
-			selected = selections[0].merge(selections[1]) #inner merge
+			selected = selections[0].merge(selections[1], how=how) 
 		else:
 			selected = selections[0]
 
@@ -1523,7 +1530,7 @@ class CombObj():
 		TF2_col : str, optional
 			The column in table corresponding to "TF2" name. If merge == "TF1", 'TF2' is ignored. Default: "TF2".
 		prefix : str, optional
-			A prefix to add to the columns. Can be useful for adding the same information to both TF1 and TF2 (e.g. by using "TF1_" and "TF2_" prefixes),
+			A prefix to add to the columns. Can be useful for adding the same information to both TF1 and TF2 (e.g. by using "TF1" and "TF2" prefixes),
 			or adding same-name columns from different tables. Default: None (no prefix).
 		"""
 
@@ -1710,7 +1717,7 @@ class CombObj():
 		self.distObj.fill_rules(self)
 		self.distObj.logger.info("DistObject successfully created! It can be accessed via <CombObj>.distObj")
 
-	def analyze_distances(self, parent_directory=None, threads=4, **kwargs):
+	def analyze_distances(self, parent_directory=None, threads=4, correction=True, scale=True, **kwargs):
 		""" Standard distance analysis workflow.
 			Use create_distObj for own workflow steps and more options!
 		"""
@@ -1734,9 +1741,12 @@ class CombObj():
 			subfolder_peaks = parent_directory
 		
 		#Perform steps in standard workflow
+		if scale:
+			self.distObj.scale()
+
 		self.distObj.smooth(window_size=3)
-		self.distObj.linregress_all(threads=threads, save=subfolder_linres)
-		self.distObj.correct_all(threads=threads, save=subfolder_corrected)
+		if correction:
+			self.distObj.correct_background(threads=threads)
 		self.distObj.analyze_signal_all(threads=threads, save=subfolder_peaks, **kwargs)
 
 		if parent_directory is not None:
@@ -1747,11 +1757,11 @@ class CombObj():
 	def analyze_orientation(self):
 		""" Analyze preferred orientation of sites in .TFBS. This is a wrapper for tfcomb.analysis.orientation().
 		
-		Returns: 
+		Returns 
 		--------
 		pd.DataFrame
 		
-		See also:
+		See also
 		----------
 		tfcomb.analysis.orientation
 		"""
@@ -2588,7 +2598,7 @@ class DistObj():
 		self.peaking_count = None    # Number of pairs with at least one peak 
 		self.zscores = None			 # calculated zscores
 		self.stringency = None       # stringency param
-		self.prominence = None       # zscore, median or array of flat values
+		self.prominence = None       # zscore or array of flat values
 		self._noise_method = None 	 # private storage noise_method
 		self._height_multiplier = None # private storage height_mulitplier
 		self._collapsed = None 		#stores the negative values to be able to expand negative section again
@@ -2724,7 +2734,7 @@ class DistObj():
 	def check_datasource(self, att):
 		""" Utility function to check if distances in .<att> were set. If not, InputError is raised. 
 		
-		Paramters
+		Parameters
 		----------
 		att : str
 			Attribute name for a dataframe in self.
@@ -3520,7 +3530,7 @@ class DistObj():
 	def mean_distance(self, source="datasource"):
 		""" Get the mean distance for each rule in .rules.
 		
-		Returns:
+		Returns
 		---------
 		pandas.DataFrame containing "mean_distance" per rule.
 

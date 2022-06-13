@@ -322,7 +322,7 @@ class TFBSPairList(list):
 		"""
 		Prepare pair and score tables for plotting.
 
-		Parameter:
+		Parameters
 		------------
 		flank : int, default 100
 			Window size of TFBSpair. Adds given amount of bases in both directions counted from center between binding sites.
@@ -384,14 +384,14 @@ class TFBSPairList(list):
 	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
-		
-		Parameters:
-		----------
+
+		Parameters
+		-----------
 			logNorm_cbar : str, default None
 				[None, "centerLogNorm", "SymLogNorm"]
-				Choose a type of normalization for the colorbar.
+				Choose a type of normalization for the colorbar. \n
 				SymLogNorm:
-					Use matplotlib.colors.SymLogNorm. This does not center to 0
+					Use matplotlib.colors.SymLogNorm. This does not center to 0 \n
 				centerLogNorm:
 					Use custom matplotlib.colors.SymLogNorm from stackoverflow. Note this creates a weird colorbar.
 			show_binding : bool, default True
@@ -405,12 +405,13 @@ class TFBSPairList(list):
 				Save plot to given file.
 			flank : int, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
-		
-		Returns:
+
+		Returns
 		----------
 			matplotlib.gridspec.GridSpec:
 				Object containing the finished pairMap.
 		"""
+
 		# check parameter values
 		if not logNorm_cbar in [None, "centerLogNorm", "SymLogNorm"]:
 			raise ValueError(f"Parameter 'logNorm_cbar' has to be one of [None, \"centerLogNorm\", \"SymLogNorm\"]. But found {logNorm_cbar}.")
@@ -598,7 +599,7 @@ class TFBSPairList(list):
 		If the second approach spans multiple distances the binding locations are shown as a range as well.
 		
 		
-		Parameters:
+		Parameters
 		----------
 			dist : int or int list, default None
 				Show track for one or more distances between binding sites.
@@ -618,7 +619,7 @@ class TFBSPairList(list):
 				Intended for internal animation use!
 				If True will cause the function to return a dict of function call parameters used to create plot.
 		
-		Returns:
+		Returns
 		----------
 			matplotlib.axes._subplots.AxesSubplot or dict:
 				Return axes object of the plot.
@@ -735,12 +736,13 @@ class TFBSPairList(list):
 		"""
 		Combine a set of pairTrack plots to a .gif.
 			
-		Note:
+		Note
+		--------
 		The memory limit can be increased with the following if necessary. Default is 20 MB.
 		matplotlib.rcParams['animation.embed_limit'] = 100 # in MB
 		
 		
-		Parameters:
+		Parameters
 		----------
 			site_num : int, default None
 				Number of sites to aggregate for every step. If None will aggregate by distance between binding pair.
@@ -761,7 +763,7 @@ class TFBSPairList(list):
 			flank : int, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 		
-		Returns:
+		Returns
 		----------
 			IPython.core.display.HTML:
 				Gif object ready to display in a jupyter notebook.
@@ -883,7 +885,7 @@ class TFBSPairList(list):
 		"""
 		Compare miscellaneous values between TF-pair.
 		
-		Parameters:
+		Parameters
 		----------
 			x : string
 				Data to show on the x-axis. Set None to get a list of options.
@@ -894,7 +896,7 @@ class TFBSPairList(list):
 			output : str, default None
 				Save plot to given file.
 
-		Returns:
+		Returns
 		----------
 			matplotlib.axes._subplots.AxesSubplot:
 				Return axes object of the plot.
@@ -1990,7 +1992,7 @@ def _get_noise_measure(peaks, signal, method, height_multiplier):
 
 	# cut all peaks out of the signal
 	for cut in cuts:
-		signal[cut[0]:cut[1]] = np.nan
+		signal.iloc[cut[0]:cut[1]] = np.nan
 
 	measure = None
 	if method == "median":
@@ -2004,9 +2006,9 @@ def _get_cut_points(peaks, height_multiplier, signal):
 	cuts =[]
 	for idx,row in peaks.iterrows():
 		# get the peak distance
-		peak = row.Distance
+		peak = row.Distance - int(signal.index[0]) # subract min distance for peak offset
 		# get the peak height 
-		peak_height = signal[peak]
+		peak_height = signal.iloc[peak]
 		# determine cutoff, in common sense this should be "going ~25% down the peak size"
 		cut_off = height_multiplier * peak_height
 		cuts.append(_expand_peak(peak, cut_off, signal))
@@ -2026,7 +2028,7 @@ def _expand_peak(start_pos, cut_off, signal):
 			if pos_left <= -1: # check if position less than start of signal
 				found_left = True
 				left = 0
-			elif signal[pos_left] <= cut_off:
+			elif signal.iloc[pos_left] <= cut_off:
 				found_left = True
 				left = pos_left  + 1 # we are one to far left
 			pos_left -= 1
@@ -2037,7 +2039,7 @@ def _expand_peak(start_pos, cut_off, signal):
 			if  pos_right == len(signal): # check if position higher than end of signal
 				found_right = True
 				right = len(signal) - 1
-			elif signal[pos_right] < cut_off:
+			elif signal.iloc[pos_right] < cut_off:
 				found_right = True
 				right = pos_right - 1 # we are one to far right
 			pos_right += 1
@@ -2047,14 +2049,14 @@ def getAllAttr(object, private=False, functions=False):
 	"""
 	Collect all attributes of an object and return as dict.
 
-	Parameters:
+	Parameters
 	----------
 		private : boolean, default False
 			If private attributes should be included. Everything with '_' prefix.
 		functions : boolean, default False
 			If callable attributes ie functions shoudl be included.
 
-	Returns:
+	Returns
 	----------
 		dictionary : 
 			Dict of all the objects attributes.

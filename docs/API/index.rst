@@ -8,6 +8,5 @@ API reference
    tfcomb.network
    tfcomb.analysis
    tfcomb.annotation
-   tfcomb.distances
    tfcomb.plotting
    tfcomb.utils
