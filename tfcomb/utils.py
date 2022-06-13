@@ -571,19 +571,23 @@ class TFBSPairList(list):
 																subplot_spec=grid[1],
 																wspace=0)
 
-		strand1 = fig.add_subplot(plot_grid[0])
 		heatmap = fig.add_subplot(plot_grid[1])
-		strand2 = fig.add_subplot(plot_grid[2])
+		# add flanks if needed
+		if flank_plot is not None:
+			strand1 = fig.add_subplot(plot_grid[0])
+			strand2 = fig.add_subplot(plot_grid[2])
 
 		# legend area
 		legend_grid = matplotlib.gridspec.GridSpecFromSubplotSpec(ncols=1, nrows=2, subplot_spec=grid[0])
 
+		# heatmap legend
 		heatmap_led = fig.add_subplot(legend_grid[0])
-		strand_led = fig.add_subplot(legend_grid[1])
-
-		# legend label
 		heatmap_led.set_title(legend_name_score)
-		strand_led.set_title("TF Binding Strand")
+
+		# strand legend
+		if flank_plot is not None:
+			strand_led = fig.add_subplot(legend_grid[1])
+			strand_led.set_title("TF Binding Strand")
 
 		###### define plots ######
 		### main heatmap ###
