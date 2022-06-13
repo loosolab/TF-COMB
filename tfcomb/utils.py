@@ -1510,7 +1510,6 @@ def calculate_TFBS(regions, motifs, genome, resolve="merge"):
 
 		#Convert RegionLists to TFBS class
 		region_TFBS = RegionList([OneTFBS(region) for region in region_TFBS])
-		region_TFBS.loc_sort()
 
 		TFBS_list += region_TFBS
 
@@ -1545,21 +1544,23 @@ def resolve_overlaps(sites, how="merge", per_name=True):
 	check_string(how, ["highest_score", "merge"], "how")
 
 	#Create a copy of sites to ensure that original sites are not changed
-	sites = copy.copy(sites)
-	
 	n_sites = len(sites)
+	new_sites = [None]*n_sites
+	
 	tracking = {} # dictionary for tracking positions of TFBS per name (or across all)
 	
-	for current_site_i in range(n_sites):
-		
-		current_site = sites[current_site_i]
+	for current_i in range(n_sites):
+
+		current_site = sites[current_i]
+		new_sites[current_i] = current_site #might change again during merging
+
 		site_name = current_site.name if per_name == True else "." #control which site to fetch as 'previous'
 		
 		if site_name in tracking: #if not in tracking, site is the first site of this name
 			
 			#previous_site = tracking[site_name]["site"]
 			previous_i = tracking[site_name]
-			previous_site = sites[previous_i]
+			previous_site = new_sites[previous_i]
 
 			if (current_site.chrom == previous_site.chrom) and (current_site.start < previous_site.end): #overlapping
 								
@@ -1567,11 +1568,11 @@ def resolve_overlaps(sites, how="merge", per_name=True):
 				if how == "highest_score":
 					
 					if current_site.score >= previous_site.score: #keep current site
-						sites[previous_i] = None
-						tracking[site_name] = current_site_i #new tracking
+						new_sites[previous_i] = None
+						tracking[site_name] = current_i #new tracking
 						
 					else: #keep previous site
-						sites[current_site_i] = None
+						new_sites[current_i] = None
 						#tracking stays the same
 						
 				elif how == "merge":
@@ -1586,19 +1587,17 @@ def resolve_overlaps(sites, how="merge", per_name=True):
 									  "score": previous_site.score,
 									  "strand": previous_site.strand})
 					
-					sites[previous_i] = merged
-					sites[current_site_i] = None
+					new_sites[previous_i] = merged
+					new_sites[current_i] = None
 					#tracking i stays the same
-
-					#tracking[site_name] = previous_i, "site": merged} , but site is updated to merged
 					
 			else: #no overlaps with previous; save this site to tracking
-				tracking[site_name] = current_site_i
+				tracking[site_name] = current_i
 				
 		else: #Save first site to tracking
-			tracking[site_name] = current_site_i
+			tracking[site_name] = current_i
 	
-	resolved = [site for site in sites if site is not None]
+	resolved = [site for site in new_sites if site is not None]
 	
 	return(resolved)
 
