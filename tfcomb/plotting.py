@@ -76,8 +76,11 @@ def bubble(rules_table, yaxis="confidence", size_by="TF1_TF2_support", color_by=
 	ax.set(ylabel=yaxis, xlabel="Co-occurring pairs")
 	ax.set_xticks(range(len(labels))) #explicitly set xticks to prevent matplotlib error
 	ax.set_xticklabels(labels, rotation=45, ha="right")
-	ax.grid()
-	ax.set_axisbelow(True) #prevent grid from plotting above points
+	#ax.grid()
+	#ax.set_axisbelow(True) #prevent grid from plotting above points
+	
+	ax.spines['right'].set_visible(False)
+	ax.spines['top'].set_visible(False)
 
 	if save is not None:
 		plt.savefig(save, dpi=600, bbox_inches="tight")
@@ -212,7 +215,7 @@ def scatter(table, x, y,
 	x_finite = table[x][~np.isinf(table[x].astype(float))]
 	y_finite = table[y][~np.isinf(table[y].astype(float))]
 
-	g = sns.jointplot(x=x_finite, y=y_finite, space=0, linewidth=0.2, **kwargs) #, joint_kws={"s": 100})
+	g = sns.jointplot(x=x_finite, y=y_finite, space=0, **kwargs) #, joint_kws={"s": 100})
 
 	#Plot thresholds
 	if x_threshold is not None:
@@ -229,7 +232,7 @@ def scatter(table, x, y,
 	if x_threshold is not None or y_threshold is not None:
 		if x_threshold is not None:
 			if len(x_threshold) == 1: 
-				 x_threshold = (-np.inf, x_threshold[0])  #assume that value is lower bound
+				x_threshold = (-np.inf, x_threshold[0])  #assume that value is lower bound
 
 		if y_threshold is not None:
 			if len(y_threshold) == 1:
@@ -245,7 +248,7 @@ def scatter(table, x, y,
 		xvals_finite = xvals[~np.isinf(xvals)]
 		yvals = selection[y]
 		yvals_finite = yvals[~np.isinf(yvals)]
-		_ = sns.scatterplot(x=xvals_finite, y=yvals_finite, ax=g.ax_joint, color="red", linewidth=0.2, 
+		_ = sns.scatterplot(x=xvals_finite, y=yvals_finite, ax=g.ax_joint, color="red", linewidth=0, 
 							label="Selection (n={0})".format(n_selected))
 
 	#Label given indices
@@ -866,7 +869,7 @@ def genome_view(TFBS,
 	logger.debug("Subsetting TFBS to window")
 
 	if window_chrom != None and window_start != None and window_end != None:
-		window = tfcomb.utils.OneTFBS(**{"chrom": window_chrom, "start": window_start, "end": window_end})
+		window = tfcomb.utils.OneTFBS([window_chrom, window_start, window_end])
 
 	#Subset on windows or take all TFBS?
 	if window != None:
@@ -1022,7 +1025,7 @@ def genome_view(TFBS,
 
 			#Plot highlight
 			xlim = axes[0].get_xlim()
-			for i in range(bigwigs):
+			for i in range(len(bigwigs)):
 				pass
 				#axes[i+1].
 

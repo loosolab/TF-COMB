@@ -123,7 +123,7 @@ def orientation(rules, verbosity=1):
 		pairs = rules.index.tolist()
 		unique = get_unique_pairs(pairs)
 		rules = rules.loc[unique,:]
-
+	
 	else:
 		scenarios = ["TF1-TF2", "TF2-TF1", "convergent", "divergent"] #4 scenarios
 		logger.info("Rules are directional - scenarios counted are: {0}".format(scenarios))
@@ -224,7 +224,8 @@ class OrientationAnalysis(pd.DataFrame):
 							figsize=figsize, 
 							**kwargs)
 
-		g.ax_heatmap.set_ylabel('TF-TF pairs')
+		n_pairs = self.shape[0]
+		g.ax_heatmap.set_ylabel("TF-TF pairs (n={0})".format(n_pairs))
 
 		if save is not None:
 			plt.savefig(save, dpi=600)
