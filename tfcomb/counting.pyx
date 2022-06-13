@@ -4,21 +4,59 @@ import numpy as np
 cimport numpy as np
 import cython
 
+
+#---------------------------------------------------------------------------------------#
+def rolling_mean(np.ndarray[np.float64_t, ndim=1] arr, int w):
+	"""
+	Rolling mean of arr with window size w. The mean of the border regions are calculated on the reduced window, 
+	e.g. with a window size of 3, the first and last windows only consists of 2 values.
+	"""
+
+	cdef int L = arr.shape[0]
+	cdef np.ndarray[np.float64_t, ndim=1] mean_arr = np.zeros(L)   #mean of values per window
+	
+	cdef int i, j, w_start, w_end, n_vals
+	cdef int lf = int(np.floor((w - 1) / 2.0))
+	cdef int rf = int(np.ceil((w - 1)/ 2.0))
+	cdef float valsum
+
+	#Mean per window
+	for i in range(L):
+		
+		#Ranges of window
+		w_start = max(0, i-lf)
+		w_end = min(i+rf+1, L) #w_end includes +1
+
+		#Sum in window
+		valsum = 0
+		for j in range(w_start, w_end):
+			valsum += arr[j]
+		n_vals = w_end - w_start
+
+		#Mean of window
+		mean_arr[i] = valsum / (n_vals*1.0)
+
+	return mean_arr
+
+
 #---------------------------------------------------------------------------------------#
 @cython.cdivision(True)		#no check for zero division
 @cython.boundscheck(False)	#dont check boundaries
 @cython.wraparound(False) 	#dont deal with negative indices
 @cython.nonecheck(False)
 def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, 
-						int min_distance=0,
-						int max_distance=100, 
+						int min_dist=0,
+						int max_dist=100, 
+						float min_overlap=0,
 						float max_overlap=0, 
-						bint binary=False,
+						bint binarize=False,
 						int anchor=0, 
 						int n_names=1000,
+						bint directional=False,
 						int task=1,
 						list rules=[],
-						bint directional=False,
+						bint percentage=False,
+						int percentage_bins=100					
 						):
 
 	"""
@@ -28,13 +66,15 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 	------------
 	sites : np.array
 		Array of coordinate-lists (chr, start, stop, name) sorted by (chromosom, start).
-	min_distance : int, optional
+	min_dist : int, optional
 		Minimum allowed distance between two TFs. Default: 0.
-	max_distance : int, optional
+	max_dist : int, optional
 		Maximum allowed distance between two TFs. Default: 100.
+	min_overlap : float, optional
+		Minimum overlap fraction needed between sites, e.g. 0 = no overlap needed, 1 = full overlap needed. Default: 0.
 	max_overlap : float, optional
 		Maximum overlap fraction allowed between sites e.g. 0 = no overlap allowed, 1 = full overlap allowed. Default: 0.
-	binary : bool, optional
+	binarize : bool, optional
 		If False; TF1-TF2 can be counted more than once for the same TF1 (if TF2 occurs multiple times per window). If True; a TF1-TF2 pair is only counted once per TF1 occurrence. Default: False.
 	anchor : int, optional
 		Anchor used to calculate distance with. One of [0,1,2] (0 = inner, 1 = outer, 2 = center). Default: 0
@@ -46,18 +86,22 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 		If 2; count the distribution of distances per pair given in 'rules'. 
 		If 3; get the indices of co-occurring pairs for the pairs given in 'rules'. 
 		Default: 1.
+	directional : bool, optional
+		For task == 2, 'directional' controls whether to count TF1-TF2 exclusively, or count TF2-TF1 counts for the TF1-TF2 pair. Setting 'False' means TF1-TF2 counts == TF2-TF1 counts, and
+		'True' means distances are only counted in the TF1-TF2 direction. Default: False.		
 	rules : list, optional
 		The rules to be taken into account. Is only used for task == 2 and task == 3. Must be a list of tuple-pairs (TF1_name, TF2_name) encoded as int.
-	directional : bool, optional
-		For counting distances, 'directional' controls whether to count TF1-TF2 exclusively, or count TF2-TF1 counts for the TF1-TF2 pair. Setting 'False' means TF1-TF2 counts == TF2-TF1 counts, and
-		'True' means distances are only counted in the TF1-TF2 direction. Default: False.
-
+	percentage : bool, optional
+		For task == 2; whether to count distances as base pairs or percentage of longest TF length. Default: False.
+	percentage_bins : int, optional
+		For task == 2 and dist_percentage == True; how many bins for collecting distances. Default: 101 (one per percent + 0).
+	
 	Returns:
 	-----------
 	If task == 1:
 		(np.array(1 x n_names), np.array(n_names x n_names))
 	If task == 2:
-		np.array(n_rules x 2 + min_distance:max_distance) 
+		np.array(n_rules x 2 + min_dist:max_dist) 
 	If task == 3:
 		np.array( <n_pairs> x 2)
 	"""
@@ -78,17 +122,24 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 	cdef bint valid_pair
 	cdef int TF1_chr, TF1_start, TF1_end, TF1_name
 	cdef int TF2_chr, TF2_start, TF2_end, TF2_name
-	cdef int overlap_bp, short_bp
+	cdef int overlap_bp, short_bp, long_bp
 	cdef int TF1_anchor, TF2_anchor
 	cdef int distance
 	cdef int self_count
+	cdef double overlap_frac
 	
 	#Initializations for distance counting (not necessarily used)
 	cdef int n_pairs = len(rules)
 	cdef int rule_idx
 	cdef int dist_idx
 	cdef int ind = 1 
-	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((n_pairs+1, 2+max_distance-min_distance+1), dtype=int) #2 first cols are names, then min_dist:max dist both included (+1)
+
+	if task == 2 and percentage == True:
+		n_distances = 2+percentage_bins+1 #names and bins (+0)
+	else:
+		n_distances = 2+max_dist-min_dist+1 #+1 to make range inclusive
+		
+	cdef np.ndarray[np.int64_t, ndim=2] dist_count_mat = np.zeros((n_pairs+1, n_distances), dtype=int) #2 first cols are names, then min_dist:max dist both included (+1)
 	cdef np.ndarray[np.int64_t, ndim=2] dist_indices_mat = np.zeros((n_names, n_names), dtype=int) #0 index is reserved for non-counted pairs
 
 	#Initializations for pair locations (not necessarily used)
@@ -163,24 +214,24 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 						TF2_anchor = TF2_start
 						
 					#Calculate distance between the two sites
-					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end will be negative if TF1 and TF2 are overlapping
+					distance = TF2_anchor - TF1_anchor #TF2_start - TF1_end (inner) will be negative if TF1 and TF2 are overlapping
 					
 					if task == 1:
 						if distance < 0:
 							distance = 0 #cap any negative distances to 0 (overlapping is dist 0)
 
 					#Check if distance is valid:
-					if distance <= max_distance:
-						if distance >= min_distance: #check that sites are within window; else we stay in finding_assoc and increment j					
+					if distance <= max_dist:
+						if distance >= min_dist: #check that sites are within window; else we stay in finding_assoc and increment j					
 
 							#Check if sites overlap more than threshold
 							short_bp = min([TF1_end - TF1_start, TF2_end - TF2_start]) # Get the length of the shorter TF
-							overlap_bp = TF1_end - TF2_start #will be negative if no overlap is found
-							if overlap_bp > short_bp: #overlap_bp can maximally be the size of the smaller TF (is larger when TF2 is completely within TF1)
-								overlap_bp = short_bp
+							overlap_bp = min(TF1_end, TF2_end) - max(TF1_start, TF2_start) #will be negative if no overlap is found
+							overlap_bp = max([overlap_bp, 0]) #capped at 0
 
 							#Invalid pair if overlap is higher than threshold
-							if (overlap_bp / (short_bp*1.0)) > max_overlap:  #if overlap_bp is negative; this will always be False
+							overlap_frac = (overlap_bp / (short_bp*1.0))
+							if (overlap_frac > max_overlap) or (overlap_frac < min_overlap):  #if overlap_bp is negative; this will always be False
 								valid_pair = False
 
 							#Save counts of association
@@ -189,22 +240,39 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 								TF2_counts_adjustment[TF2_name] += self_count
 
 								#Count TF1 self-counts for adjusting to binary flag
-								if binary == 1 and TF1_name == TF2_name:
+								if binarize == 1 and TF1_name == TF2_name:
 									self_count += 1
 
 								#Save distance to distribution (if chosen)
 								if task == 2:
-
+									
 									#Append to distance in dist_count_mat
 									rule_idx = dist_indices_mat[TF1_name, TF2_name] #row index of rule (is 0 if pair is not in rules)
-									dist_idx = 2 + distance - min_distance #column index of distance
-									dist_count_mat[rule_idx, dist_idx] += 1
+
+									if percentage == True:
+										
+										long_bp = max([TF1_end - TF1_start, TF2_end - TF2_start]) # Get the length of the longer TF
+										
+										#Convert any negative distance to positive for percentage
+										if distance < 0:
+											distance = long_bp + distance 
+
+										#Convert to bin idx
+										dist_idx = 2 + <int>((distance * percentage_bins * 1.0) / long_bp) #force to integer
+										if dist_idx <= percentage_bins + 2:
+											dist_count_mat[rule_idx, dist_idx] += 1
+
+									else:
+										dist_idx = 2 + distance - min_dist #column index of distance
+										dist_count_mat[rule_idx, dist_idx] += 1
 
 									#Save counts to TF2_name, TF1_name as well
 									if directional == False:
 										rule_idx = dist_indices_mat[TF2_name, TF1_name] #this can be 0 even if TF1-TF2 is != 0
-										dist_count_mat[rule_idx, dist_idx] += 1 
-
+										
+										if percentage == False or (percentage == True and dist_idx <= percentage_bins + 2):
+											dist_count_mat[rule_idx, dist_idx] += 1 
+										
 								#Append indices of pair to list (if chosen)
 								if task == 3:
 									
@@ -230,7 +298,7 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 						else: #If anchor is outer or center, there might still be valid pairs for future TF2's
 
 							#Check if it will be possible to find valid pairs in next sites
-							if TF2_start > TF1_start + max_distance:
+							if TF2_start > TF1_anchor + max_dist:
 								#no longer possible to find valid pairs for TF1; increment to next i
 								i += 1
 								finding_assoc = False   #break out of finding_assoc-loop
@@ -243,7 +311,7 @@ def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites,
 		## Done finding TF2's for current TF1
 		
 		#Should counts be binarized?
-		if binary == 1:
+		if binarize == 1:
 			for k in range(n_names):
 
 				#Convert all TF1-TF2 counts above 1 -> 1
