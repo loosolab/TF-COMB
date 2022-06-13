@@ -15,11 +15,15 @@ print(notebooks)
 
 #Set the target order for notebook execution
 notebook_order = ["chipseq_analysis.ipynb", "Select_rules.ipynb", "TFBS_from_motifs.ipynb", "Annotate_TFBS.ipynb", "Differential_analysis.ipynb"] 
-#"network_analysis.ipynb" must be run manually
+
 order_dict = {name: i for i, name in enumerate(notebook_order)}
 notebooks = sorted(notebooks, key= lambda x: order_dict.get(os.path.basename(x), 10**10))
 
-print("Sorted notebooks:")
+#These notebooks must be run manually due to network plotting and errors shown
+excluded = ["network_analysis.ipynb", "Differential_analysis.ipynb", "Select_rules.ipynb"]
+notebooks = [notebook for notebook in notebooks if notebook not in excluded]
+
+print("Notebooks to run (in order):")
 print(notebooks)
 
 #Run notebooks

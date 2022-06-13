@@ -1,13 +1,8 @@
 from __future__ import print_function
 
-import os
 import pandas as pd
 import numpy as np
-import itertools
-import scipy
 from scipy.stats import chisquare
-import re
-import copy
 import multiprocessing as mp
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -43,7 +38,7 @@ def _get_scenario_keys(TF1, TF2, scenario):
 
 		return(scenario_keys[scenario])
 
-def get_unique_pairs(pairs):
+def _get_unique_pairs(pairs):
 
 	#Remove TF2-TF1 duplicates
 	seen = {}
@@ -58,15 +53,18 @@ def orientation(rules, verbosity=1):
 	"""
 	Perform orientation analysis on the TF pairs in a directional / strand-specific table. The analysis counts different scenarios depending on the input.
 	
-	If the input matrix is symmetric, the analysis contains two scenarios:
-	1. Same:      ⊢—(TF1+)⟶  ⊢—(TF2+)⟶  =  ⊢—(TF2+)⟶  ⊢—(TF1+)⟶  =  ⟵(TF1-)—⊣  ⟵(TF2-)—⊣  =  ⟵(TF2-)—⊣  ⟵(TF1-)—⊣
-	2. Opposite:  ⊢—(TF1+)⟶  ⟵(TF2-)—⊣  =  ⊢—(TF2+)⟶  ⟵(TF1-)—⊣  =  ⟵(TF1-)—⊣  ⊢—(TF2+)⟶  =  ⟵(TF2-)—⊣  ⊢—(TF1+)⟶
 
-	If the input is directional, the analysis contains four different scenarios:
-	1. TF1-TF2:    |-TF1(+)->   |---TF2(+)--->   =   <---TF2(-)---|   <---TF1(-)---| 
-	2. TF2-TF1:    |---TF2(+)--->   |---TF1(+)--->   =   <---TF1(-)---|   <---TF2(-)---|
-	3. convergent: |---TF1(+)--->   <---TF2(-)---|   =   |---TF2(+)--->   <---TF1(-)---| 
-	4. divergent:  <---TF1(-)---|   |---TF2(+)--->   =   <---TF2(-)---|   |---TF1(+)--->
+	If the input matrix is symmetric, the analysis contains two scenarios::
+
+		1. Same:      ⟝(TF1+)⟶  ⟝(TF2+)⟶  =  ⟝(TF2+)⟶  ⟝(TF1+)⟶  =  ⟵(TF1-)⟞  ⟵(TF2-)⟞  =  ⟵(TF2-)⟞  ⟵(TF1-)⟞
+		2. Opposite:  ⟝(TF1+)⟶  ⟵(TF2-)⟞  =  ⟝(TF2+)⟶  ⟵(TF1-)⟞  =  ⟵(TF1-)⟞  ⟝(TF2+)⟶  =  ⟵(TF2-)⟞  ⟝(TF1+)⟶
+
+	If the input is directional, the analysis contains four different scenarios::
+
+		1. TF1-TF2:     ⟝(TF1+)⟶  ⟝(TF2+)⟶   =   ⟵(TF2-)⟞  ⟵(TF1-)⟞
+		2. TF2-TF1:     ⟝(TF2+)⟶  ⟝(TF1+)⟶   =   ⟵(TF1-)⟞  ⟵(TF2-)⟞
+		3. convergent:  ⟝(TF1+)⟶  ⟵(TF2-)⟞   =   ⟝(TF2+)⟶  ⟵(TF1-)⟞
+		4. divergent:   ⟵(TF1-)⟞  ⟝(TF2+)⟶   =   ⟵(TF2-)⟞  ⟝(TF1+)⟶
 
 	Parameters
 	----------
@@ -121,7 +119,7 @@ def orientation(rules, verbosity=1):
 		#Remove duplicated pairs from analysis (TF1-TF2 = TF2-TF1)
 		rules.set_index(["TF1", "TF2"], inplace=True)
 		pairs = rules.index.tolist()
-		unique = get_unique_pairs(pairs)
+		unique = _get_unique_pairs(pairs)
 		rules = rules.loc[unique,:]
 	
 	else:
@@ -136,7 +134,7 @@ def orientation(rules, verbosity=1):
 	#Get all possible TF1-TF2 pairs
 	pairs = list(zip(rules["TF1_name"], rules["TF2_name"]))
 	pairs = sorted(list(set(pairs)))
-	pairs = get_unique_pairs(pairs)
+	pairs = _get_unique_pairs(pairs)
 
 	#Get counts per scenario
 	counts = {}
@@ -231,10 +229,3 @@ class OrientationAnalysis(pd.DataFrame):
 			plt.savefig(save, dpi=600)
 
 		return(g)
-
-
-def grammar(pairs):
-	""" Uncover correlations between distances and orientation """
-
-
-	pass
