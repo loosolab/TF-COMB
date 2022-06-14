@@ -15,4 +15,4 @@ $ pip install .
 ```  
 
 ## Usage
-Please visit the full documentation at: [tfcomb.readthedocs.io]([tfcomb.readthedocs.io](https://tf-comb.readthedocs.io))
+Please visit the full documentation at: [tf-comb.readthedocs.io](https://tf-comb.readthedocs.io)
