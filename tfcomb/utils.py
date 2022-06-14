@@ -337,8 +337,8 @@ class TFBSPairList(list):
 		align : str, default 'center'
 			Position from which the flanking regions are added. Must be one of 'center', 'left', 'right'.
 				'center': Midpoint between binding positions (rounded down if uneven).
-				'left': Start of first binding position in pair.
-				'right': End of second binding position in pair.
+				'left': End of first binding position in pair.
+				'right': Start of second binding position in pair.
 		"""
 		if align not in ["center", "left", "right"]:
 			raise ValueError(f"Parameter 'align' has to be one of ['center', 'left', 'right']. Got '{align}'.")
@@ -357,53 +357,55 @@ class TFBSPairList(list):
 		sorted_pairs = []
 
 		for (index, row) in pairs.iterrows():
-			# compute positioning
+			# switch pair to always start with same TF
 			if row["site1_name"] < row["site2_name"]:
-				# compute center and flanks
-				if align == "center":
-					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
-				elif align == "left":
-					row["center"] = row["site2_end"]
-				elif align == "right":
-					row["center"] = row["site1_start"]
-
-				row["window_start"] = row["center"] - flank[1]
-				row["window_end"] = row["center"] + flank[0]
-
-				# switch pair
-				site1 = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_strand"]
+				site1 = ["site1_chrom", "site1_end", "site1_start", "site1_name", "site1_strand"]
 				site2 = ["site2_chrom", "site2_start", "site2_end", "site2_name", "site2_strand"]
 				row[site1], row[site2] = row[site2].values, row[site1].values
-				
-				# compute relative positions
-				row["site1_rel_start"] = row["window_end"] - row["site1_end"]
-				row["site1_rel_end"] = row["window_end"] - row["site1_start"]
-				
-				row["site2_rel_start"] = row["window_end"] - row["site2_end"]
-				row["site2_rel_end"] = row["window_end"] - row["site2_start"]
-			else:
-				# compute center and flanks
-				if align == "center":
-					row["center"] = row["site1_end"] + round(row["site_distance"] / 2)
-				elif align == "left":
-					row["center"] = row["site1_start"]
-				elif align == "right":
-					row["center"] = row["site2_end"]
 
-				row["window_start"] = row["center"] - flank[0]
-				row["window_end"] = row["center"] + flank[1]
+				# get anchor point (center) to which flanks are added
+				if align == "center":
+					anchor = row["site1_end"] - row["site_distance"] // 2
+				elif align == "left":
+					anchor = row["site1_end"]
+				elif align == "right":
+					anchor = row["site2_start"]
+
+				# compute window from anchor point
+				row["window_start"] = anchor + flank[0]
+				row["window_end"] = anchor - flank[1]
+
+				# compute relative positions
+				row["site1_rel_start"] = row["window_start"] - row["site1_start"]
+				row["site1_rel_end"] = row["window_start"] - row["site1_end"]
+
+				row["site2_rel_start"] = row["window_start"] - row["site2_start"]
+				row["site2_rel_end"] = row["window_start"] - row["site2_end"]
+
+				# fetch scores
+				values = signal_bigwig.values(row["site1_chrom"], row["window_end"], row["window_start"])
+				values.reverse()
+			else:
+				# get anchor point (center) to which flanks are added
+				if align == "center":
+					anchor = row["site1_end"] + row["site_distance"] // 2
+				elif align == "left":
+					anchor = row["site1_end"]
+				elif align == "right":
+					anchor = row["site2_start"]
+
+				# compute window from anchor point
+				row["window_start"] = anchor - flank[0]
+				row["window_end"] = anchor + flank[1]
 
 				# compute relative positions
 				row["site1_rel_start"] = row["site1_start"] - row["window_start"]
 				row["site1_rel_end"] = row["site1_end"] - row["window_start"]
-				
+
 				row["site2_rel_start"] = row["site2_start"] - row["window_start"]
 				row["site2_rel_end"] = row["site2_end"] - row["window_start"]
 
-			# get scores
-			values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
-			if row["site1_name"] < row["site2_name"]:
-				values.reverse()
+				values = signal_bigwig.values(row["site1_chrom"], row["window_start"], row["window_end"])
 
 			sorted_pairs.append(row)
 			scores.append(values)
@@ -416,19 +418,29 @@ class TFBSPairList(list):
 		scores = scores.loc[sorted_pairs.index]
 
 		# warn if the binding site length is not always the same
-		if (len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1 or
-			len(set(sorted_pairs["site1_end"] - sorted_pairs["site1_start"])) > 1):
+		if (len(set(sorted_pairs["site1_rel_end"] - sorted_pairs["site1_rel_start"])) > 1 or
+			len(set(sorted_pairs["site2_rel_end"] - sorted_pairs["site2_rel_start"])) > 1):
 			warnings.warn("Differences in binding site length detected! This can have undesired effects when plotting. Refer to 'CombObj.TFBS_from_motifs(resolve_overlapping)' to solve.")
-
-
-
-
 
 		self._last_flank = flank
 		self._last_align = align
 		self._plotting_tables = (sorted_pairs, scores)
 
-	def pairMap(self, logNorm_cbar=None, show_binding=True, flank_plot="strand", figsize=(7, 14), output=None, flank=None, align=None, alpha=0.7, cmap="seismic", show_diagonal=True):
+	def pairMap(self,
+				logNorm_cbar=None,
+				show_binding=True,
+				flank_plot="strand",
+				figsize=(7, 14),
+				output=None,
+				flank=None,
+				align=None,
+				alpha=0.7,
+				cmap="seismic",
+				show_diagonal=True,
+				legend_name_score="Bigwig Score",
+				xtick_num=10,
+				log=np.log1p,
+				dpi=300):
 		"""
 		Create a heatmap of TF binding pairs sorted for distance.
 
@@ -444,8 +456,8 @@ class TFBSPairList(list):
 			show_binding : bool, default True
 				Shows the TF binding positions as a grey background.
 			flank_plot : str, default 'strand'
-				["strand", "orientation"]
-				Decide if the plots flanking the heatmap should be colored for strand or strand-orientation.
+				["strand", "orientation", None]
+				Decide if the plots flanking the heatmap should be colored for strand, strand-orientation or disabled.
 			figsize : int tuple, default (7, 14)
 				Figure dimensions.
 			output : str, default None 
@@ -460,6 +472,15 @@ class TFBSPairList(list):
 				Color palette used in the main heatmap. Forwarded to seaborn.heatmap(cmap)
 			show_diagonal : boolean, default True
 				Shows diagonal lines for identifying preference in binding distance.
+			legend_name_score : str, default 'Bigwig Score'
+				Name of the score legend (upper legend).
+			xtick_num : int, default 10
+				Number of ticks shown on the x-axis. Disable ticks with None or values < 0.
+			log : function, default numpy.log1p
+				Function applied to each row of scores. Excludes 0 and will use absolute value for negative numbers adding the sign afterwards.
+				Use any of the numpy.log functions. For example numpy.log, numpy.log10 or numpy.log1p. None to disable.
+			dpi : float, default 300
+				The resolution of the figure in dots-per-inch.
 		
 		Returns
 		----------
@@ -470,15 +491,15 @@ class TFBSPairList(list):
 		# check parameter values
 		if not logNorm_cbar in [None, "centerLogNorm", "SymLogNorm"]:
 			raise ValueError(f"Parameter 'logNorm_cbar' has to be one of [None, \"centerLogNorm\", \"SymLogNorm\"]. But found {logNorm_cbar}.")
-		if not flank_plot in ["strand", "orientation"]:
-			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\"]. But found {flank_plot}")
+		if not flank_plot in ["strand", "orientation", None]:
+			raise ValueError(f"Parameter 'flank_plot' hat to be one of [\"strand\", \"orientation\", None]. But found {flank_plot}")
 
 		# fixes FloatingPointError: underflow encountered in multiply
 		# https://stackoverflow.com/a/61756043
 		# should be set by default but for some reason it isn't for matplotlib 3.5.1/ numpy 1.21.5
 		np.seterr(under='ignore')
 
-		fig = plt.figure(figsize=figsize)
+		fig = plt.figure(figsize=figsize, dpi=dpi)
 
 		# compute plotting tables with custom flank
 		if not flank is None and flank != self._last_flank or not align is None and align != self._last_align:
@@ -490,6 +511,18 @@ class TFBSPairList(list):
 
 		# load data
 		pairs, scores = self.plotting_tables
+
+		# log scores
+		if log:
+			def log_row(row):
+				out = np.zeros(len(row))
+				
+				out[row > 0] = log(row[row > 0])
+				out[row < 0] = -log(np.abs(row[row < 0]))
+				
+				return pd.Series(out)
+
+			scores = scores.apply(axis=1, func=log_row)
 
 		# load custom colorbar normalizaition class
 		# https://stackoverflow.com/a/65260996
@@ -544,30 +577,43 @@ class TFBSPairList(list):
 																subplot_spec=grid[1],
 																wspace=0)
 
-		strand1 = fig.add_subplot(plot_grid[0])
 		heatmap = fig.add_subplot(plot_grid[1])
-		strand2 = fig.add_subplot(plot_grid[2])
+		# add flanks if needed
+		if flank_plot is not None:
+			strand1 = fig.add_subplot(plot_grid[0])
+			strand2 = fig.add_subplot(plot_grid[2])
 
 		# legend area
 		legend_grid = matplotlib.gridspec.GridSpecFromSubplotSpec(ncols=1, nrows=2, subplot_spec=grid[0])
 
+		# heatmap legend
 		heatmap_led = fig.add_subplot(legend_grid[0])
-		strand_led = fig.add_subplot(legend_grid[1])
+		heatmap_led.set_title(legend_name_score)
 
-		# legend label
-		heatmap_led.set_title("Open Chromatin Score")
-		strand_led.set_title("TF Binding Strand")
+		# strand legend
+		if flank_plot is not None:
+			strand_led = fig.add_subplot(legend_grid[1])
+			strand_led.set_title("TF Binding Strand")
 
 		###### define plots ######
 		### main heatmap ###
 		
+		# get normalization function
 		if logNorm_cbar == None:
 			norm = None
 		elif logNorm_cbar == "centerLogNorm":
 			norm = MidpointLogNorm(lin_thres=1, lin_scale=1, midpoint=0)
 		elif logNorm_cbar == "SymLogNorm":
 			norm = matplotlib.colors.SymLogNorm(linthresh=1, linscale=1)
-			
+		
+		# get center line position
+		if self._last_align == "center":
+			pos = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
+		elif self._last_align == "left":
+			pos = pairs["site1_rel_end"][0]
+		elif self._last_align == "right":
+			pos = pairs["site2_rel_start"][0]
+
 		plot = sns.heatmap(scores, 
 						yticklabels=False,
 						xticklabels=False,
@@ -576,19 +622,25 @@ class TFBSPairList(list):
 						cbar=True,
 						cbar_ax=heatmap_led,
 						norm=norm,
-						ax=heatmap)
+						ax=heatmap,
+						rasterized=True)
 
+		# set title
 		name1, name2 = set(pairs["site1_name"]).pop(), set(pairs["site2_name"]).pop()
 		heatmap.set_title(f"{name1} <-> {name2}")
 
-		# center line
-		if self._last_align == "center":
-			pos = pairs["site1_rel_end"][0] + pairs["site_distance"][0] // 2
-		elif self._last_align == "left":
-			pos = pairs["site1_rel_end"][0]
-		elif self._last_align == "right":
-			pos = pairs["site2_rel_start"][0]
+		# show evenly spaced xticks
+		if xtick_num and xtick_num > 0:
+			xtickpositions = np.linspace(0, len(scores.columns), xtick_num, dtype=int)
+			xticklabels = np.linspace(-pos, len(scores.columns) - pos, xtick_num, dtype=int)
+			# replace nearest tick to 0 with 0
+			tick_index = np.absolute(xticklabels).argmin()
+			xticklabels[tick_index], xtickpositions[tick_index] = 0, pos
 
+			plot.set_xticks(xtickpositions)
+			plot.set_xticklabels(xticklabels)
+
+		# center line
 		plot.vlines(x=pos,
 					ymin=0, ymax=len(scores),
 					linestyles="dashed",
@@ -607,7 +659,8 @@ class TFBSPairList(list):
 					alpha=alpha,
 					color="gray",
 					edgecolor=None,
-					lw=0
+					lw=0,
+					rasterized=True
 				))
 
 				# right sites
@@ -618,13 +671,14 @@ class TFBSPairList(list):
 					alpha=alpha,
 					color="gray",
 					edgecolor=None,
-					lw=0
+					lw=0,
+					rasterized=True
 				))
 
 		# diagonal binding lines
 		if show_diagonal:
 			linecolor="black"
-			linestyle="dotted"
+			linestyle="solid"
 
 			# left
 			# start
@@ -663,36 +717,39 @@ class TFBSPairList(list):
 		for _, spine in plot.spines.items():
 			spine.set_visible(True)
 
-		### strand left ###
-		#https://stackoverflow.com/a/57994641
-		col = ["site1_strand"] if flank_plot == "strand" else ["site_orientation"]
-		
-		str_to_int = {j:i for i, j in enumerate(pd.unique(pairs[col[0]].values))}
+		if flank_plot is not None:
+			### strand left ###
+			#https://stackoverflow.com/a/57994641
+			col = ["site1_strand"] if flank_plot == "strand" else ["site_orientation"]
+			
+			str_to_int = {j:i for i, j in enumerate(pd.unique(pairs[col[0]].values))}
 
-		cmap = sns.color_palette("tab10", len(str_to_int))
+			cmap = sns.color_palette("tab10", len(str_to_int))
 
-		plot = sns.heatmap(pairs[col].replace(str_to_int),
-							yticklabels=False,
-							xticklabels=False,
-							cmap=cmap,
-							cbar=True,
-							cbar_ax=strand_led,
-							ax=strand1)
+			plot = sns.heatmap(pairs[col].replace(str_to_int),
+								yticklabels=False,
+								xticklabels=False,
+								cmap=cmap,
+								cbar=True,
+								cbar_ax=strand_led,
+								ax=strand1,
+								rasterized=True)
 
-		colorbar = plot.collections[0].colorbar 
-		r = colorbar.vmax - colorbar.vmin 
-		colorbar.set_ticks([colorbar.vmin + r / len(str_to_int) * (0.5 + i) for i in range(len(str_to_int))])
-		colorbar.set_ticklabels(list(str_to_int.keys()))
+			colorbar = plot.collections[0].colorbar 
+			r = colorbar.vmax - colorbar.vmin 
+			colorbar.set_ticks([colorbar.vmin + r / len(str_to_int) * (0.5 + i) for i in range(len(str_to_int))])
+			colorbar.set_ticklabels(list(str_to_int.keys()))
 
-		### strand right ###
-		col = ["site2_strand"] if flank_plot == "strand" else ["site_orientation"]
-		
-		sns.heatmap(pairs[col].replace(str_to_int),
-					yticklabels=False,
-					xticklabels=False,
-					cmap=cmap,
-					cbar=False,
-					ax=strand2)
+			### strand right ###
+			col = ["site2_strand"] if flank_plot == "strand" else ["site_orientation"]
+			
+			sns.heatmap(pairs[col].replace(str_to_int),
+						yticklabels=False,
+						xticklabels=False,
+						cmap=cmap,
+						cbar=False,
+						ax=strand2,
+						rasterized=True)
 		
 		# save plot
 		if output:
@@ -706,7 +763,7 @@ class TFBSPairList(list):
 
 		return grid
 
-	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, output=None, flank=None, align=None, _ret_param=False):
+	def pairTrack(self, dist=None, start=None, end=None, ymin=None, ymax=None, ylabel="Bigwig signal", output=None, flank=None, align=None, figsize=(6, 4), dpi=70, _ret_param=False):
 		"""
 		Create an aggregated footprint track on the paired binding sites.
 		Either aggregate all sites for a specific distance or give a range of sites that should be aggregated. 
@@ -725,12 +782,18 @@ class TFBSPairList(list):
 				Y-axis minimum limit.
 			ymax : int, default None
 				Y-axis maximum limit.
+			ylabel : str, default 'Bigwig signal'
+				Label for the y-axis.
 			output : str, default None
 				Save plot to given file.
 			flank : int or int tuple, default None
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 			align : str, default None
 				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
+			figsize : int tuple, default (3, 3)
+				Figure dimensions.
+			dpi : float, default 70
+				The resolution of the figure in dots-per-inch.
 			_ret_param : bool, default False
 				Intended for internal animation use!
 				If True will cause the function to return a dict of function call parameters used to create plot.
@@ -798,12 +861,12 @@ class TFBSPairList(list):
 
 		
 		##### plot #####
-		fig, ax = plt.subplots()
+		fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 		
 		# add aggregated line
 		parameter["set"] = {"ylim": (ymin, ymax),
 							"xlim": (xmin, xmax),
-							"ylabel": "Bigwig signal",
+							"ylabel": ylabel,
 							"xlabel": "Basepair",
 							"title": f"Distance: {dist} | Sites aggregated: {len(tmp_pairs)}\n{lname} <--> {rname}"}
 		
@@ -842,13 +905,13 @@ class TFBSPairList(list):
 											"alpha": 0.2})
 		ax.add_patch(matplotlib.patches.Rectangle(**parameter["patches.Rectangle"][1]))
 		
-		# show plot if not in parameter mode
-		if not _ret_param:
-			plt.show()
-		
 		# save plot
 		if output:
 			plt.savefig(output)
+
+		# show plot if not in parameter mode
+		if not _ret_param:
+			plt.show()
 
 		# close figure
 		plt.close()
@@ -858,7 +921,7 @@ class TFBSPairList(list):
 		else:
 			return ax
 
-	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, interval=50, repeat_delay=0, repeat=False, output=None, flank=None, align=None):
+	def pairTrackAnimation(self, site_num=None, step=10, ymin=None, ymax=None, ylabel="Bigwig signal", interval=50, repeat_delay=0, repeat=False, output=None, flank=None, align=None, figsize=(6, 4), dpi=70):
 		"""
 		Combine a set of pairTrack plots to a .gif.
 			
@@ -878,6 +941,8 @@ class TFBSPairList(list):
 				Y-axis minimum limit
 			ymax : int, default None
 				Y-axis maximum limit
+			ylabel : str, default 'Bigwig signal'
+				Label for the y-axis.
 			interval : int, default 50
 				Delay between frames in milliseconds
 			repeat_delay : int, default 0
@@ -890,6 +955,10 @@ class TFBSPairList(list):
 				Bases added to both sides counted from center. Forwarded to comp_plotting_tables().
 			align : str, default None
 				Alignment of pairs. One of ['left', 'right', 'center']. Forwarded to comp_plotting_tables().
+			figsize : int tuple, default (6, 4)
+				Figure dimensions.
+			dpi : float, default 70
+				The resolution of the figure in dots-per-inch.
 		
 		Returns
 		----------
@@ -928,6 +997,7 @@ class TFBSPairList(list):
 													end=start + site_num if start + site_num < len(pairs) else len(pairs),
 													ymin=ymin,
 													ymax=ymax,
+													ylabel=ylabel,
 													_ret_param=True
 													)
 									)
@@ -948,6 +1018,7 @@ class TFBSPairList(list):
 				parameter_list.append(self.pairTrack(dist=d,
 													ymin=ymin,
 													ymax=ymax,
+													ylabel=ylabel,
 													_ret_param=True
 													)
 									)
@@ -957,7 +1028,7 @@ class TFBSPairList(list):
 				
 		##### Setup animation #####
 		# setup figure to draw on
-		fig, axes = plt.subplots()
+		fig, axes = plt.subplots(figsize=figsize, dpi=dpi)
 		line, = axes.plot([])
 		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
 		axes.add_patch(matplotlib.patches.Rectangle(xy=(0, 0), width=0, height=0))
@@ -1000,7 +1071,7 @@ class TFBSPairList(list):
 		
 		# save animation
 		if output:
-			anim_created.save(output, dpi=300)
+			anim_created.save(output, dpi=dpi)
 			pbar.reset()
 		
 		# prepare output
@@ -1013,7 +1084,7 @@ class TFBSPairList(list):
 		
 		return html
 
-	def pairLines(self, x, y, figsize=(6, 4), output=None):
+	def pairLines(self, x, y, figsize=(6, 4), dpi=70, output=None):
 		"""
 		Compare miscellaneous values between TF-pair.
 		
@@ -1025,6 +1096,8 @@ class TFBSPairList(list):
 				Data to show on the y-axis. Set None to get a list of options.
 			figsize : int tuple, default (6, 4)
 				Figure dimensions.
+			dpi : float, default 70
+				The resolution of the figure in dots-per-inch.
 			output : str, default None
 				Save plot to given file.
 
@@ -1079,7 +1152,7 @@ class TFBSPairList(list):
 			hue1, hue2 = hue1 + "_1", hue2 + "_2"
 		
 		##### plotting #####
-		plt.figure(figsize=figsize)
+		plt.figure(figsize=figsize, dpi=dpi)
 		
 		plot = sns.lineplot(x=x1.append(x2).values,
 							y=y1.append(y2).values,
