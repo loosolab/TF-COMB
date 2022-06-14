@@ -1475,6 +1475,10 @@ class CombObj():
 		if x not in self.rules.columns:
 			raise KeyError("Column given for x ('{0}') is not in .rules".format(x))
 
+		#Warn if y aka zscore contains inf
+		if self.rules[y].isin([np.inf, -np.inf]).any():
+			self.logger.warning(f"{y} contains infinite value. This could be the result of 'n_background' from .count_within being set too low, which will lead to spurious results of .select_significant_rules. Please check and adjust parameters if necessary.")
+
 		#If measure_threshold is None; try to calculate optimal threshold via knee-plot
 		if x_threshold is None:
 			self.logger.info("x_threshold is None; trying to calculate optimal threshold")
