@@ -926,8 +926,7 @@ class CombObj():
 				self.logger.info("Running with multiprocessing threads == 1. To change this, give 'threads' in the parameter of the function.")
 				p = Progress(n_background, 10, self.logger) #Setup progress object
 				for i in range(n_background):
-					kwargs.update({"seed": i})
-					l.append(tfcomb.utils.calculate_background(sites, **kwargs))
+					l.append(tfcomb.utils.calculate_background(sites, i, **kwargs))
 					p.write_progress(i)
 
 			else:
