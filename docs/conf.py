@@ -15,15 +15,15 @@ import sys
 import glob
 import json
 
-sys.path.insert(0, os.path.abspath('../examples'))
+sys.path.insert(0, os.path.abspath('../'))
 sys.path.insert(0, os.path.abspath('../tfcomb'))
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'TF-comb'
-copyright = '2021, Mette Bentsen'
-author = 'Mette Bentsen'
+project = 'TF-COMB'
+copyright = '2021, Loosolab'
+author = 'Loosolab'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1.0'
@@ -54,6 +54,8 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+autodoc_mock_imports = ['tfcomb.counting', 'numpy', 'matplotlib', 'qnorm', 'kneed', 'pandas', 'glob', 'scipy', 'sklearn',
+                        'tobias', 'seaborn', 'networkx', 'community', 'goatools', 'statsmodels', 'mpl_toolkits']
 
 # -- Create nblink files  -------------------------------------------------
 
@@ -80,7 +82,7 @@ nbsphinx_execute = 'never'
 #
 html_theme = 'sphinx_rtd_theme'
 
-html_logo = ""
+html_logo = "_figures/tfcomb_logo.png"
 
 
 # Add any paths that contain custom static files (such as style sheets) here,
