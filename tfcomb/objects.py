@@ -1481,7 +1481,7 @@ class CombObj():
 
 		#Warn if y aka zscore contains inf
 		if self.rules[y].isin([np.inf, -np.inf]).any():
-			self.logger.warning(f"{y} contains infinite. This could hint at poor parameter choices during score calculation. Please check and adjust if necessary.")
+			self.logger.warning(f"{y} contains infinite value. This could be the result of 'n_background' from .count_within being set too low, which will lead to spurious results of .select_significant_rules. Please check and adjust parameters if necessary.")
 
 		#If measure_threshold is None; try to calculate optimal threshold via knee-plot
 		if x_threshold is None:
