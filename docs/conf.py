@@ -55,7 +55,8 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 autodoc_mock_imports = ['tfcomb.counting', 'numpy', 'matplotlib', 'qnorm', 'kneed', 'pandas', 'glob', 'scipy', 'sklearn',
-                        'tobias', 'seaborn', 'networkx', 'community', 'goatools', 'statsmodels', 'mpl_toolkits']
+                        'tobias', 'seaborn', 'networkx', 'community', 'goatools', 'statsmodels', 'mpl_toolkits', 'dill', 'pysam',
+                        'pyBigWig', 'tqdm', 'IPython', 'graphviz', 'adjustText', 'psutil', 'uropa']
 
 # -- Create nblink files  -------------------------------------------------
 
