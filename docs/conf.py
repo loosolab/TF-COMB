@@ -46,6 +46,8 @@ extensions = ['sphinx.ext.autodoc',
 napoleon_numpy_docstring = True
 autodoc_member_order = 'bysource'
 
+mathjax3_config = {'chtml': {'displayAlign': 'center'}}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
