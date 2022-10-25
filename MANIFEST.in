@@ -1,1 +1,3 @@
 include tfcomb/data/*
+exclude data/*
+exclude examples/*
