@@ -8,8 +8,14 @@ import random
 import itertools
 import scipy
 import re
+import matplotlib
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid.inset_locator import inset_axes
+from packaging import version
+
+if version.parse(matplotlib.__version__) < version.parse("3.6.0"):
+	from mpl_toolkits.axes_grid.inset_locator import inset_axes
+else:  # axes_grid was removed in matplotlib 3.6.0
+	from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 #Network analysis
 import networkx as nx
