@@ -14,6 +14,7 @@ import os
 import sys
 import glob
 import json
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.abspath('../'))
 sys.path.insert(0, os.path.abspath('../tfcomb'))
@@ -56,9 +57,10 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-autodoc_mock_imports = ['tfcomb.counting', 'numpy', 'matplotlib', 'qnorm', 'kneed', 'pandas', 'glob', 'scipy', 'sklearn',
+autodoc_mock_imports = ['tfcomb.counting', 'numpy', 'qnorm', 'kneed', 'pandas', 'glob', 'scipy', 'sklearn',
                         'tobias', 'seaborn', 'networkx', 'community', 'goatools', 'statsmodels', 'mpl_toolkits', 'dill', 'pysam',
                         'pyBigWig', 'tqdm', 'IPython', 'graphviz', 'adjustText', 'psutil', 'uropa']
+
 
 # -- Create nblink files  -------------------------------------------------
 
