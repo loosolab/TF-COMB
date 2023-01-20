@@ -70,8 +70,9 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 
 	Returns
 	--------
-	None
-		The .annotation attribute is added to each region in input regions. See 'Examples' of how to access this information.
+	pd.DataFrame or None
+		Dataframe including regions and annotation information (if applicable, otherwise a warning will be displayed and None is returned).
+		
 
 	References
 	----------
@@ -193,10 +194,14 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 	if best == True:
 		annotations = [annotations[i] for i, anno in enumerate(annotations) if anno["best_hit"] == 1]
 	
+	
+	found_annotation = False
 	#Extend feat_attributes per annotation and format for output
 	del_keys = ["raw_distance", "anchor_pos", "query", "peak_center", "peak_length", "feat_length", "feat_center"] 
 	for anno in annotations:
 		if "feat_attributes" in anno:
+			# at least one annotation was found
+			found_annotation = True
 			for key in anno["feat_attributes"]:
 				anno[key] = anno["feat_attributes"][key]
 			del anno["feat_attributes"]
@@ -214,6 +219,12 @@ def annotate_regions(regions, gtf, config=None, best=True, threads=1, verbosity=
 		for key in anno:
 			if isinstance(anno[key], list):
 				anno[key] = anno[key][0]
+
+
+	# handle no annotations found
+	if not found_annotation:
+		logger.warning("No annotations found for given config. Return type is None.")
+		return None
 
 	#Convert to pandas table
 	annotations_table = pd.DataFrame(annotations)
