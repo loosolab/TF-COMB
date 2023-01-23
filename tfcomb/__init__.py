@@ -1,6 +1,13 @@
 from importlib import import_module
+import sys
 
-__version__ = "1.0.2"
+#Set package version from pyproject.toml
+if sys.version_info[:2] >= (3, 8):
+    from importlib import metadata
+else:
+    import importlib_metadata as metadata
+
+__version__ = metadata.version(__package__)
 
 #Set classes to be available directly from upper tfcomb, i.e. "from tfcomb import CombObj"
 global_classes = ["tfcomb.objects.CombObj",

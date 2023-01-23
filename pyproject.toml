@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tfcomb"
+description = "Transcription Factor Co-Occurrence using Market Basket analysis"
+version = "1.0.3"
+readme = "README.md"
+requires-python = ">=3,<3.11" #upper limit due to numba restriction
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3"]
+license = {file = "LICENSE"}
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "pysam",
+    "matplotlib>=2",
+    "pandas",
+    "tobias",
+    "networkx>=2.4",  # G.node -> G.nodes
+    "python-louvain",
+    "graphviz",
+    "statsmodels",
+    "goatools",
+    "uropa",
+    "qnorm",
+    "dill",
+    "seaborn",
+    "tqdm",
+    "IPython"
+]
+
+[project.urls]
+homepage = "https://github.com/loosolab/TF-COMB"
+documentation = "https://tf-comb.readthedocs.io/en/latest/"
+
+[tool.setuptools]
+py-modules = ["_custom_build"]
+
+[tool.setuptools.cmdclass]
+build_py = "_custom_build.build_py"
