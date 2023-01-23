@@ -30,10 +30,6 @@ else:
     else:  # Only happens when installing directly from source
         sys.exit("Cython is needed to compile TF-comb.")
 
-# Path of setup file to establish version
-setupdir = os.path.abspath(os.path.dirname(__file__))
-
-
 def find_version(init_file):
     version_file = open(init_file).read()
     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M)
@@ -49,7 +45,7 @@ def readme():
         return f.read()
 
 setup(name='TF-COMB',
-        version=find_version(os.path.join(setupdir, "tfcomb", "__init__.py")),   # get version from __init__.py
+        version=find_version(os.path.join("tfcomb", "__init__.py")),   # get version from __init__.py
         description='Transcription Factor Co-Occurrence using Market Basket analysis',
         long_description=readme(),
         long_description_content_type='text/markdown',
@@ -57,11 +53,11 @@ setup(name='TF-COMB',
         author='Mette Bentsen',
         author_email='mette.bentsen@mpi-bn.mpg.de',
         license='MIT',
-        packages=["tfcomb"],
+        packages=['tfcomb'],
         ext_modules=ext_modules,
         cmdclass=cmdclass,
         python_requires='>=3',
-        setup_requires=["numpy"],
+        setup_requires=['numpy'],
         install_requires=[
             'numpy',
             'scipy',
