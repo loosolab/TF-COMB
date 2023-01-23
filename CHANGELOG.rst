@@ -1,3 +1,7 @@
+1.0.3 (23-01-2023)
+------------------
+- Added pyproject.toml to fix error introduced in 1.0.2 when installing with pip
+
 1.0.2 (20-01-2023)
 -------------------
 - Fixed missing readthedocs documentation
