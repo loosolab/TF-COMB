@@ -81,6 +81,7 @@ class CombObj():
 		self.prefix = None 	     #is used when objects are added to a DiffCombObj
 		self.TFBS = None		 #None or filled with list of TFBS
 		self.TF_names = []		 #list of TF names
+		self.count_names = []	 #list of counted TF names (might be different than TF_names due to strand-specific counting)
 
 		#Variables for counts
 		self.TF_counts = None 	 #numpy array of size n_TFs
@@ -254,11 +255,11 @@ class CombObj():
 			raise InputError(".rules not filled. Please run .fill_rules() first.")
 
 		# check tf1 is present within object
-		if tf1 not in self.TF_names:
+		if tf1 not in self.TF_names and tf1 not in self.count_names:  #if the tf is stranded (e.g. TFNAME(+)), it could be in count_names
 			raise InputError(f"{tf1} (TF1) is not valid as it is not present in the current object.")
 
 		# check tf1 is present within object
-		if tf2 not in self.TF_names:
+		if tf2 not in self.TF_names and tf2 not in self.count_names:
 			raise InputError(f"{tf2} (TF2) is not valid as it is not present in the current object.")
 		
 		if type(self) == DistObj:
@@ -2706,6 +2707,7 @@ class DistObj():
 		# copy required attributes
 		self.rules = comb_obj.rules
 		self.TF_names = comb_obj.TF_names
+		self.count_names = comb_obj.count_names		#different from TF_names if counting is stranded
 		self.TFBS = comb_obj.TFBS
 		self.TF_table = comb_obj.TF_table
 
@@ -2714,7 +2716,7 @@ class DistObj():
 		for variable in variables:
 			if hasattr(comb_obj, variable):
 				setattr(self, variable, getattr(comb_obj, variable))
-	
+
 	def reset_signal(self):
 		""" Resets the signals to their original state. 
 
