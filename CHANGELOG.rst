@@ -1,3 +1,7 @@
+1.0.4 (in progress)
+-------------------
+- Fix for floating-point error handling (#55)
+
 1.0.3 (23-01-2023)
 ------------------
 - Added pyproject.toml to fix error introduced in 1.0.2 when installing with pip

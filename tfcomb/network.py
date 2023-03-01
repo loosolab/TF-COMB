@@ -61,7 +61,9 @@ def _establish_node_attributes(table, node):
 	
 	for attribute in columns_to_assign:
 		try:
-			p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
+			# temporary change numpy floating-point error handling
+			with np.errstate(all="raise"):
+				p = scipy.stats.chisquare(factorized[node], f_exp=factorized[attribute])[1]
 		except ValueError: #observed frequencies != expected frequencies
 			p = 0.0 #not correlated
 		except FloatingPointError: #sum of factorized is 0 -> all nan

@@ -48,7 +48,6 @@ from tfcomb.utils import OneTFBS, Progress, check_type, check_value, check_strin
 from tfcomb.utils import *
 
 
-np.seterr(all='raise') # raise errors for runtimewarnings
 #pd.options.mode.chained_assignment = 'raise' # for debugging
 pd.options.mode.chained_assignment = None
 

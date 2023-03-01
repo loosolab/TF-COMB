@@ -1981,7 +1981,9 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, 
 		
 		#Catch any exceptions from fitting
 		try:
-			params = distribution.fit(data_finite)
+			# temporary change numpy floating-point error handling
+			with np.errstate(all="raise"):
+				params = distribution.fit(data_finite)
 		except Exception as e:
 			logger.error("Exception ({0}) occurred while fitting data to '{1}' distribution; skipping this distribution. Error message was: {2} ".format(e.__class__.__name__, distribution.name, e))
 			continue
