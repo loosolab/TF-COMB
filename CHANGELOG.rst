@@ -1,6 +1,7 @@
 1.0.4 (in progress)
 -------------------
 - Fix for floating-point error handling (#55)
+- Fix error reading MEME files without "name" per motif (#64)
 
 1.0.3 (23-01-2023)
 ------------------
