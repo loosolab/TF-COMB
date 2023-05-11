@@ -1009,20 +1009,26 @@ class CombObj():
 		TF1_int = self.name_to_idx[TF1]
 		TF2_int = self.name_to_idx[TF2]
 		anchor_string = kwargs["anchor"]
+		self.logger.debug(f"TF1: {TF1}={TF1_int}, TF2: {TF2}={TF2_int}")
 		
-		#Sort sites based on the anchor position
+		# Sort sites based on the anchor position
+		self.logger.debug("Sorting sites based on anchor '{0}'".format(anchor_string))
 		sites = self._sites
 		if anchor_string == "center":
 			sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
 			idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
 			sites = sites[sort_idx, :]
 
-		#Get locations via counting function
-		kwargs["anchor"] = self.anchor_to_int[anchor_string] #convert anchor string to int
+		# Get locations via counting function
+		self.logger.debug("Getting locations for {0}-{1} with anchor '{2}'".format(TF1, TF2, anchor_string))
+		kwargs["anchor"] = self.anchor_to_int[anchor_string]  # convert anchor string to int
+		kwargs["n_names"] = max(self.name_to_idx.values()) + 1  # need at least the number of names as the highest index (for intializing the matrix)
+		self.logger.spam(f"kwargs for count_co_occurrence: {kwargs}")
 		idx_mat = tfcomb.counting.count_co_occurrence(sites, task=3, rules=[(TF1_int, TF2_int)], **kwargs)
 		n_locations = idx_mat.shape[0]
 
 		#Fetch locations from TFBS list
+		self.logger.debug("Fetching locations from .TFBS")
 		locations = tfcomb.utils.TFBSPairList([None]*n_locations)
 		if anchor_string == "center":
 			for i in range(n_locations):
