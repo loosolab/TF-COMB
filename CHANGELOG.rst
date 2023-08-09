@@ -3,6 +3,7 @@
 - Fix for floating-point error handling (#55)
 - Fix error reading MEME files without "name" per motif (#64)
 - Fix get_pair_locations for motif lists with length > 1000 (#62)
+- Added figsize to plotting.genome_view (#69)
 
 1.0.3 (23-01-2023)
 ------------------
