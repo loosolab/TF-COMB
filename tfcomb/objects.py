@@ -48,7 +48,6 @@ from tfcomb.utils import OneTFBS, Progress, check_type, check_value, check_strin
 from tfcomb.utils import *
 
 
-np.seterr(all='raise') # raise errors for runtimewarnings
 #pd.options.mode.chained_assignment = 'raise' # for debugging
 pd.options.mode.chained_assignment = None
 
@@ -81,6 +80,7 @@ class CombObj():
 		self.prefix = None 	     #is used when objects are added to a DiffCombObj
 		self.TFBS = None		 #None or filled with list of TFBS
 		self.TF_names = []		 #list of TF names
+		self.count_names = []	 #list of counted TF names (might be different than TF_names due to strand-specific counting)
 
 		#Variables for counts
 		self.TF_counts = None 	 #numpy array of size n_TFs
@@ -254,11 +254,11 @@ class CombObj():
 			raise InputError(".rules not filled. Please run .fill_rules() first.")
 
 		# check tf1 is present within object
-		if tf1 not in self.TF_names:
+		if tf1 not in self.TF_names and tf1 not in self.count_names:  #if the tf is stranded (e.g. TFNAME(+)), it could be in count_names
 			raise InputError(f"{tf1} (TF1) is not valid as it is not present in the current object.")
 
 		# check tf1 is present within object
-		if tf2 not in self.TF_names:
+		if tf2 not in self.TF_names and tf2 not in self.count_names:
 			raise InputError(f"{tf2} (TF2) is not valid as it is not present in the current object.")
 		
 		if type(self) == DistObj:
@@ -1009,20 +1009,26 @@ class CombObj():
 		TF1_int = self.name_to_idx[TF1]
 		TF2_int = self.name_to_idx[TF2]
 		anchor_string = kwargs["anchor"]
+		self.logger.debug(f"TF1: {TF1}={TF1_int}, TF2: {TF2}={TF2_int}")
 		
-		#Sort sites based on the anchor position
+		# Sort sites based on the anchor position
+		self.logger.debug("Sorting sites based on anchor '{0}'".format(anchor_string))
 		sites = self._sites
 		if anchor_string == "center":
 			sort_idx = self._get_sort_idx(sites, anchor=anchor_string)
 			idx_to_original = {idx: original_idx for idx, original_idx in enumerate(sort_idx)} 
 			sites = sites[sort_idx, :]
 
-		#Get locations via counting function
-		kwargs["anchor"] = self.anchor_to_int[anchor_string] #convert anchor string to int
+		# Get locations via counting function
+		self.logger.debug("Getting locations for {0}-{1} with anchor '{2}'".format(TF1, TF2, anchor_string))
+		kwargs["anchor"] = self.anchor_to_int[anchor_string]  # convert anchor string to int
+		kwargs["n_names"] = max(self.name_to_idx.values()) + 1  # need at least the number of names as the highest index (for intializing the matrix)
+		self.logger.spam(f"kwargs for count_co_occurrence: {kwargs}")
 		idx_mat = tfcomb.counting.count_co_occurrence(sites, task=3, rules=[(TF1_int, TF2_int)], **kwargs)
 		n_locations = idx_mat.shape[0]
 
 		#Fetch locations from TFBS list
+		self.logger.debug("Fetching locations from .TFBS")
 		locations = tfcomb.utils.TFBSPairList([None]*n_locations)
 		if anchor_string == "center":
 			for i in range(n_locations):
@@ -2706,6 +2712,7 @@ class DistObj():
 		# copy required attributes
 		self.rules = comb_obj.rules
 		self.TF_names = comb_obj.TF_names
+		self.count_names = comb_obj.count_names		#different from TF_names if counting is stranded
 		self.TFBS = comb_obj.TFBS
 		self.TF_table = comb_obj.TF_table
 
@@ -2714,7 +2721,7 @@ class DistObj():
 		for variable in variables:
 			if hasattr(comb_obj, variable):
 				setattr(self, variable, getattr(comb_obj, variable))
-	
+
 	def reset_signal(self):
 		""" Resets the signals to their original state. 
 

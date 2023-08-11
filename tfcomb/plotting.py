@@ -825,6 +825,7 @@ def genome_view(TFBS,
 					title=None,
 					highlight=None,
 					save=None,
+					figsize=None,
 					verbosity=1):
 
 	""" Plot TFBS in genome view via the 'DnaFeaturesViewer' package. 
@@ -855,6 +856,8 @@ def genome_view(TFBS,
 		Title of plot. Default: None.
 	highlight : list, optional
 		A list of OneTFBS objects or any other object containing .chrom, .start, .end and .name variables.
+	figsize : tuple, optional
+		The size of the figure. Default: None (8, TFBS_track_height + number of bigwig tracks).
 	save : str, optional
 		Save the plot to the file given in 'save'. Default: None.
 	"""
@@ -915,9 +918,16 @@ def genome_view(TFBS,
 
 	height_ratios = [TFBS_track_height] + [1]*n_bigwig_tracks
 
+	if figsize is None:
+		figsize = (8, TFBS_track_height+n_bigwig_tracks)
+	else:
+		# Check that figsize is a tuple of length 2
+		if not isinstance(figsize, tuple) or len(figsize) != 2:
+			raise ValueError("figsize must be a tuple of length 2")
+
 	fig, axes = plt.subplots(n_tracks, 1, 
 								sharex=True, 
-								figsize=(8,TFBS_track_height+n_bigwig_tracks), 
+								figsize=figsize, 
 								constrained_layout=True,
 								gridspec_kw={"height_ratios": height_ratios}
 								)

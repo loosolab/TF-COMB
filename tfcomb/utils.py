@@ -1597,13 +1597,19 @@ def log_progress(jobs, logger, n=10):
 def prepare_motifs(motifs_file, motif_pvalue=0.0001, motif_naming="name"):
 	""" Read motifs from motifs_file and set threshold/name. """
 
-	#Read and prepare motifs
+	# Read and prepare motifs
 	motifs_obj = MotifList().from_file(motifs_file)
 
 	_ = [motif.get_threshold(motif_pvalue) for motif in motifs_obj]
-	_ = [motif.set_prefix(motif_naming) for motif in motifs_obj] #using naming from args
+	_ = [motif.set_prefix(motif_naming) for motif in motifs_obj]  # using naming from args
 
-	return(motifs_obj)
+	# If motif_naming is "name", but motifs do not have a name, use the motif ID as name
+	for motif in motifs_obj:
+		if motif.prefix == "" and motif_naming == "name":
+			motif.prefix = motif.id
+
+	return motifs_obj
+
 
 def open_genome(genome_f):	
 	""" Opens an internal genome object for fetching sequences.
@@ -1981,7 +1987,9 @@ def get_threshold(data, which="upper", percent=0.05, _n_max=10000, verbosity=0, 
 		
 		#Catch any exceptions from fitting
 		try:
-			params = distribution.fit(data_finite)
+			# temporary change numpy floating-point error handling
+			with np.errstate(all="raise"):
+				params = distribution.fit(data_finite)
 		except Exception as e:
 			logger.error("Exception ({0}) occurred while fitting data to '{1}' distribution; skipping this distribution. Error message was: {2} ".format(e.__class__.__name__, distribution.name, e))
 			continue

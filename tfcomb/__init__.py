@@ -1,6 +1,6 @@
 from importlib import import_module
 
-__version__ = "1.0.3"
+__version__ = "1.1"
 
 #Set classes to be available directly from upper tfcomb, i.e. "from tfcomb import CombObj"
 global_classes = ["tfcomb.objects.CombObj",
