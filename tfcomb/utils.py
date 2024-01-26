@@ -198,6 +198,9 @@ class TFBSPairList(list):
 		# https://stackoverflow.com/a/65915289
 		table = table.apply(pd.to_numeric, errors='ignore').convert_dtypes()
 
+		# ensure chr columns are string type; fixes https://github.com/loosolab/TF-COMB/issues/75
+		table[["site1_chrom", "site2_chrom"]] = table[["site1_chrom", "site2_chrom"]].astype("string")
+
 		#Sort columns
 		col_order = ["site1_chrom", "site1_start", "site1_end", "site1_name", "site1_score", "site1_strand",
 					 "site2_chrom", "site2_start", "site2_end", "site2_name", "site2_score", "site2_strand"]
