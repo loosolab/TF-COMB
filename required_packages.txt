@@ -1,6 +1,6 @@
 python
 numpy
-pandas
+pandas<=2.0.0
 scipy
 pysam
 matplotlib>=2
