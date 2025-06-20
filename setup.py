@@ -63,7 +63,7 @@ setup(name='TF-COMB',
             'scipy',
             'pysam',
             'matplotlib>=2',
-            'pandas<=2.0.0',  # limit to 2.0.0 due to Issue#77 check later
+            'pandas>=2.3.0',  # due to Issue#77
             'tobias>=0.11',
             'networkx>=2.4',  # G.node -> G.nodes
             'python-louvain',

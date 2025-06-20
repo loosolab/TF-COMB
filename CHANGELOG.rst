@@ -2,6 +2,7 @@
 - Remove python version upper bound (#85)
 - Fix install cython compiler error (#85)
 - Fix DistObj kde plot; pairTrackAnimation, pairLines
+- Fix TFBS_from_motifs ValueError (#77)
 
 1.1 (11-08-2023)
 -------------------
