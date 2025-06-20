@@ -1147,20 +1147,20 @@ class TFBSPairList(list):
 
 		
 		# collect data
-		x1, x2 = table[x_names[0]], table[x_names[1]]
-		y1, y2 = table[y_names[0]], table[y_names[1]]
-		hue1, hue2 = table[hue_names[0]], table[hue_names[1]]
+		x1, x2 = table[x_names[0]].tolist(), table[x_names[1]].tolist()
+		y1, y2 = table[y_names[0]].tolist(), table[y_names[1]].tolist()
+		hue1, hue2 = table[hue_names[0]].tolist(), table[hue_names[1]].tolist()
 		
 		# in case of both names being equal set postfix
 		if tmp_postfix:
-			hue1, hue2 = hue1 + "_1", hue2 + "_2"
+			hue1, hue2 = [h + "_1" for h in hue1], [h + "_2" for h in hue2]
 		
 		##### plotting #####
 		plt.figure(figsize=figsize, dpi=dpi)
 		
-		plot = sns.lineplot(x=x1.append(x2).values,
-							y=y1.append(y2).values,
-							hue=hue1.append(hue2).values)
+		plot = sns.lineplot(x=x1 + x2,
+							y=y1 + y2,
+							hue=hue1 + hue2)
 		
 		# rotate x-ticks for non numeric data
 		if not pd.api.types.is_numeric_dtype(x1.append(x2)):
