@@ -1056,7 +1056,8 @@ class TFBSPairList(list):
 				elif key == "patches.Rectangle":
 					# remove old patches
 					# https://stackoverflow.com/a/62591596
-					axes.patches.clear()
+					for p in axes.patches:
+						p.remove()
 					# add new patches
 					for p in params:
 						axes.add_patch(matplotlib.patches.Rectangle(**p))
