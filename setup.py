@@ -56,7 +56,7 @@ setup(name='TF-COMB',
         packages=['tfcomb'],
         ext_modules=ext_modules,
         cmdclass=cmdclass,
-        python_requires='>=3,<3.11', #upper bound due to numba dependency
+        python_requires='>=3,',
         setup_requires=['numpy'],
         install_requires=[
             'numpy',
