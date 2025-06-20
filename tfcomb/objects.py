@@ -4066,7 +4066,7 @@ class DistObj():
 			if min(y_data) < 0:
 				raise InputError("Style 'kde' is not valid for negative input data, e.g. if counts were corrected or if plotting zscores. Please select another method or style.") 
 
-			sns.kdeplot(x_data, weights=y_data, bw_adjust=config["bw_adjust"], x="distance", ax=ax, color=color)
+			sns.kdeplot(x=x_data, weights=y_data, bw_adjust=config["bw_adjust"], ax=ax, color=color)
 
 		elif style == "hist":
 
