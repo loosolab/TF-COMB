@@ -56,14 +56,14 @@ setup(name='TF-COMB',
         packages=['tfcomb'],
         ext_modules=ext_modules,
         cmdclass=cmdclass,
-        python_requires='>=3,<3.11', #upper bound due to numba dependency
+        python_requires='>=3,',
         setup_requires=['numpy'],
         install_requires=[
             'numpy',
             'scipy',
             'pysam',
             'matplotlib>=2',
-            'pandas',
+            'pandas<=2.0.0',  # limit to 2.0.0 due to Issue#77 check later
             'tobias>=0.11',
             'networkx>=2.4',  # G.node -> G.nodes
             'python-louvain',

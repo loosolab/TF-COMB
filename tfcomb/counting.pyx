@@ -44,7 +44,7 @@ def rolling_mean(np.ndarray[np.float64_t, ndim=1] arr, int w):
 @cython.boundscheck(False)	#dont check boundaries
 @cython.wraparound(False) 	#dont deal with negative indices
 @cython.nonecheck(False)
-def count_co_occurrence(np.ndarray[np.int_t, ndim=2] sites, 
+def count_co_occurrence(np.ndarray[np.int64_t, ndim=2] sites, 
 						int min_dist=0,
 						int max_dist=100, 
 						float min_overlap=0,

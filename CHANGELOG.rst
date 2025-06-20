@@ -1,3 +1,8 @@
+1.1.1 (20-06-2025)
+- Remove python version upper bound (#85)
+- Fix install cython compiler error (#85)
+- Fix DistObj kde plot; pairTrackAnimation, pairLines
+
 1.1 (11-08-2023)
 -------------------
 - Fix for floating-point error handling (#55)
