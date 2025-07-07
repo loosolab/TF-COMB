@@ -1,3 +1,7 @@
+1.1.2 (in progress)
+- Hopefully fixed TFBS_from_motifs ValueError this time (#77)
+- fixed some warnings
+
 1.1.1 (20-06-2025)
 - Remove python version upper bound (#85)
 - Fix install cython compiler error (#85)
