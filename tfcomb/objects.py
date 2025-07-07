@@ -1126,7 +1126,7 @@ class CombObj():
 		#Convert pair counts to table and convert to long format
 		pair_counts_table = pd.DataFrame(self.pair_counts, index=self.count_names, columns=self.count_names) #size n x n TFs
 		pair_counts_table["TF1"] = pair_counts_table.index
-		table = pd.melt(pair_counts_table, id_vars=["TF1"], var_name=["TF2"], value_name="TF1_TF2_count")  #long format (TF1, TF2, value)
+		table = pd.melt(pair_counts_table, id_vars="TF1", var_name="TF2", value_name="TF1_TF2_count")  #long format (TF1, TF2, value)
 
 		#Add TF single counts to table
 		vals = zip(self.count_names, self.TF_counts)
@@ -1169,7 +1169,7 @@ class CombObj():
 		if hasattr(self, "zscore"):
 			zscore_table = pd.DataFrame(self.zscore, index=self.count_names, columns=self.count_names) #size n x n TFs
 			zscore_table["TF1"] = zscore_table.index
-			ztable_table_long = pd.melt(zscore_table, id_vars=["TF1"], var_name=["TF2"], value_name="zscore")  #long format (TF1, TF2, value)
+			ztable_table_long = pd.melt(zscore_table, id_vars="TF1", var_name="TF2", value_name="zscore")  #long format (TF1, TF2, value)
 			table = table.merge(ztable_table_long)
 			measure += ["zscore"] #show zscore in output
 
@@ -1210,7 +1210,7 @@ class CombObj():
 			name_strands = {}
 			clean_names = []
 			for name in selected_names:
-				m = re.match("(.+)\(([+-.])\)$", name) #check if name is "NAME(+/./-)"
+				m = re.match(r"(.+)\(([+-.])\)$", name) #check if name is "NAME(+/./-)"
 				if m is not None:
 					name_clean = m.group(1) #name without strand
 					clean_names.append(name_clean)
@@ -2936,7 +2936,7 @@ class DistObj():
 		
 		#Check if rules look stranded
 		rule_names = list(set(self.rules["TF1"].tolist() + self.rules["TF2"].tolist()))
-		strand_matching = [re.match("(.+)\(([+-.])\)$", name) for name in rule_names] #check if name is "NAME(+/./-)"
+		strand_matching = [re.match(r"(.+)\(([+-.])\)$", name) for name in rule_names] #check if name is "NAME(+/./-)"
 		n_strand_names = sum([match is not None for match in strand_matching])
 		if n_strand_names > 0 and stranded == False:
 			raise InputError("TF names in .rules contain strand information, but stranded is set to False. Please set stranded to True to count distances for rules.")
